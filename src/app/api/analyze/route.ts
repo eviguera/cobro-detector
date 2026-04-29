@@ -4,6 +4,11 @@ import { parseExcelFile, parsePDFText, detectBank } from '@/lib/parser'
 import { detectAnomaliesRules, analyzeTransactionsWithAI } from '@/lib/analyzer'
 import type { ParsedTransaction, Credits } from '@/types/database.types'
 
+// Rate limiting simple (en memoria, para Vercel usa Redis en producción)
+const requestCounts = new Map<string, { count: number; resetTime: number }>()
+const RATE_LIMIT = 10 // máximo 10 análisis por hora por usuario
+const RATE_WINDOW = 60 * 60 * 1000 // 1 hora
+
 export const maxDuration = 60 // 60s timeout para Vercel
 
 export async function POST(request: NextRequest) {
@@ -13,6 +18,23 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    // Rate limiting
+    const now = Date.now()
+    const userRequests = requestCounts.get(user.id)
+    
+    if (userRequests) {
+      if (now > userRequests.resetTime) {
+        // Reset window
+        requestCounts.set(user.id, { count: 1, resetTime: now + RATE_WINDOW })
+      } else if (userRequests.count >= RATE_LIMIT) {
+        return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta más tarde.' }, { status: 429 })
+      } else {
+        userRequests.count++
+      }
+    } else {
+      requestCounts.set(user.id, { count: 1, resetTime: now + RATE_WINDOW })
     }
 
     // Verificar créditos
@@ -35,6 +57,20 @@ export async function POST(request: NextRequest) {
 
     if (!file) {
       return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
+    }
+
+    // Validar tamaño (máximo 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Archivo demasiado grande (máx 10MB)' }, { status: 400 })
+    }
+
+    // Validar tipo de archivo
+    const allowedTypes = ['application/pdf', 'text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel']
+    const allowedExtensions = ['.pdf', '.csv', '.xlsx', '.xls']
+    const hasValidType = allowedTypes.includes(file.type) || allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+    
+    if (!hasValidType) {
+      return NextResponse.json({ error: 'Tipo de archivo no permitido. Usa PDF, Excel o CSV.' }, { status: 400 })
     }
 
     // Registrar análisis en DB (estado: processing)
