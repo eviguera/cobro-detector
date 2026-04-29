@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
     // Detección con IA (si hay API key)
     let aiAnomalies: typeof ruleAnomalies = []
     let aiSummary = ''
-
-    if (process.env.ANTHROPIC_API_KEY) {
+    
+    if (process.env.GOOGLE_GEMINI_API_KEY) {
       try {
         const aiResult = await analyzeTransactionsWithAI(transactions, bank)
         aiAnomalies = aiResult.anomalies
@@ -158,10 +158,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Descontar crédito
-    await supabase
+    const { error: creditError } = await supabase
       .from('credits')
       .update({ used: (credits?.used ?? 0) + 1 })
       .eq('user_id', user.id)
+
+    if (creditError) {
+      console.error('Error al descontar crédito:', creditError)
+    }
 
     return NextResponse.json({
       analysisId: analysis.id,
