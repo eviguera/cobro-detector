@@ -42,11 +42,16 @@ cd cobro-detector
 npm install
 ```
 
-### 2. Crear proyecto en Supabase
+### 2. Configurar Supabase
 
-1. Ve a [supabase.com](https://supabase.com) → New project
-2. En el SQL Editor, ejecuta el contenido de `supabase/schema.sql`
-3. Copia las credenciales: Project URL y anon key
+1. Crea un proyecto en [supabase.com](https://supabase.com)
+2. Ve a SQL Editor y ejecuta:
+   - `supabase/schema.sql` (esquema principal)
+   - `supabase/migration_payments.sql` (migración pagos)
+3. Copia las credenciales en `.env.local`:
+   - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
+   - anon key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - service_role key → `SUPABASE_SERVICE_ROLE_KEY`
 
 ### 3. Variables de entorno
 
