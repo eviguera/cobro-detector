@@ -147,13 +147,12 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
   })
 
   // Regla 2: Montos idénticos en ventana de 7 días (posible duplicado)
-  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date))
   const checked = new Set<string>()
 
-  sorted.forEach((tx, i) => {
+  sortedTxs.forEach((tx, i) => {
     if (checked.has(tx.id)) return
     const txDate = new Date(tx.date)
-    const duplicates = sorted.filter((other, j) => {
+    const duplicates = sortedTxs.filter((other, j) => {
       if (j <= i || checked.has(other.id)) return false
       const otherDate = new Date(other.date)
       const diffDays = Math.abs((txDate.getTime() - otherDate.getTime()) / (1000 * 60 * 60 * 24))
