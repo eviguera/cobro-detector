@@ -1,15 +1,13 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { ParsedTransaction, DetectedAnomaly } from '@/types/database.types'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!)
 
 export async function analyzeTransactionsWithAI(
   transactions: ParsedTransaction[],
   bankName?: string
 ): Promise<{ anomalies: DetectedAnomaly[]; summary: string }> {
-  const txSample = transactions.slice(0, 200) // máx 200 para el contexto
+  const txSample = transactions.slice(0, 200)
 
   const prompt = `Eres un experto en detección de cobros bancarios incorrectos para negocios chilenos.
 
@@ -41,14 +39,10 @@ Responde SOLO en JSON con esta estructura exacta:
   ],
   "summary": "Resumen ejecutivo en 2-3 oraciones explicando las principales anomalías encontradas y el monto total recuperable estimado en pesos chilenos."
 }`
-
-  const response = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: 4000,
-    messages: [{ role: 'user', content: prompt }],
-  })
-
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  const result = await model.generateContent(prompt)
+  const text = result.response.text()
 
   try {
     const clean = text.replace(/```json\n?|```\n?/g, '').trim()
@@ -57,6 +51,10 @@ Responde SOLO en JSON con esta estructura exacta:
       anomalies: parsed.anomalies ?? [],
       summary: parsed.summary ?? '',
     }
+  } catch {
+    return { anomalies: [], summary: 'No se pudo completar el análisis automático.' }
+  }
+}
   } catch {
     return { anomalies: [], summary: 'No se pudo completar el análisis automático.' }
   }
