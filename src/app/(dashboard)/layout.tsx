@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Shield, LayoutDashboard, FileSearch, History, CreditCard, LogOut, ChevronRight } from 'lucide-react'
+import type { Credits, Profile } from '@/types/database.types'
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -16,8 +17,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  const { data: credits } = await supabase.from('credits').select('*').eq('user_id', user.id).single()
+  const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+  const { data: creditsData } = await supabase.from('credits').select('*').eq('user_id', user.id).single()
+
+  const profile = profileData as Profile | null
+  const credits = creditsData as Credits | null
 
   const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
 

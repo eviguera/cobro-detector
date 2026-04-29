@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { parseExcelFile, parsePDFText, detectBank } from '@/lib/parser'
 import { detectAnomaliesRules, analyzeTransactionsWithAI } from '@/lib/analyzer'
-import type { ParsedTransaction } from '@/types/database.types'
+import type { ParsedTransaction, Credits } from '@/types/database.types'
 
 export const maxDuration = 60 // 60s timeout para Vercel
 
@@ -16,11 +16,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar créditos
-    const { data: credits } = await supabase
+    const creditsResult = await supabase
       .from('credits')
       .select('*')
       .eq('user_id', user.id)
       .single()
+
+    const credits = creditsResult.data as Credits | null
 
     const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
     if (creditsLeft <= 0) {

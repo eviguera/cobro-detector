@@ -2,15 +2,18 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { FileSearch, TrendingDown, AlertTriangle, CheckCircle2, ArrowRight, Plus } from 'lucide-react'
 import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
+import type { Analysis, Credits } from '@/types/database.types'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: analyses }, { data: credits }] = await Promise.all([
+  const [analysesResult, creditsResult] = await Promise.all([
     supabase.from('analyses').select('*').eq('user_id', user!.id).order('created_at', { ascending: false }).limit(5),
     supabase.from('credits').select('*').eq('user_id', user!.id).single(),
   ])
+  const analyses = analysesResult.data as Analysis[] | null
+  const credits = creditsResult.data as Credits | null
 
   const totalRecoverable = analyses?.reduce((sum, a) => sum + (a.recoverable_amount ?? 0), 0) ?? 0
   const totalAnomalies = analyses?.reduce((sum, a) => sum + (a.anomalies_count ?? 0), 0) ?? 0

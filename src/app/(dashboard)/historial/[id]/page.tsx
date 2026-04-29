@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, AlertTriangle, CheckCircle2, FileDown, RotateCcw } from 'lucide-react'
 import { formatCLP, formatDate, getAnomalyTypeLabel, getSeverityLabel, getStatusLabel } from '@/lib/utils'
-import type { DetectedAnomaly, ParsedTransaction } from '@/types/database.types'
+import type { DetectedAnomaly, ParsedTransaction, Analysis } from '@/types/database.types'
 import AnomalyStatusButton from './anomaly-status-button'
 import DownloadReportButton from './download-report-button'
 
@@ -28,13 +28,14 @@ export default async function AnalysisDetailPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: analysis } = await supabase
+  const { data: analysisData } = await supabase
     .from('analyses')
     .select('*')
     .eq('id', params.id)
     .eq('user_id', user.id)
     .single()
 
+  const analysis = analysisData as Analysis | null
   if (!analysis) notFound()
 
   const anomalies = (analysis.anomalies ?? []) as unknown as DetectedAnomaly[]

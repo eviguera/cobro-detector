@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { CheckCircle2, ArrowRight, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { formatCLP } from '@/lib/utils'
+import type { Order } from '@/types/database.types'
 
 interface Props {
   searchParams: { order?: string; pending?: string }
@@ -17,11 +18,13 @@ export default async function PagoExitosoPage({ searchParams }: Props) {
 
   if (orderId) {
     const supabase = await createClient()
-    const { data: order } = await supabase
+    const { data: orderData } = await supabase
       .from('orders')
       .select('*')
       .eq('id', orderId)
       .single()
+
+    const order = orderData as Order | null
 
     if (order) {
       credits = order.credits_purchased
