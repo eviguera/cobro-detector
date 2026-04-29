@@ -4,11 +4,11 @@ export const PLANS: Plan[] = [
   {
     key: 'starter',
     name: 'Emprendedor',
-    credits: 3,
+    credits: 1,
     price: 9900,
-    pricePerAnalysis: 3300,
+    pricePerAnalysis: 9900,
     features: [
-      '3 análisis de estados de cuenta',
+      '1 análisis de estado de cuenta',
       'Detección de comisiones duplicadas',
       'Detección de errores en cuotas',
       'Reporte PDF descargable',
@@ -18,12 +18,12 @@ export const PLANS: Plan[] = [
   {
     key: 'professional',
     name: 'Profesional',
-    credits: 10,
+    credits: 3,
     price: 24900,
-    pricePerAnalysis: 2490,
+    pricePerAnalysis: 8300,
     highlighted: true,
     features: [
-      '10 análisis de estados de cuenta',
+      '3 análisis de estados de cuenta',
       'Todo lo del plan Emprendedor',
       'Detección de cargos no reconocidos con IA',
       'Resumen ejecutivo con IA',
@@ -34,17 +34,33 @@ export const PLANS: Plan[] = [
   {
     key: 'enterprise',
     name: 'Contador / Empresa',
-    credits: 30,
+    credits: 5,
     price: 59900,
-    pricePerAnalysis: 1997,
+    pricePerAnalysis: 11980,
     features: [
-      '30 análisis de estados de cuenta',
+      '5 análisis de estados de cuenta',
       'Todo lo del plan Profesional',
       'Multi-empresa (gestiona varios clientes)',
       'Historial completo de análisis',
       'Exportación masiva de reportes',
       'API de integración (próximamente)',
       'Soporte telefónico',
+    ],
+  },
+  {
+    key: 'success_fee',
+    name: 'Cobro por Éxito',
+    credits: 999999, // Ilimitado (se cobra por éxito)
+    price: 0, // No tiene precio fijo
+    pricePerAnalysis: 0,
+    features: [
+      'Análisis ilimitados',
+      'Solo pagas el 10% de lo que recuperes',
+      'Requiere vincular tarjeta de crédito/débito',
+      'Detección con IA avanzada',
+      'Reporte legal para el banco',
+      'Soporte prioritario 24/7',
+      'Gestión de cobro (próximamente)',
     ],
   },
 ]

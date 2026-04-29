@@ -22,7 +22,7 @@ export default async function PreciosPage() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6 max-w-4xl">
+      <div className="grid md:grid-cols-4 gap-6 max-w-5xl">
         {PLANS.map(plan => (
           <div key={plan.key} className={`bg-white rounded-2xl border p-7 flex flex-col relative ${
             plan.highlighted ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200'

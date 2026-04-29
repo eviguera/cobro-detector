@@ -5,7 +5,7 @@ import { PLANS } from '@/lib/plans'
 import { z } from 'zod'
 
 const bodySchema = z.object({
-  planKey: z.enum(['starter', 'professional', 'enterprise']),
+  planKey: z.enum(['starter', 'professional', 'enterprise', 'success_fee']),
 })
 
 export async function POST(request: NextRequest) {
@@ -34,22 +34,40 @@ export async function POST(request: NextRequest) {
       .single()
 
     // 4. Crear orden pendiente en DB
+    const orderData: any = {
+      user_id: user.id,
+      plan: planKey,
+      credits_purchased: plan.credits,
+      amount_clp: plan.price,
+      status: 'pending',
+      payment_provider: 'mercadopago',
+    }
+
+    // Plan de éxito: cobro por 10% de lo recuperado
+    if (planKey === 'success_fee') {
+      orderData.credits_purchased = 999999 // Ilimitado
+      orderData.amount_clp = 0
+      orderData.payment_provider = 'success_fee'
+      orderData.fee_percentage = 10
+    }
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .insert({
-        user_id: user.id,
-        plan: planKey,
-        credits_purchased: plan.credits,
-        amount_clp: plan.price,
-        status: 'pending',
-        payment_provider: 'mercadopago',
-      })
+      .insert(orderData)
       .select()
       .single()
 
     if (orderError || !order) {
       console.error('Error creando orden:', orderError)
       return NextResponse.json({ error: 'Error creando la orden' }, { status: 500 })
+    }
+
+    // Plan de éxito: no necesita preferencia de Mercado Pago
+    if (planKey === 'success_fee') {
+      return NextResponse.json({
+        orderId: order.id,
+        message: 'Plan de éxito activado. Se cobrará el 10% de lo recuperado.',
+      })
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'

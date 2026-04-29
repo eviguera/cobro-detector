@@ -30,12 +30,14 @@ CREATE TABLE IF NOT EXISTS credits (
 CREATE TABLE IF NOT EXISTS orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  plan TEXT NOT NULL, -- 'starter', 'professional', 'enterprise'
-  credits_purchased INTEGER NOT NULL,
-  amount_clp INTEGER NOT NULL,
+  plan TEXT NOT NULL, -- 'starter', 'professional', 'enterprise', 'success_fee'
+  credits_purchased INTEGER NOT NULL DEFAULT 0, -- 0 para success_fee
+  amount_clp INTEGER NOT NULL DEFAULT 0,
   status TEXT DEFAULT 'pending', -- 'pending', 'paid', 'failed'
-  payment_provider TEXT DEFAULT 'manual',
+  payment_provider TEXT DEFAULT 'manual', -- 'mercadopago', 'success_fee'
   payment_reference TEXT,
+  recovered_amount BIGINT DEFAULT 0, -- Para plan success_fee: monto recuperado
+  fee_percentage INTEGER DEFAULT 0, -- Para success_fee: 10%
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
