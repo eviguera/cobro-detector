@@ -6,6 +6,8 @@ import { Shield, Mail, Lock, User, Building2, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
+export const dynamic = 'force-dynamic'
+
 export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [loading, setLoading] = useState(false)

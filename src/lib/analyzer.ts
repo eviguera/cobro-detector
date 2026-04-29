@@ -55,10 +55,6 @@ Responde SOLO en JSON con esta estructura exacta:
     return { anomalies: [], summary: 'No se pudo completar el análisis automático.' }
   }
 }
-  } catch {
-    return { anomalies: [], summary: 'No se pudo completar el análisis automático.' }
-  }
-}
 
 // Motor de reglas determinístico (rápido, sin IA)
 export function detectAnomaliesRules(transactions: ParsedTransaction[]): DetectedAnomaly[] {
