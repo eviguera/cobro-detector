@@ -69,11 +69,11 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
   const saleKeywords = ['venta', 'venta tc', 'venta debito', 'abono']
   
   // Buscar patrones: Venta X cuotas + Comisión repetida
-  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date))
+  const sortedTxs = [...transactions].sort((a: any, b: any) => a.date.localeCompare(b.date))
   
   // Detectar ventas a cuotas
-  const saleGroups: Record<string, ParsedTransaction[]> = {}
-  sorted.forEach(tx => {
+  const saleGroups: Record<string, any[]> = {}
+  sortedTxs.forEach((tx: any) => {
     const desc = tx.description.toLowerCase()
     // Detectar patrón: "VENTA TC X CUOTAS" o "CUOTA X/N VENTA"
     const saleMatch = desc.match(/(venta|sale).*?(\d+).*?(cuota|cota)/i) ||
@@ -86,30 +86,30 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
   })
   
   // Para cada grupo de ventas detectadas, buscar comisiones en cuotas consecutivas
-  Object.entries(saleGroups).forEach(([key, sales]) => {
+  Object.entries(saleGroups).forEach(([key, sales]: [string, any[]]) => {
     const month = sales[0].date.substring(0, 7)
     // Buscar comisiones en el mismo mes
-    const monthCommissions = sorted.filter(tx => 
+    const monthCommissions = sortedTxs.filter((tx: any) => 
       tx.date.startsWith(month) &&
       commissionKeywords.some(kw => tx.description.toLowerCase().includes(kw))
     )
     
     if (monthCommissions.length > 1) {
       // Verificar que sea la misma operación (mismo monto aprox)
-      const amounts = monthCommissions.map(c => Math.abs(c.amount))
-      const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length
-      const isSameCommission = amounts.every(a => Math.abs(a - avgAmount) < 100) // Tolerancia $100
+      const amounts = monthCommissions.map((c: any) => Math.abs(c.amount))
+      const avgAmount = amounts.reduce((a: number, b: number) => a + b, 0) / amounts.length
+      const isSameCommission = amounts.every((a: number) => Math.abs(a - avgAmount) < 100) // Tolerancia $100
       
       if (isSameCommission) {
-        const totalExtra = monthCommissions.slice(1).reduce((sum, tx) => sum + Math.abs(tx.amount), 0)
+        const totalExtra = monthCommissions.slice(1).reduce((sum: number, tx: any) => sum + Math.abs(tx.amount), 0)
         anomalies.push({
           type: 'duplicate_commission',
           severity: 'high',
           title: `Comisión de crédito cobrada ${monthCommissions.length} veces en ${month}`,
           description: `Caso típico: Venta en cuotas sin interés. La comisión de $${Math.abs(monthCommissions[0].amount).toLocaleString('es-CL')} se cobró ${monthCommissions.length} veces, pero debe ser solo 1 vez.`,
-          detail: `Banco: Santander/otro · Período: ${month} · Total cobrado: $${amounts.reduce((a, b) => a + b, 0).toLocaleString('es-CL')} · Cobro justo: $${Math.abs(monthCommissions[0].amount).toLocaleString('es-CL')} · Recuperable: $${totalExtra.toLocaleString('es-CL')}`,
+          detail: `Banco: Santander/otro · Período: ${month} · Total cobrado: $${amounts.reduce((a: number, b: number) => a + b, 0).toLocaleString('es-CL')} · Cobro justo: $${Math.abs(monthCommissions[0].amount).toLocaleString('es-CL')} · Recuperable: $${totalExtra.toLocaleString('es-CL')}`,
           recoverableAmount: totalExtra,
-          transactionRefs: monthCommissions.slice(1).map(t => t.id),
+          transactionRefs: monthCommissions.slice(1).map((t: any) => t.id),
         })
       }
     }
@@ -148,11 +148,12 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
 
   // Regla 2: Montos idénticos en ventana de 7 días (posible duplicado)
   const checked = new Set<string>()
+  const sortedTxs2 = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
-  sortedTxs.forEach((tx, i) => {
+  sortedTxs2.forEach((tx: any, i: number) => {
     if (checked.has(tx.id)) return
     const txDate = new Date(tx.date)
-    const duplicates = sortedTxs.filter((other, j) => {
+    const duplicates = sortedTxs2.filter((other: any, j: number) => {
       if (j <= i || checked.has(other.id)) return false
       const otherDate = new Date(other.date)
       const diffDays = Math.abs((txDate.getTime() - otherDate.getTime()) / (1000 * 60 * 60 * 24))
@@ -167,16 +168,16 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
 
     if (duplicates.length > 0) {
       checked.add(tx.id)
-      duplicates.forEach(d => checked.add(d.id))
-      const totalDup = duplicates.reduce((sum, d) => sum + Math.abs(d.amount), 0)
+      duplicates.forEach((d: any) => checked.add(d.id))
+      const totalDup = duplicates.reduce((sum: number, d: any) => sum + Math.abs(d.amount), 0)
       anomalies.push({
         type: 'duplicate_commission',
         severity: 'high',
         title: `Cobro duplicado: ${tx.description}`,
         description: `Se detectó el mismo monto cobrado ${duplicates.length + 1} veces en un período de 7 días.`,
-        detail: `Monto: $${Math.abs(tx.amount).toLocaleString('es-CL')} · Fechas: ${[tx, ...duplicates].map(t => t.date).join(', ')}`,
+        detail: `Monto: $${Math.abs(tx.amount).toLocaleString('es-CL')} · Fechas: ${[tx, ...duplicates].map((t: any) => t.date).join(', ')}`,
         recoverableAmount: totalDup,
-        transactionRefs: duplicates.map(d => d.id),
+        transactionRefs: duplicates.map((d: any) => d.id),
       })
     }
   })

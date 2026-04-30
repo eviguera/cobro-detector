@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Obtener perfil del usuario
-    const { data: profile } = await supabase
+    const { data: profile } = await (supabase as any)
       .from('profiles')
       .select('email, full_name')
       .eq('id', user.id)
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       orderData.fee_percentage = 10
     }
 
-    const { data: order, error: orderError } = await supabase
+    const { data: order, error: orderError } = await (supabase as any)
       .from('orders')
       .insert(orderData)
       .select()
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Plan de éxito: no necesita preferencia de Mercado Pago
     if (planKey === 'success_fee') {
       return NextResponse.json({
-        orderId: order.id,
+        orderId: (order as any).id,
         message: 'Plan de éxito activado. Se cobrará el 10% de lo recuperado.',
       })
     }
@@ -89,21 +89,21 @@ export async function POST(request: NextRequest) {
           },
         ],
         payer: {
-          email: profile?.email ?? user.email ?? '',
-          name: profile?.full_name ?? '',
+          email: (profile as any)?.email ?? user.email ?? '',
+          name: (profile as any)?.full_name ?? '',
         },
         back_urls: {
-          success: `${appUrl}/pago/exitoso?order=${order.id}`,
-          failure: `${appUrl}/pago/fallido?order=${order.id}`,
-          pending: `${appUrl}/pago/exitoso?order=${order.id}&pending=true`,
+          success: `${appUrl}/pago/exitoso?order=${(order as any).id}`,
+          failure: `${appUrl}/pago/fallido?order=${(order as any).id}`,
+          pending: `${appUrl}/pago/exitoso?order=${(order as any).id}&pending=true`,
         },
         auto_return: 'approved',
-        external_reference: order.id, // nuestro ID de orden para el webhook
+        external_reference: (order as any).id, // nuestro ID de orden para el webhook
         notification_url: `${appUrl}/api/payments/webhook`,
         statement_descriptor: 'COBRO DETECTOR',
         expires: false,
         metadata: {
-          order_id: order.id,
+          order_id: (order as any).id,
           user_id: user.id,
           plan_key: planKey,
           credits: plan.credits,
@@ -112,13 +112,13 @@ export async function POST(request: NextRequest) {
     })
 
     // 6. Guardar preference_id en la orden
-    await supabase
+    await (supabase as any)
       .from('orders')
       .update({ mp_preference_id: preferenceData.id })
-      .eq('id', order.id)
+      .eq('id', (order as any).id)
 
     return NextResponse.json({
-      orderId: order.id,
+      orderId: (order as any).id,
       preferenceId: preferenceData.id,
       initPoint: preferenceData.init_point,        // URL de producción
       sandboxInitPoint: preferenceData.sandbox_init_point, // URL de sandbox

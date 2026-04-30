@@ -37,23 +37,40 @@ export async function POST(request: NextRequest) {
       requestCounts.set(user.id, { count: 1, resetTime: now + RATE_WINDOW })
     }
 
-    // Verificar créditos
-    const creditsResult = await supabase
-      .from('credits')
-      .select('*')
+    // Verificar si el usuario tiene plan de éxito activo
+    const { data: activeSuccessOrder } = await supabase
+      .from('orders')
+      .select('id')
       .eq('user_id', user.id)
+      .eq('plan', 'success_fee')
+      .eq('status', 'paid')
+      .eq('success_plan_active', true)
       .single()
 
-    const credits = creditsResult.data as Credits | null
+    const hasSuccessPlan = !!activeSuccessOrder
 
-    const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
-    if (creditsLeft <= 0) {
-      return NextResponse.json({ error: 'Sin créditos disponibles' }, { status: 402 })
+    let credits: any = null
+
+    // Verificar créditos (solo si no tiene plan de éxito)
+    if (!hasSuccessPlan) {
+      const creditsResult = await (supabase as any)
+        .from('credits')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+
+      credits = creditsResult.data
+
+      const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
+      if (creditsLeft <= 0) {
+        return NextResponse.json({ error: 'Sin créditos disponibles' }, { status: 402 })
+      }
     }
 
-    // Obtener archivo
+    // Obtener archivo y company_id
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const companyId = formData.get('company_id') as string | null
 
     if (!file) {
       return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
@@ -74,10 +91,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Registrar análisis en DB (estado: processing)
-    const { data: analysis, error: insertError } = await supabase
+    const { data: analysis, error: insertError } = await (supabase as any)
       .from('analyses')
       .insert({
         user_id: user.id,
+        company_id: companyId || null,
         file_name: file.name,
         file_type: file.type || 'unknown',
         status: 'processing',
@@ -161,7 +179,7 @@ export async function POST(request: NextRequest) {
     const totalRecoverable = combined.reduce((sum, a) => sum + a.recoverableAmount, 0)
 
     // Actualizar análisis en DB
-    await supabase
+    await (supabase as any)
       .from('analyses')
       .update({
         bank,
@@ -173,13 +191,13 @@ export async function POST(request: NextRequest) {
         anomalies: combined as unknown as Record<string, unknown>[],
         ai_summary: aiSummary || null,
       })
-      .eq('id', analysis.id)
+      .eq('id', (analysis as any).id)
 
     // Guardar anomalías individuales
     if (combined.length > 0) {
-      await supabase.from('anomalies').insert(
+      await (supabase as any).from('anomalies').insert(
         combined.map(a => ({
-          analysis_id: analysis.id,
+          analysis_id: (analysis as any).id,
           user_id: user.id,
           type: a.type,
           severity: a.severity,
@@ -193,14 +211,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Descontar crédito
-    const { error: creditError } = await supabase
-      .from('credits')
-      .update({ used: (credits?.used ?? 0) + 1 })
-      .eq('user_id', user.id)
+    // Descontar crédito (solo si no tiene plan de éxito)
+    if (!hasSuccessPlan) {
+      const { error: creditError } = await (supabase as any)
+        .from('credits')
+        .update({ used: ((credits as any)?.used ?? 0) + 1 })
+        .eq('user_id', user.id)
 
-    if (creditError) {
-      console.error('Error al descontar crédito:', creditError)
+      if (creditError) {
+        console.error('Error al descontar crédito:', creditError)
+      }
     }
 
     return NextResponse.json({
@@ -221,21 +241,21 @@ export async function POST(request: NextRequest) {
 // Datos demo realistas basados en el caso real de la carnicería
 function generateDemoTransactions(): ParsedTransaction[] {
   const base = [
-    { date: '2024-03-01', desc: 'VENTA TC 6 CUOTAS S/INT', amount: 120000, type: 'credit' as const },
-    { date: '2024-03-01', desc: 'COMISION CREDITO TC', amount: -3600, type: 'debit' as const },
-    { date: '2024-03-05', desc: 'VENTA DEBITO', amount: 45200, type: 'credit' as const },
-    { date: '2024-03-12', desc: 'VENTA DEBITO POS 4821', amount: 85900, type: 'credit' as const },
-    { date: '2024-03-12', desc: 'CARGO TRANSACCION POS 4821', amount: -85900, type: 'debit' as const },
-    { date: '2024-03-15', desc: 'VENTA TC 3 CUOTAS S/INT', amount: 85000, type: 'credit' as const },
-    { date: '2024-04-01', desc: 'CUOTA 2/6 VENTA 01/03', amount: 20000, type: 'credit' as const },
-    { date: '2024-04-01', desc: 'COMISION CREDITO TC', amount: -3600, type: 'debit' as const },
-    { date: '2024-04-10', desc: 'MANTENCION TERMINAL POS', amount: -12890, type: 'debit' as const },
-    { date: '2024-04-10', desc: 'MANTENCION TERMINAL POS', amount: -12890, type: 'debit' as const },
-    { date: '2024-04-15', desc: 'COM ADM 04', amount: -5500, type: 'debit' as const },
-    { date: '2024-05-01', desc: 'CUOTA 3/6 VENTA 01/03', amount: 20000, type: 'credit' as const },
-    { date: '2024-05-01', desc: 'COMISION CREDITO TC', amount: -3600, type: 'debit' as const },
-    { date: '2024-05-15', desc: 'VENTA TC 6 CUOTAS S/INT', amount: 340000, type: 'credit' as const },
-    { date: '2024-05-15', desc: 'COMISION CREDITO TC', amount: -10200, type: 'debit' as const },
+    { date: '2024-03-01', description: 'VENTA TC 6 CUOTAS S/INT', amount: 120000, type: 'credit' as const },
+    { date: '2024-03-01', description: 'COMISION CREDITO TC', amount: -3600, type: 'debit' as const },
+    { date: '2024-03-05', description: 'VENTA DEBITO', amount: 45200, type: 'credit' as const },
+    { date: '2024-03-12', description: 'VENTA DEBITO POS 4821', amount: 85900, type: 'credit' as const },
+    { date: '2024-03-12', description: 'CARGO TRANSACCION POS 4821', amount: -85900, type: 'debit' as const },
+    { date: '2024-03-15', description: 'VENTA TC 3 CUOTAS S/INT', amount: 85000, type: 'credit' as const },
+    { date: '2024-04-01', description: 'CUOTA 2/6 VENTA 01/03', amount: 20000, type: 'credit' as const },
+    { date: '2024-04-01', description: 'COMISION CREDITO TC', amount: -3600, type: 'debit' as const },
+    { date: '2024-04-10', description: 'MANTENCION TERMINAL POS', amount: -12890, type: 'debit' as const },
+    { date: '2024-04-10', description: 'MANTENCION TERMINAL POS', amount: -12890, type: 'debit' as const },
+    { date: '2024-04-15', description: 'COM ADM 04', amount: -5500, type: 'debit' as const },
+    { date: '2024-05-01', description: 'CUOTA 3/6 VENTA 01/03', amount: 20000, type: 'credit' as const },
+    { date: '2024-05-01', description: 'COMISION CREDITO TC', amount: -3600, type: 'debit' as const },
+    { date: '2024-05-15', description: 'VENTA TC 6 CUOTAS S/INT', amount: 340000, type: 'credit' as const },
+    { date: '2024-05-15', description: 'COMISION CREDITO TC', amount: -10200, type: 'debit' as const },
   ]
-  return base.map((tx, i) => ({ ...tx, id: `tx-${i.toString().padStart(4, '0')}` }))
+  return base.map((tx: any, i: number) => ({ ...tx, id: `tx-${i.toString().padStart(4, '0')}` }))
 }
