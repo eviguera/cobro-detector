@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X } from 'lucide-react'
+import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { formatCLP } from '@/lib/utils'
@@ -27,19 +27,19 @@ interface AnalysisResult {
 }
 
 const ANALYSIS_STEPS = [
-  'Leyendo el archivo...',
-  'Extrayendo transacciones...',
-  'Identificando comisiones de crédito...',
-  'Detectando cobros duplicados...',
-  'Analizando cuotas y errores...',
-  'Consultando IA para cargos desconocidos...',
-  'Generando reporte...',
+  { label: 'Leyendo el archivo', icon: FileText },
+  { label: 'Extrayendo transacciones', icon: FileSpreadsheet },
+  { label: 'Identificando comisiones de crédito', icon: ShieldCheck },
+  { label: 'Detectando cobros duplicados', icon: AlertCircle },
+  { label: 'Analizando cuotas y errores', icon: FileBadge },
+  { label: 'Consultando IA para cargos desconocidos', icon: Sparkles },
+  { label: 'Generando reporte final', icon: CheckCircle2 },
 ]
 
 const SEVERITY_COLORS: Record<string, string> = {
-  high: 'bg-red-50 border-red-200 text-red-700',
-  medium: 'bg-amber-50 border-amber-200 text-amber-700',
-  low: 'bg-blue-50 border-blue-200 text-blue-700',
+  high: 'bg-danger-50 dark:bg-danger-500/10 border-danger-200 dark:border-danger-500/20 text-danger-700 dark:text-danger-400',
+  medium: 'bg-warning-50 dark:bg-warning-500/10 border-warning-200 dark:border-warning-500/20 text-warning-700 dark:text-warning-400',
+  low: 'bg-brand-50 dark:bg-brand-500/10 border-brand-200 dark:border-brand-500/20 text-brand-700 dark:text-brand-400',
 }
 
 const SEVERITY_LABELS: Record<string, string> = {
@@ -89,7 +89,6 @@ export default function AnalisisPage() {
     setStep('analyzing')
     setCurrentAnalysisStep(0)
 
-    // Simular pasos progresivos
     const interval = setInterval(() => {
       setCurrentAnalysisStep(prev => {
         if (prev >= ANALYSIS_STEPS.length - 1) { clearInterval(interval); return prev }
@@ -128,68 +127,120 @@ export default function AnalisisPage() {
 
   if (step === 'upload') {
     return (
-      <div className="animate-fade-in max-w-2xl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Nuevo análisis</h1>
-        <p className="text-sm text-gray-500 mb-8">Sube tu estado de cuenta bancario y detectamos cobros injustificados en minutos.</p>
+      <div className="animate-fade-in-up max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4 text-brand-500" />
+            <span className="text-xs font-medium uppercase tracking-wider text-brand-600 dark:text-brand-400 font-mono">
+              Nuevo análisis
+            </span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-display font-bold text-gray-900 dark:text-gray-50 tracking-tight">
+            Analizar estado de cuenta
+          </h1>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+            Sube tu estado de cuenta bancario y detectamos cobros injustificados en minutos.
+          </p>
+        </div>
 
-        {/* Upload zone */}
+        {/* Upload Zone */}
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-2xl p-12 text-center transition-colors ${
-            dragging ? 'border-blue-400 bg-blue-50' :
-            file ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+          className={`upload-zone rounded-2xl p-8 sm:p-12 text-center transition-all duration-300 ${
+            dragging ? 'dragging bg-brand-50 dark:bg-brand-950/50' :
+            file ? 'has-file' : 'bg-gray-50/50 dark:bg-gray-900/50 hover:border-gray-300 dark:hover:border-gray-600'
           }`}
+          role="button"
+          tabIndex={0}
+          aria-label="Zona de carga de archivos. Arrastra un archivo aquí o haz clic para seleccionar."
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click() }}
         >
           {file ? (
-            <div>
-              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-7 h-7 text-green-600" />
+            <div className="animate-fade-in-scale">
+              <div className="w-16 h-16 bg-success-50 dark:bg-success-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <CheckCircle2 className="w-8 h-8 text-success-600 dark:text-success-400" />
               </div>
-              <p className="font-medium text-gray-900 mb-1">{file.name}</p>
-              <p className="text-sm text-gray-500 mb-4">{(file.size / 1024).toFixed(0)} KB</p>
-              <button onClick={() => setFile(null)} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 mx-auto">
-                <X className="w-3 h-3" /> Quitar archivo
+              <p className="font-display font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                {file.name}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 font-mono">
+                {(file.size / 1024).toFixed(0)} KB
+              </p>
+              <button
+                onClick={() => setFile(null)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-500/10 rounded-lg transition-colors"
+              >
+                <X className="w-3 h-3" />
+                Quitar archivo
               </button>
             </div>
           ) : (
             <div>
-              <div className="w-14 h-14 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Upload className="w-6 h-6 text-gray-400" />
+              <div className={`w-16 h-16 mx-auto mb-5 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                dragging
+                  ? 'bg-brand-100 dark:bg-brand-900/50 scale-110'
+                  : 'bg-gray-200 dark:bg-gray-800'
+              }`}>
+                <Upload className={`w-7 h-7 transition-colors duration-300 ${
+                  dragging ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 dark:text-gray-500'
+                }`} />
               </div>
-              <p className="font-medium text-gray-900 mb-2">Arrastra tu estado de cuenta aquí</p>
-              <p className="text-sm text-gray-400 mb-6">PDF, Excel (.xlsx) o CSV · Máximo 10MB</p>
-              <label className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition-colors">
+              <p className="font-display font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
+                Arrastra tu estado de cuenta aquí
+              </p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
+                o haz clic para seleccionar un archivo
+              </p>
+              <label className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
                 Seleccionar archivo
-                <input type="file" className="hidden" accept=".pdf,.xlsx,.xls,.csv" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.xlsx,.xls,.csv"
+                  onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+                  aria-label="Seleccionar archivo de estado de cuenta"
+                />
               </label>
+              <p className="mt-4 text-xs text-gray-400 dark:text-gray-500 font-mono">
+                PDF, Excel (.xlsx) o CSV · Máximo 10MB
+              </p>
             </div>
           )}
         </div>
 
-        {/* Bancos compatibles */}
-        <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
-          <p className="text-xs font-medium text-gray-500 mb-3">Bancos compatibles</p>
+        {/* Banks */}
+        <div className="mt-6 card-fintech rounded-xl p-4">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
+            Bancos compatibles
+          </p>
           <div className="flex flex-wrap gap-2">
             {['Santander', 'BCI', 'Banco de Chile', 'BancoEstado', 'Itaú', 'Scotiabank', 'Security', 'Falabella', 'Ripley'].map(bank => (
-              <span key={bank} className="text-xs px-2 py-1 bg-gray-100 rounded-full text-gray-600">{bank}</span>
+              <span key={bank} className="text-xs px-2.5 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-400 font-medium">
+                {bank}
+              </span>
             ))}
           </div>
         </div>
 
-        <div className="mt-4 flex items-start gap-2 text-xs text-gray-400">
-          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-          <span>Tu archivo se procesa de forma segura y no se almacena el contenido original, solo los datos del análisis.</span>
+        {/* Security Note */}
+        <div className="mt-4 flex items-start gap-2.5 text-xs text-gray-400 dark:text-gray-500">
+          <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5 text-success-500" />
+          <span>
+            Tu archivo se procesa de forma segura. No almacenamos el contenido original, solo los datos del análisis.
+          </span>
         </div>
 
+        {/* Submit Button */}
         {file && (
           <button
             onClick={runAnalysis}
-            className="mt-6 w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+            className="mt-6 w-full flex items-center justify-center gap-2.5 py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-all duration-300 shadow-md shadow-brand-600/20 hover:shadow-lg hover:shadow-brand-600/30 hover:-translate-y-0.5"
           >
             Analizar ahora (usa 1 crédito)
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
           </button>
         )}
       </div>
@@ -197,31 +248,75 @@ export default function AnalisisPage() {
   }
 
   if (step === 'analyzing') {
-    return (
-      <div className="animate-fade-in max-w-xl mx-auto pt-20 text-center">
-        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-        </div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Analizando tu estado de cuenta</h2>
-        <p className="text-gray-400 text-sm mb-8">Esto puede tomar hasta 1 minuto</p>
+    const progress = ((currentAnalysisStep + 1) / ANALYSIS_STEPS.length) * 100
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6 text-left space-y-3">
-          {ANALYSIS_STEPS.map((s, i) => (
-            <div key={s} className={`flex items-center gap-3 text-sm transition-all ${
-              i < currentAnalysisStep ? 'text-green-600' :
-              i === currentAnalysisStep ? 'text-blue-600 font-medium' :
-              'text-gray-300'
-            }`}>
-              {i < currentAnalysisStep ? (
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-              ) : i === currentAnalysisStep ? (
-                <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
-              ) : (
-                <div className="w-4 h-4 rounded-full border-2 border-current flex-shrink-0" />
-              )}
-              {s}
-            </div>
-          ))}
+    return (
+      <div className="animate-fade-in-up max-w-lg mx-auto pt-16 sm:pt-24">
+        {/* Animated Icon */}
+        <div className="relative w-20 h-20 mx-auto mb-8">
+          <div className="absolute inset-0 bg-brand-100 dark:bg-brand-900/30 rounded-2xl flex items-center justify-center">
+            <Loader2 className="w-10 h-10 text-brand-600 dark:text-brand-400 animate-spin" />
+          </div>
+          <div className="absolute -inset-3 border-2 border-brand-200 dark:border-brand-800 rounded-3xl animate-pulse-subtle" />
+        </div>
+
+        <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-gray-50 text-center mb-2">
+          Analizando tu estado de cuenta
+        </h2>
+        <p className="text-gray-400 dark:text-gray-500 text-sm text-center mb-10">
+          Esto puede tomar hasta 1 minuto
+        </p>
+
+        {/* Progress Bar */}
+        <div className="mb-8">
+          <div className="h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-brand-500 to-brand-600 rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-2">
+            <span className="text-xs text-gray-400 font-mono">{Math.round(progress)}%</span>
+            <span className="text-xs text-gray-400">{currentAnalysisStep + 1} de {ANALYSIS_STEPS.length}</span>
+          </div>
+        </div>
+
+        {/* Steps */}
+        <div className="card-fintech rounded-2xl p-6 space-y-1">
+          {ANALYSIS_STEPS.map((s, i) => {
+            const isCompleted = i < currentAnalysisStep
+            const isActive = i === currentAnalysisStep
+            const StepIcon = s.icon
+
+            return (
+              <div
+                key={s.label}
+                className={`flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm transition-all duration-300 ${
+                  isCompleted ? 'text-success-600 dark:text-success-400' :
+                  isActive ? 'text-brand-600 dark:text-brand-400 bg-brand-50/50 dark:bg-brand-950/50 font-medium' :
+                  'text-gray-300 dark:text-gray-600'
+                }`}
+              >
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                  isCompleted ? 'bg-success-50 dark:bg-success-500/10' :
+                  isActive ? 'bg-brand-100 dark:bg-brand-900/50' :
+                  'bg-gray-100 dark:bg-gray-800'
+                }`}>
+                  {isCompleted ? (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  ) : isActive ? (
+                    <StepIcon className="w-3.5 h-3.5 animate-pulse-subtle" />
+                  ) : (
+                    <StepIcon className="w-3.5 h-3.5 opacity-40" />
+                  )}
+                </div>
+                <span className="font-medium">{s.label}</span>
+                {isActive && (
+                  <Loader2 className="w-3.5 h-3.5 ml-auto animate-spin" />
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     )
@@ -232,74 +327,121 @@ export default function AnalisisPage() {
   const highCount = result.anomalies.filter(a => a.severity === 'high').length
 
   return (
-    <div className="animate-fade-in max-w-3xl">
-      <div className="flex items-start justify-between mb-6">
+    <div className="animate-fade-in-up max-w-3xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Análisis completado</h1>
-          <p className="text-sm text-gray-500">{result.totalTransactions} transacciones analizadas</p>
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle2 className="w-5 h-5 text-success-500" />
+            <span className="text-xs font-medium uppercase tracking-wider text-success-600 dark:text-success-400 font-mono">
+              Análisis completado
+            </span>
+          </div>
+          <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-gray-50 tracking-tight">
+            Resultados del análisis
+          </h1>
+          <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400 font-mono">
+            {result.totalTransactions} transacciones analizadas
+          </p>
         </div>
-        <button onClick={() => router.push(`/historial/${result.analysisId}`)} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors">
+        <button
+          onClick={() => router.push(`/historial/${result.analysisId}`)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300 hover:-translate-y-0.5"
+        >
           <FileText className="w-4 h-4" />
           Ver reporte completo
         </button>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <p className="text-xs text-gray-400 mb-1">Anomalías detectadas</p>
-          <p className="text-3xl font-bold text-red-600">{result.anomaliesCount}</p>
-          {highCount > 0 && <p className="text-xs text-red-400 mt-1">{highCount} de alta prioridad</p>}
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 stagger-children">
+        <div className="card-fintech rounded-2xl p-5 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+            Anomalías detectadas
+          </p>
+          <p className="text-3xl font-display font-bold text-danger-600 dark:text-danger-400">
+            <span className="tabular-nums">{result.anomaliesCount}</span>
+          </p>
+          {highCount > 0 && (
+            <p className="text-xs text-danger-400 dark:text-danger-500 mt-1.5">
+              {highCount} de alta prioridad
+            </p>
+          )}
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <p className="text-xs text-gray-400 mb-1">Monto recuperable</p>
-          <p className="text-2xl font-bold text-gray-900">{formatCLP(result.recoverableAmount)}</p>
-          <p className="text-xs text-gray-400 mt-1">estimado</p>
+        <div className="card-fintech rounded-2xl p-5 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+            Monto recuperable
+          </p>
+          <p className="text-2xl font-display font-bold text-gray-900 dark:text-gray-50">
+            <span className="tabular-nums">{formatCLP(result.recoverableAmount)}</span>
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">estimado</p>
         </div>
-        <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-          <p className="text-xs text-green-600 mb-1">Siguiente paso</p>
-          <p className="text-sm font-semibold text-green-900">Descarga el reporte y ve al banco</p>
+        <div className="bg-success-50 dark:bg-success-500/10 border border-success-200 dark:border-success-500/20 rounded-2xl p-5 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
+          <p className="text-xs font-medium text-success-600 dark:text-success-400 uppercase tracking-wider mb-1.5">
+            Siguiente paso
+          </p>
+          <p className="text-sm font-semibold text-success-900 dark:text-success-100">
+            Descarga el reporte y ve al banco
+          </p>
         </div>
       </div>
 
+      {/* AI Summary */}
       {result.summary && (
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
-          <p className="text-xs font-medium text-blue-600 mb-1">Resumen del análisis (IA)</p>
-          <p className="text-sm text-blue-900">{result.summary}</p>
+        <div className="bg-brand-50 dark:bg-brand-950/50 border border-brand-100 dark:border-brand-800/50 rounded-2xl p-5 mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4 text-brand-500" />
+            <p className="text-xs font-medium text-brand-600 dark:text-brand-400 uppercase tracking-wider">
+              Resumen del análisis (IA)
+            </p>
+          </div>
+          <p className="text-sm text-brand-900 dark:text-brand-100 leading-relaxed">
+            {result.summary}
+          </p>
         </div>
       )}
 
-      {/* Anomalies list */}
+      {/* Anomalies List */}
       <div className="space-y-3">
         {result.anomalies.map((anomaly, i) => (
-          <div key={i} className={`border rounded-xl p-5 ${SEVERITY_COLORS[anomaly.severity]}`}>
-            <div className="flex items-start justify-between mb-2">
+          <div
+            key={i}
+            className={`border rounded-2xl p-5 transition-all duration-300 hover:shadow-md ${SEVERITY_COLORS[anomaly.severity]}`}
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
+            <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-white/60 dark:bg-gray-800/60">
                   {TYPE_LABELS[anomaly.type] ?? anomaly.type}
                 </span>
-                <span className="text-xs">{SEVERITY_LABELS[anomaly.severity]}</span>
+                <span className="text-xs opacity-70">{SEVERITY_LABELS[anomaly.severity]}</span>
               </div>
-              <span className="font-bold text-lg">{formatCLP(anomaly.recoverableAmount)}</span>
+              <span className="font-display font-bold text-lg tabular-nums">
+                {formatCLP(anomaly.recoverableAmount)}
+              </span>
             </div>
             <p className="font-semibold text-sm mb-1">{anomaly.title}</p>
-            <p className="text-xs opacity-80">{anomaly.description}</p>
-            {anomaly.detail && <p className="text-xs opacity-60 mt-1">{anomaly.detail}</p>}
+            <p className="text-xs opacity-80 leading-relaxed">{anomaly.description}</p>
+            {anomaly.detail && (
+              <p className="text-xs opacity-60 mt-2 font-mono">{anomaly.detail}</p>
+            )}
           </div>
         ))}
       </div>
 
-      <div className="mt-8 flex gap-4">
+      {/* Action Buttons */}
+      <div className="mt-8 flex flex-col sm:flex-row gap-3">
         <button
           onClick={() => router.push(`/historial/${result.analysisId}`)}
-          className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+          className="flex-1 py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium text-sm transition-all duration-300 shadow-md shadow-brand-600/20 hover:shadow-lg hover:shadow-brand-600/30 hover:-translate-y-0.5 flex items-center justify-center gap-2"
         >
           Descargar reporte PDF
           <ArrowRight className="w-4 h-4" />
         </button>
         <button
           onClick={() => { setStep('upload'); setFile(null); setResult(null) }}
-          className="px-6 py-3 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+          className="px-6 py-3.5 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300 hover:-translate-y-0.5"
         >
           Nuevo análisis
         </button>

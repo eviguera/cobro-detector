@@ -6,7 +6,7 @@ import type { Database } from '@/types/database.types'
  * Cliente tipado para el servidor
  * Retorna un cliente con el tipo Database propagado correctamente
  */
-export function createClient() {
+export async function createClient() {
   const cookieStore = await cookies()
   
   return createServerClient<Database>(
