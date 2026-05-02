@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
       analysis: analysis as unknown as Analysis,
       anomalies: anomalies as unknown as Anomaly[],
       bankName: analysis.bank || 'No especificado',
-      businessName: (profile as any)?.business_name || '',
-      userName: (profile as any)?.full_name || user.email || 'Usuario',
-      rut: (profile as any)?.rut || '',
+      businessName: profile?.business_name || '',
+      userName: profile?.full_name || user.email || 'Usuario',
+      rut: profile?.rut || '',
       date: new Date().toLocaleDateString('es-CL'),
     }
 
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="carta_reclamo_${(analysis as any).bank || 'banco'}_${new Date().toISOString().split('T')[0]}.pdf"`,
+        'Content-Disposition': `attachment; filename="carta_reclamo_${analysis.bank || 'banco'}_${new Date().toISOString().split('T')[0]}.pdf"`,
       },
     })
 

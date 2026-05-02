@@ -1,13 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMPClient, Payment } from '@/lib/mercadopago'
 import { createClient } from '@/lib/supabase/server'
+import { verifyMercadoPagoWebhook } from '@/lib/security'
 
 // Mercado Pago envía notificaciones IPN a este endpoint
 // Docs: https://www.mercadopago.cl/developers/es/docs/notifications/ipn/introduction
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    // Obtener body crudo para verificar firma
+    const rawBody = await request.text()
+    
+    // Verificar firma del webhook (si está configurado el secret)
+    const signature = request.headers.get('x-signature')
+    const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
+    
+    if (webhookSecret && signature) {
+      const isValid = verifyMercadoPagoWebhook(rawBody, signature, webhookSecret)
+      if (!isValid) {
+        console.error('Webhook MP: firma inválida')
+        return NextResponse.json({ received: false, error: 'Firma inválida' }, { status: 401 })
+      }
+    } else if (webhookSecret && !signature) {
+      console.warn('Webhook MP: falta header x-signature')
+      return NextResponse.json({ received: false, error: 'Falta firma' }, { status: 401 })
+    }
+    
+    const body = JSON.parse(rawBody)
     const { type, data } = body
 
     // Solo procesamos notificaciones de pagos
@@ -41,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     if (isSuccessCharge) {
       // Es un cargo por éxito
-      const { data: successCharge } = await supabase
+      const { data: successCharge } = await (supabase as any)
         .from('success_charges')
         .select('*')
         .eq('id', externalRef)
@@ -60,12 +79,12 @@ export async function POST(request: NextRequest) {
           .eq('id', externalRef)
 
         if (status === 'approved') {
-          console.log(`✅ Cargo por éxito aprobado: ${(successCharge as any).charge_amount} CLP para usuario ${(successCharge as any).user_id}`)
+          console.log(`✅ Cargo por éxito aprobado: ${successCharge.charge_amount} CLP para usuario ${successCharge.user_id}`)
         }
       }
     } else {
       // Es una orden de compra de créditos
-      const { data: order } = await supabase
+      const { data: order } = await (supabase as any)
         .from('orders')
         .select('*')
         .eq('id', externalRef)
@@ -75,6 +94,8 @@ export async function POST(request: NextRequest) {
         console.error('Webhook: orden no encontrada', externalRef)
         return NextResponse.json({ error: 'Orden no encontrada' }, { status: 404 })
       }
+
+      const typedOrder = order as any
 
       // Actualizar estado de la orden
       await (supabase as any)
@@ -89,34 +110,34 @@ export async function POST(request: NextRequest) {
         .eq('id', externalRef)
 
       // Si el pago fue aprobado → acreditar créditos al usuario
-      if (status === 'approved' && (order as any).status !== 'paid') {
+      if (status === 'approved' && typedOrder.status !== 'paid') {
         const { data: credits } = await (supabase as any)
           .from('credits')
           .select('*')
-          .eq('user_id', (order as any).user_id)
+          .eq('user_id', order.user_id)
           .single()
 
         if (credits) {
           await (supabase as any)
             .from('credits')
-            .update({ total: (credits as any).total + (order as any).credits_purchased })
-            .eq('user_id', (order as any).user_id)
+            .update({ total: credits.total + order.credits_purchased })
+            .eq('user_id', order.user_id)
         } else {
           // Primera compra (no debería pasar si el trigger funcionó)
           await (supabase as any)
             .from('credits')
-            .insert({ user_id: (order as any).user_id, total: (order as any).credits_purchased, used: 0 })
+            .insert({ user_id: order.user_id, total: order.credits_purchased, used: 0 })
         }
 
         // Si es plan de éxito, activarlo
-        if ((order as any).plan === 'success_fee') {
+        if (order.plan === 'success_fee') {
           await (supabase as any)
             .from('orders')
             .update({ success_plan_active: true })
             .eq('id', externalRef)
         }
 
-        console.log(`✅ Pago aprobado: orden ${externalRef}, +${(order as any).credits_purchased} créditos para usuario ${(order as any).user_id}`)
+        console.log(`✅ Pago aprobado: orden ${externalRef}, +${order.credits_purchased} créditos para usuario ${order.user_id}`)
       }
     }
 
@@ -124,8 +145,8 @@ export async function POST(request: NextRequest) {
 
   } catch (err) {
     console.error('Webhook MP error:', err)
-    // Retornamos 200 para evitar que MP reintente indefinidamente
-    return NextResponse.json({ received: true, error: String(err) })
+    // Retornamos 200 limpio para evitar que MP reintente
+    return NextResponse.json({ received: true })
   }
 }
 

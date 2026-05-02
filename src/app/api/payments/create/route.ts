@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Plan de éxito: no necesita preferencia de Mercado Pago
     if (planKey === 'success_fee') {
       return NextResponse.json({
-        orderId: (order as any).id,
+        orderId: order.id,
         message: 'Plan de éxito activado. Se cobrará el 10% de lo recuperado.',
       })
     }
@@ -89,46 +89,82 @@ export async function POST(request: NextRequest) {
           },
         ],
         payer: {
-          email: (profile as any)?.email ?? user.email ?? '',
-          name: (profile as any)?.full_name ?? '',
+          email: profile?.email ?? user.email ?? '',
+          name: profile?.full_name ?? '',
         },
         back_urls: {
-          success: `${appUrl}/pago/exitoso?order=${(order as any).id}`,
-          failure: `${appUrl}/pago/fallido?order=${(order as any).id}`,
-          pending: `${appUrl}/pago/exitoso?order=${(order as any).id}&pending=true`,
+          success: `${appUrl}/pago/exitoso?order=${order.id}`,
+          failure: `${appUrl}/pago/fallido?order=${order.id}`,
+          pending: `${appUrl}/pago/exitoso?order=${order.id}&pending=true`,
         },
         auto_return: 'approved',
-        external_reference: (order as any).id, // nuestro ID de orden para el webhook
+        external_reference: order.id,
         notification_url: `${appUrl}/api/payments/webhook`,
         statement_descriptor: 'COBRO DETECTOR',
         expires: false,
         metadata: {
-          order_id: (order as any).id,
+          order_id: order.id,
           user_id: user.id,
           plan_key: planKey,
           credits: plan.credits,
         },
-      },
+      }
     })
 
     // 6. Guardar preference_id en la orden
     await (supabase as any)
       .from('orders')
       .update({ mp_preference_id: preferenceData.id })
-      .eq('id', (order as any).id)
+      .eq('id', order.id)
 
     return NextResponse.json({
-      orderId: (order as any).id,
+      orderId: order.id,
       preferenceId: preferenceData.id,
-      initPoint: preferenceData.init_point,        // URL de producción
-      sandboxInitPoint: preferenceData.sandbox_init_point, // URL de sandbox
+      initPoint: preferenceData.init_point,
+      sandboxInitPoint: preferenceData.sandbox_init_point,
     })
 
   } catch (err) {
-    console.error('Error creando preferencia MP:', err)
+    console.error('Error en POST /api/payments/create:', err)
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
+      return NextResponse.json({ error: 'Datos inválidos', details: err.errors }, { status: 400 })
     }
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    // Obtener orden por ID
+    const { searchParams } = new URL(request.url)
+    const orderId = searchParams.get('order')
+    
+    if (!orderId) {
+      return NextResponse.json({ error: 'Order ID requerido' }, { status: 400 })
+    }
+
+    const { data: order, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (error || !order) {
+      return NextResponse.json({ error: 'Orden no encontrada' }, { status: 404 })
+    }
+
+    return NextResponse.json({ order })
+
+  } catch (err) {
+    console.error('Error en GET /api/payments/create:', err)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

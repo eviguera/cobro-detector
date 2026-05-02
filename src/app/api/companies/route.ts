@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const { data: companies, error } = await (supabase as any)
+    const { data: companies, error } = await supabase
       .from('companies')
       .select('*')
       .eq('accountant_id', user.id)
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       .from('credits')
       .insert({
         user_id: user.id,
-        company_id: (company as any).id,
+        company_id: company.id,
         total: 1,
         used: 0,
       })

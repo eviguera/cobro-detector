@@ -38,8 +38,8 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .single()
 
-    if ((existingPaymentMethod as any)?.mp_customer_id) {
-      mpCustomerId = (existingPaymentMethod as any).mp_customer_id
+    if (existingPaymentMethod?.mp_customer_id) {
+      mpCustomerId = existingPaymentMethod.mp_customer_id
     } else {
       // Obtener email del usuario
       const { data: profile } = await (supabase as any)
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id)
         .single()
 
-      const email = (profile as any)?.email ?? user.email ?? ''
+      const email = profile?.email ?? user.email ?? ''
 
       try {
         // Crear customer en MP
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       paymentMethod: {
-        id: (paymentMethod as any).id,
+        id: paymentMethod.id,
         lastFourDigits: validated.lastFourDigits,
         cardBrand: validated.cardBrand,
         expiresMonth: validated.expiresMonth,

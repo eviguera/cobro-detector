@@ -26,7 +26,7 @@ export async function GET(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const { data: company, error } = await (supabase as any)
+    const { data: company, error } = await supabase
       .from('companies')
       .select('*')
       .eq('id', params.id)
@@ -38,14 +38,14 @@ export async function GET(
     }
 
     // Obtener créditos de la empresa
-    const { data: credits } = await (supabase as any)
+    const { data: credits } = await supabase
       .from('credits')
       .select('*')
       .eq('company_id', params.id)
       .single()
 
     // Obtener análisis recientes
-    const { data: analyses } = await (supabase as any)
+    const { data: analyses } = await supabase
       .from('analyses')
       .select('id, file_name, bank, status, created_at')
       .eq('company_id', params.id)

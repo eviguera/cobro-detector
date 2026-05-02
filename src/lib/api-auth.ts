@@ -29,7 +29,7 @@ export async function authenticateApiRequest(
     const supabase = await createClient()
     
     // Verificar API key usando la función de base de datos
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .rpc('verify_api_key', { key_text: apiKey })
       .single()
 

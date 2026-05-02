@@ -19,7 +19,7 @@ export async function processAnalysisAsync(
 
   try {
     // Actualizar estado a processing
-    await supabase
+    await (supabase as any)
       .from('analyses')
       .update({ status: 'processing' })
       .eq('id', analysisId)
@@ -80,7 +80,7 @@ export async function processAnalysisAsync(
     const totalRecoverable = combined.reduce((sum, a) => sum + a.recoverableAmount, 0)
 
     // Actualizar análisis en DB
-    await supabase
+    await (supabase as any)
       .from('analyses')
       .update({
         bank,
@@ -96,7 +96,7 @@ export async function processAnalysisAsync(
 
     // Guardar anomalías individuales
     if (combined.length > 0) {
-      await supabase.from('anomalies').insert(
+      await (supabase as any).from('anomalies').insert(
         combined.map(a => ({
           analysis_id: analysisId,
           user_id: userId,
@@ -116,7 +116,7 @@ export async function processAnalysisAsync(
     console.error('Error procesando análisis:', error)
     
     // Marcar como fallido
-    await supabase
+    await (supabase as any)
       .from('analyses')
       .update({ status: 'failed' })
       .eq('id', analysisId)

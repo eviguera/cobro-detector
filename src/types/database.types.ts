@@ -1,4 +1,3 @@
-Connecting to db 5432
 export type Json =
   | string
   | number
@@ -7,174 +6,477 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
-  graphql_public: {
+export interface Database {
+  public: {
     Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
+      profiles: {
+        Row: {
+          id: string
+          email: string | null
+          full_name: string | null
+          business_name: string | null
+          business_type: string | null
+          rut: string | null
+          phone: string | null
+          created_at: string
+          updated_at: string
         }
-        Returns: Json
+        Insert: {
+          id?: string
+          email?: string | null
+          full_name?: string | null
+          business_name?: string | null
+          business_type?: string | null
+          rut?: string | null
+          phone?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string | null
+          full_name?: string | null
+          business_name?: string | null
+          business_type?: string | null
+          rut?: string | null
+          phone?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      credits: {
+        Row: {
+          id: string
+          user_id: string
+          total: number
+          used: number
+          company_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          total: number
+          used?: number
+          company_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          total?: number
+          used?: number
+          company_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      orders: {
+        Row: {
+          id: string
+          user_id: string
+          plan: string
+          credits_purchased: number
+          amount_clp: number
+          status: string
+          payment_provider: string | null
+          payment_reference: string | null
+          recovered_amount: number
+          fee_percentage: number
+          mp_preference_id: string | null
+          mp_payment_id: string | null
+          mp_status: string | null
+          mp_detail: string | null
+          metadata: Json | null
+          company_id: string | null
+          success_plan_active: boolean | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          plan: string
+          credits_purchased: number
+          amount_clp: number
+          status: string
+          payment_provider?: string | null
+          payment_reference?: string | null
+          recovered_amount?: number
+          fee_percentage?: number
+          mp_preference_id?: string | null
+          mp_payment_id?: string | null
+          mp_status?: string | null
+          mp_detail?: string | null
+          metadata?: Json | null
+          company_id?: string | null
+          success_plan_active?: boolean | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          plan?: string
+          credits_purchased?: number
+          amount_clp?: number
+          status?: string
+          payment_provider?: string | null
+          payment_reference?: string | null
+          recovered_amount?: number
+          fee_percentage?: number
+          mp_preference_id?: string | null
+          mp_payment_id?: string | null
+          mp_status?: string | null
+          mp_detail?: string | null
+          metadata?: Json | null
+          company_id?: string | null
+          success_plan_active?: boolean | null
+          created_at?: string
+        }
+      }
+      analyses: {
+        Row: {
+          id: string
+          user_id: string
+          file_name: string
+          file_type: string
+          bank: string | null
+          period_start: string | null
+          period_end: string | null
+          total_transactions: number
+          anomalies_count: number
+          recoverable_amount: number
+          status: string
+          raw_data: Json | null
+          anomalies: Json | null
+          ai_summary: string | null
+          company_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          file_name: string
+          file_type: string
+          bank?: string | null
+          period_start?: string | null
+          period_end?: string | null
+          total_transactions?: number
+          anomalies_count?: number
+          recoverable_amount?: number
+          status?: string
+          raw_data?: Json | null
+          anomalies?: Json | null
+          ai_summary?: string | null
+          company_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          file_name?: string
+          file_type?: string
+          bank?: string | null
+          period_start?: string | null
+          period_end?: string | null
+          total_transactions?: number
+          anomalies_count?: number
+          recoverable_amount?: number
+          status?: string
+          raw_data?: Json | null
+          anomalies?: Json | null
+          ai_summary?: string | null
+          company_id?: string | null
+          created_at?: string
+        }
+      }
+      api_keys: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          key_hash: string
+          company_id: string | null
+          last_used_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          key_hash: string
+          company_id?: string | null
+          last_used_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          key_hash?: string
+          company_id?: string | null
+          last_used_at?: string | null
+          created_at?: string
+        }
+      }
+      companies: {
+        Row: {
+          id: string
+          name: string
+          rut: string | null
+          owner_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          rut?: string | null
+          owner_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          rut?: string | null
+          owner_id?: string
+          created_at?: string
+        }
+      }
+      company_members: {
+        Row: {
+          id: string
+          company_id: string
+          user_id: string
+          role: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          user_id: string
+          role: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          user_id?: string
+          role?: string
+          created_at?: string
+        }
+      }
+      success_plans: {
+        Row: {
+          id: string
+          user_id: string
+          company_id: string | null
+          plan_type: string
+          starts_at: string
+          ends_at: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          company_id?: string | null
+          plan_type: string
+          starts_at: string
+          ends_at?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          company_id?: string | null
+          plan_type?: string
+          starts_at?: string
+          ends_at?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+      }
+      anomalies: {
+        Row: {
+          id: string
+          analysis_id: string
+          user_id: string
+          type: string
+          severity: string
+          title: string
+          description: string
+          detail: string | null
+          recoverable_amount: number
+          transaction_refs: string[]
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          analysis_id: string
+          user_id: string
+          type: string
+          severity: string
+          title: string
+          description: string
+          detail?: string | null
+          recoverable_amount: number
+          transaction_refs: string[]
+          status: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          analysis_id?: string
+          user_id?: string
+          type?: string
+          severity?: string
+          title?: string
+          description?: string
+          detail?: string | null
+          recoverable_amount?: number
+          transaction_refs?: string[]
+          status?: string
+          created_at?: string
+        }
+      }
+      success_charges: {
+        Row: {
+          id: string
+          user_id: string
+          anomaly_id: string
+          analysis_id: string
+          recovered_amount: number
+          fee_percentage: number
+          charge_amount: number
+          status: string
+          mp_payment_id: string | null
+          mp_status: string | null
+          mp_detail: string | null
+          charged_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          anomaly_id: string
+          analysis_id: string
+          recovered_amount: number
+          fee_percentage: number
+          charge_amount: number
+          status: string
+          mp_payment_id?: string | null
+          mp_status?: string | null
+          mp_detail?: string | null
+          charged_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          anomaly_id?: string
+          analysis_id?: string
+          recovered_amount?: number
+          fee_percentage?: number
+          charge_amount?: number
+          status?: string
+          mp_payment_id?: string | null
+          mp_status?: string | null
+          mp_detail?: string | null
+          charged_at?: string | null
+          created_at?: string
+        }
+      }
+      payment_methods: {
+        Row: {
+          id: string
+          user_id: string
+          mp_card_token: string
+          last_four: string | null
+          card_brand: string | null
+          is_default: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          mp_card_token: string
+          last_four?: string | null
+          card_brand?: string | null
+          is_default?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          mp_card_token?: string
+          last_four?: string | null
+          card_brand?: string | null
+          is_default?: boolean
+          created_at?: string
+        }
       }
     }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
+    Views: {}
     Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
-
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+      verify_api_key: {
+        Args: { key_text: string }
+        Returns: {
+          id: string
+          user_id: string
+          name: string
+          company_id: string | null
+        } | null
       }
-      ? R
-      : never
-    : never
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
     }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    Enums: {}
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
 
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+// Export types for convenience
+export type Profile = Database['public']['Tables']['profiles']['Row']
+export type Credits = Database['public']['Tables']['credits']['Row']
+export type Order = Database['public']['Tables']['orders']['Row']
+export type Analysis = Database['public']['Tables']['analyses']['Row']
+export type ApiKey = Database['public']['Tables']['api_keys']['Row']
+export type Company = Database['public']['Tables']['companies']['Row']
+export type CompanyMember = Database['public']['Tables']['company_members']['Row']
+export type SuccessPlan = Database['public']['Tables']['success_plans']['Row']
+export type Anomaly = Database['public']['Tables']['anomalies']['Row']
+export type SuccessCharge = Database['public']['Tables']['success_charges']['Row']
+export type PaymentMethod = Database['public']['Tables']['payment_methods']['Row']
+
+// Custom types
+export type SuccessChargeStatus = 'pending' | 'charged' | 'failed'
+
+export interface ParsedTransaction {
+  id: string
+  date: string
+  description: string
+  amount: number
+  type: 'credit' | 'debit'
+  category?: string
+  metadata?: Record<string, unknown>
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
 
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+export interface DetectedAnomaly {
+  type: string
+  severity: 'high' | 'medium' | 'low'
+  title: string
+  description: string
+  detail?: string
+  recoverableAmount: number
+  transactionRefs: string[]
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
 
-export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
-  public: {
-    Enums: {},
-  },
-} as const
-
+export interface Plan {
+  key: string
+  name: string
+  credits: number
+  price: number
+  pricePerAnalysis: number
+  highlighted?: boolean
+  features: string[]
+}

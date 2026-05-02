@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="carta_reclamo_${(analysis as any).bank || 'banco'}_${new Date().toISOString().split('T')[0]}.docx"`,
+        'Content-Disposition': `attachment; filename="carta_reclamo_${analysis.bank || 'banco'}_${new Date().toISOString().split('T')[0]}.docx"`,
       },
     })
 

@@ -21,7 +21,7 @@ export async function GET(
     const supabase = await createClient()
 
     // Obtener análisis (solo del usuario autenticado via API)
-    const { data: analysis, error } = await (supabase as any)
+    const { data: analysis, error } = await supabase
       .from('analyses')
       .select('*, anomalias(*)')
       .eq('id', params.id)
