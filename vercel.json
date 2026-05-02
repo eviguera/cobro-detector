@@ -2,5 +2,18 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "env": {
+    "NEXT_PUBLIC_APP_URL": "https://tu-dominio.vercel.app",
+    "NEXT_PUBLIC_APP_NAME": "CobroDetector",
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
+    "GOOGLE_GEMINI_API_KEY": "@google_gemini_api_key",
+    "MERCADOPAGO_ACCESS_TOKEN": "@mercadopago_access_token",
+    "NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY": "@mercadopago_public_key",
+    "MERCADOPAGO_WEBHOOK_SECRET": "@mercadopago_webhook_secret",
+    "UPSTASH_REDIS_URL": "@upstash_redis_url",
+    "UPSTASH_REDIS_TOKEN": "@upstash_redis_token"
+  }
 }
