@@ -25,19 +25,19 @@ export async function authenticateApiRequest(
     return { authenticated: false }
   }
 
-  try {
+    try {
     const supabase = await createClient()
     
     // Verificar API key usando la función de base de datos
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .rpc('verify_api_key', { key_text: apiKey })
       .single()
 
-    if (error || !data || !(data as any)[0]?.valid) {
+    if (error || !data || !data.valid) {
       return { authenticated: false }
     }
 
-    const result = (data as any)[0]
+    const result = data
     
     return {
       authenticated: true,

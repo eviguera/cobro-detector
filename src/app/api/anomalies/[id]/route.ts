@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { chargeSuccessFee } from '@/lib/mercadopago'
-import type { SuccessChargeStatus } from '@/types/database.types'
+import type { SuccessChargeStatus, Anomaly, Order, PaymentMethod, SuccessCharge } from '@/types/database.types'
 
 export async function PATCH(
   request: NextRequest,
@@ -36,8 +36,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Anomalía no encontrada' }, { status: 404 })
     }
 
+    const typedAnomaly = anomaly as Anomaly & { analyses: { user_id: string; recoverable_amount: number } }
+    const anomalyData = typedAnomaly
+
     // Si se marca como recuperada y el usuario tiene plan de éxito activo
-    if (status === 'recovered' && (anomaly as any).status !== 'recovered') {
+    if (status === 'recovered' && anomalyData.status !== 'recovered') {
       // Verificar si el usuario tiene plan de éxito activo
       const { data: activeOrder } = await (supabase as any)
         .from('orders')
@@ -49,6 +52,7 @@ export async function PATCH(
         .single()
 
       if (activeOrder) {
+          const orderData = activeOrder as Order
           // Obtener método de pago del usuario
           const { data: paymentMethod } = await (supabase as any)
             .from('payment_methods')
@@ -58,8 +62,9 @@ export async function PATCH(
             .single()
 
           if (paymentMethod) {
-            const amountToCharge = recoveredAmount || (anomaly as any).recoverable_amount
-            const feeAmount = Math.round(amountToCharge * ((activeOrder as any).fee_percentage || 10) / 100)
+            const pmData = paymentMethod as PaymentMethod
+            const amountToCharge = recoveredAmount || anomalyData.recoverable_amount
+            const feeAmount = Math.round(amountToCharge * (orderData.fee_percentage || 10) / 100)
 
             // Crear registro de cargo pendiente
             const { data: successCharge, error: chargeError } = await (supabase as any)
@@ -67,9 +72,9 @@ export async function PATCH(
               .insert({
                 user_id: user.id,
                 anomaly_id: anomalyId,
-                analysis_id: (anomaly as any).analysis_id,
+                analysis_id: anomalyData.analysis_id,
                 recovered_amount: amountToCharge,
-                fee_percentage: (activeOrder as any).fee_percentage || 10,
+                fee_percentage: orderData.fee_percentage || 10,
                 charge_amount: feeAmount,
                 status: 'pending' as SuccessChargeStatus,
               })
@@ -84,10 +89,10 @@ export async function PATCH(
           try {
             // Realizar cobro con MP
             const payment = await chargeSuccessFee(
-              (paymentMethod as any).mp_card_token,
+              pmData.mp_card_token,
               feeAmount,
-              `CobroDetector - 10% de recuperación (${(anomaly as any).title})`,
-              successCharge.id
+              `CobroDetector - 10% de recuperación (${anomalyData.title})`,
+              (successCharge as SuccessCharge).id
             )
 
             // Actualizar estado del cargo
@@ -100,7 +105,7 @@ export async function PATCH(
                 mp_detail: payment.status_detail,
                 charged_at: payment.status === 'approved' ? new Date().toISOString() : null,
               })
-              .eq('id', successCharge.id)
+              .eq('id', (successCharge as SuccessCharge).id)
 
             if (payment.status !== 'approved') {
               return NextResponse.json({
@@ -119,7 +124,7 @@ export async function PATCH(
                 status: 'failed' as SuccessChargeStatus,
                 mp_detail: String(chargeErr),
               })
-              .eq('id', successCharge.id)
+              .eq('id', (successCharge as SuccessCharge).id)
 
             return NextResponse.json({ error: 'Error procesando el cobro' }, { status: 500 })
           }

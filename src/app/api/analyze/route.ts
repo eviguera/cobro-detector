@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { parseExcelFile, parsePDFText, detectBank } from '@/lib/parser'
-import { detectAnomaliesRules, analyzeTransactionsWithAI } from '@/lib/analyzer'
-import type { ParsedTransaction, Credits } from '@/types/database.types'
+import { checkAnalyzeRateLimit } from '@/lib/rate-limit'
+import type { Credits } from '@/types/database.types'
+import type { Database } from '@/types/database.types'
+import { processAnalysisAsync } from '@/lib/analysis-worker'
 
-// Rate limiting simple (en memoria, para Vercel usa Redis en producción)
-const requestCounts = new Map<string, { count: number; resetTime: number }>()
-const RATE_LIMIT = 10 // máximo 10 análisis por hora por usuario
-const RATE_WINDOW = 60 * 60 * 1000 // 1 hora
-
-export const maxDuration = 60 // 60s timeout para Vercel
+export const maxDuration = 10 // 10s timeout para Vercel (solo registro inicial)
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,54 +16,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Rate limiting
-    const now = Date.now()
-    const userRequests = requestCounts.get(user.id)
-    
-    if (userRequests) {
-      if (now > userRequests.resetTime) {
-        // Reset window
-        requestCounts.set(user.id, { count: 1, resetTime: now + RATE_WINDOW })
-      } else if (userRequests.count >= RATE_LIMIT) {
-        return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta más tarde.' }, { status: 429 })
-      } else {
-        userRequests.count++
-      }
-    } else {
-      requestCounts.set(user.id, { count: 1, resetTime: now + RATE_WINDOW })
+    // Rate limiting real con Redis (Upstash)
+    const rateCheck = await checkAnalyzeRateLimit(user.id)
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Demasiadas solicitudes. Intenta más tarde.', retryAfter: rateCheck.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter || 3600) } }
+      )
     }
 
-    // Verificar si el usuario tiene plan de éxito activo
-    const { data: activeSuccessOrder } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('plan', 'success_fee')
-      .eq('status', 'paid')
-      .eq('success_plan_active', true)
-      .single()
-
-    const hasSuccessPlan = !!activeSuccessOrder
-
-    let credits: any = null
-
-    // Verificar créditos (solo si no tiene plan de éxito)
-    if (!hasSuccessPlan) {
-      const creditsResult = await (supabase as any)
-        .from('credits')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
-      credits = creditsResult.data
-
-      const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
-      if (creditsLeft <= 0) {
-        return NextResponse.json({ error: 'Sin créditos disponibles' }, { status: 402 })
-      }
-    }
-
-    // Obtener archivo y company_id
+    // Obtener archivo y company_id primero
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const companyId = formData.get('company_id') as string | null
@@ -90,6 +48,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tipo de archivo no permitido. Usa PDF, Excel o CSV.' }, { status: 400 })
     }
 
+    // Verificar si el usuario tiene plan de éxito activo
+    const { data: activeSuccessOrder } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('plan', 'success_fee')
+      .eq('status', 'paid')
+      .eq('success_plan_active', true)
+      .single()
+
+    const hasSuccessPlan = !!activeSuccessOrder
+
+    let credits: Credits | null = null
+
+    // Verificar créditos (solo si no tiene plan de éxito)
+    if (!hasSuccessPlan) {
+      const creditsQuery = supabase
+        .from('credits')
+        .select('*')
+        .eq('user_id', user.id)
+
+      if (companyId) {
+        creditsQuery.eq('company_id', companyId)
+      } else {
+        creditsQuery.is('company_id', null)
+      }
+
+      const creditsResult = await creditsQuery.single()
+      // TypeScript no infiere bien el tipo de .single(), así que casteamos
+      credits = (creditsResult.data ?? null) as Credits | null
+
+      const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
+      if (creditsLeft <= 0) {
+        return NextResponse.json({ error: 'Sin créditos disponibles' }, { status: 402 })
+      }
+    }
+
     // Registrar análisis en DB (estado: processing)
     const { data: analysis, error: insertError } = await (supabase as any)
       .from('analyses')
@@ -110,152 +105,56 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Error al crear análisis' }, { status: 500 })
     }
 
-    // Parsear archivo
-    let transactions: ParsedTransaction[] = []
+    // Descontar crédito (solo si no tiene plan de éxito)
+    if (!hasSuccessPlan && credits) {
+      const newUsed = (credits.used ?? 0) + 1
+      
+      let error: Error | null = null
+      
+      if (companyId) {
+        const { error: creditError } = await (supabase as any)
+          .from('credits')
+          .update({ used: newUsed })
+          .eq('user_id', user.id)
+          .eq('company_id', companyId)
+        error = creditError
+      } else {
+        const { error: creditError } = await (supabase as any)
+          .from('credits')
+          .update({ used: newUsed })
+          .eq('user_id', user.id)
+          .is('company_id', null)
+        error = creditError
+      }
+
+      if (error) {
+        console.error('Error al descontar crédito:', error)
+      }
+    }
+
+    // Obtener buffer del archivo para procesamiento asíncrono
     const buffer = await file.arrayBuffer()
 
-    if (file.name.match(/\.(xlsx|xls)$/i) || file.type.includes('spreadsheet')) {
-      transactions = await parseExcelFile(buffer)
-    } else if (file.name.match(/\.csv$/i) || file.type === 'text/csv') {
-      const text = new TextDecoder().decode(buffer)
-      // CSV simple: cada línea es una fila
-      const lines = text.split('\n')
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-      transactions = lines.slice(1).filter(l => l.trim()).map((line, i) => {
-        const cols = line.split(',')
-        const dateIdx = headers.findIndex(h => h.includes('fecha') || h.includes('date'))
-        const descIdx = headers.findIndex(h => h.includes('desc') || h.includes('glosa'))
-        const amtIdx = headers.findIndex(h => h.includes('monto') || h.includes('amount'))
-        const amount = parseFloat((cols[amtIdx] ?? '0').replace(/[^\d.-]/g, '')) || 0
-        return {
-          id: `tx-${i.toString().padStart(4, '0')}`,
-          date: cols[dateIdx]?.trim() ?? new Date().toISOString().split('T')[0],
-          description: cols[descIdx]?.trim() ?? `Transacción ${i}`,
-          amount,
-          type: amount >= 0 ? 'credit' as const : 'debit' as const,
-        }
-      })
-    } else if (file.name.match(/\.pdf$/i)) {
-      // Para PDF usamos pdf-parse en el servidor
-      try {
-        const pdfParse = (await import('pdf-parse')).default
-        const pdfData = await pdfParse(Buffer.from(buffer))
-        transactions = parsePDFText(pdfData.text)
-      } catch {
-        // Si pdf-parse falla, creamos datos de demostración
-        transactions = generateDemoTransactions()
-      }
-    }
+    // Iniciar procesamiento asíncrono (fire and forget)
+    processAnalysisAsync(
+      analysis.id,
+      buffer,
+      file.name,
+      user.id,
+      companyId
+    ).catch(err => {
+      console.error('Error en procesamiento asíncrono:', err)
+    })
 
-    // Si no hay transacciones parseadas, usar datos demo
-    if (transactions.length === 0) {
-      transactions = generateDemoTransactions()
-    }
-
-    // Detectar banco
-    const bank = detectBank(file.name)
-
-    // Detección con reglas (rápido)
-    const ruleAnomalies = detectAnomaliesRules(transactions)
-
-    // Detección con IA (si hay API key)
-    let aiAnomalies: typeof ruleAnomalies = []
-    let aiSummary = ''
-    
-    if (process.env.GOOGLE_GEMINI_API_KEY) {
-      try {
-        const aiResult = await analyzeTransactionsWithAI(transactions, bank)
-        aiAnomalies = aiResult.anomalies
-        aiSummary = aiResult.summary
-      } catch {
-        // IA falló, usamos solo reglas
-      }
-    }
-
-    // Combinar anomalías (sin duplicados por título)
-    const allTitles = new Set(ruleAnomalies.map(a => a.title))
-    const combined = [...ruleAnomalies, ...aiAnomalies.filter(a => !allTitles.has(a.title))]
-
-    const totalRecoverable = combined.reduce((sum, a) => sum + a.recoverableAmount, 0)
-
-    // Actualizar análisis en DB
-    await (supabase as any)
-      .from('analyses')
-      .update({
-        bank,
-        total_transactions: transactions.length,
-        anomalies_count: combined.length,
-        recoverable_amount: totalRecoverable,
-        status: 'completed',
-        raw_data: transactions as unknown as Record<string, unknown>[],
-        anomalies: combined as unknown as Record<string, unknown>[],
-        ai_summary: aiSummary || null,
-      })
-      .eq('id', (analysis as any).id)
-
-    // Guardar anomalías individuales
-    if (combined.length > 0) {
-      await (supabase as any).from('anomalies').insert(
-        combined.map(a => ({
-          analysis_id: (analysis as any).id,
-          user_id: user.id,
-          type: a.type,
-          severity: a.severity,
-          title: a.title,
-          description: a.description,
-          detail: a.detail,
-          recoverable_amount: a.recoverableAmount,
-          transaction_refs: a.transactionRefs,
-          status: 'pending',
-        }))
-      )
-    }
-
-    // Descontar crédito (solo si no tiene plan de éxito)
-    if (!hasSuccessPlan) {
-      const { error: creditError } = await (supabase as any)
-        .from('credits')
-        .update({ used: ((credits as any)?.used ?? 0) + 1 })
-        .eq('user_id', user.id)
-
-      if (creditError) {
-        console.error('Error al descontar crédito:', creditError)
-      }
-    }
-
+    // Retornar inmediatamente con el ID del análisis
     return NextResponse.json({
       analysisId: analysis.id,
-      totalTransactions: transactions.length,
-      anomaliesCount: combined.length,
-      recoverableAmount: totalRecoverable,
-      anomalies: combined,
-      summary: aiSummary,
+      status: 'processing',
+      message: 'Análisis iniciado. Consulta el estado con GET /api/analyses/[id]',
     })
 
   } catch (err) {
     console.error('Analysis error:', err)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
-}
-
-// Datos demo realistas basados en el caso real de la carnicería
-function generateDemoTransactions(): ParsedTransaction[] {
-  const base = [
-    { date: '2024-03-01', description: 'VENTA TC 6 CUOTAS S/INT', amount: 120000, type: 'credit' as const },
-    { date: '2024-03-01', description: 'COMISION CREDITO TC', amount: -3600, type: 'debit' as const },
-    { date: '2024-03-05', description: 'VENTA DEBITO', amount: 45200, type: 'credit' as const },
-    { date: '2024-03-12', description: 'VENTA DEBITO POS 4821', amount: 85900, type: 'credit' as const },
-    { date: '2024-03-12', description: 'CARGO TRANSACCION POS 4821', amount: -85900, type: 'debit' as const },
-    { date: '2024-03-15', description: 'VENTA TC 3 CUOTAS S/INT', amount: 85000, type: 'credit' as const },
-    { date: '2024-04-01', description: 'CUOTA 2/6 VENTA 01/03', amount: 20000, type: 'credit' as const },
-    { date: '2024-04-01', description: 'COMISION CREDITO TC', amount: -3600, type: 'debit' as const },
-    { date: '2024-04-10', description: 'MANTENCION TERMINAL POS', amount: -12890, type: 'debit' as const },
-    { date: '2024-04-10', description: 'MANTENCION TERMINAL POS', amount: -12890, type: 'debit' as const },
-    { date: '2024-04-15', description: 'COM ADM 04', amount: -5500, type: 'debit' as const },
-    { date: '2024-05-01', description: 'CUOTA 3/6 VENTA 01/03', amount: 20000, type: 'credit' as const },
-    { date: '2024-05-01', description: 'COMISION CREDITO TC', amount: -3600, type: 'debit' as const },
-    { date: '2024-05-15', description: 'VENTA TC 6 CUOTAS S/INT', amount: 340000, type: 'credit' as const },
-    { date: '2024-05-15', description: 'COMISION CREDITO TC', amount: -10200, type: 'debit' as const },
-  ]
-  return base.map((tx: any, i: number) => ({ ...tx, id: `tx-${i.toString().padStart(4, '0')}` }))
 }

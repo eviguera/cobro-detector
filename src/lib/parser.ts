@@ -1,4 +1,5 @@
 import type { ParsedTransaction } from '@/types/database.types'
+import { sanitizeDescription } from '@/lib/security'
 
 // Genera IDs únicos para transacciones
 function generateId(index: number): string {
@@ -76,7 +77,7 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
       return {
         id: generateId(i),
         date: parseDate(rawDate),
-        description: rawDesc.trim(),
+        description: sanitizeDescription(rawDesc.trim()),
         amount,
         type,
       }
@@ -104,7 +105,7 @@ export function parsePDFText(text: string): ParsedTransaction[] {
       transactions.push({
         id: generateId(index++),
         date: parseDate(rawDate),
-        description: rawDesc.trim(),
+        description: sanitizeDescription(rawDesc.trim()),
         amount,
         type: amount >= 0 ? 'credit' : 'debit',
       })
