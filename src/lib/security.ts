@@ -1,8 +1,68 @@
 import crypto from 'crypto'
 
-// ============================================
+// ==========================================
+// Validación de Tipos de Archivo (Magic Bytes)
+// ==========================================
+
+// Mapa de magic bytes para tipos de archivo soportados
+const FILE_SIGNATURES: Record<string, { signatures: number[][]; mimeTypes: string[] }> = {
+  xlsx: {
+    signatures: [[0x50, 0x4B, 0x03, 0x04]], // ZIP format (XLSX is a ZIP)
+    mimeTypes: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+  },
+  xls: {
+    signatures: [[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]],
+    mimeTypes: ['application/vnd.ms-excel']
+  },
+  csv: {
+    signatures: [], // CSV no tiene magic bytes, se valida por contenido
+    mimeTypes: ['text/csv', 'text/plain']
+  },
+  pdf: {
+    signatures: [[0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E]], // %PDF-1.
+    mimeTypes: ['application/pdf']
+  }
+}
+
+/**
+ * Valida magic bytes de un archivo
+ * @returns true si el archivo coincide con su tipo declarado
+ */
+export function validateFileSignature(
+  buffer: ArrayBuffer,
+  fileName: string
+): { valid: boolean; error?: string } {
+  const extension = fileName.toLowerCase().split('.').pop() || ''
+  const fileConfig = FILE_SIGNATURES[extension]
+  
+  if (!fileConfig) {
+    return { valid: false, error: `Tipo de archivo no soportado: .${extension}` }
+  }
+  
+  // CSV no tiene magic bytes, se acepta
+  if (fileConfig.signatures.length === 0) {
+    return { valid: true }
+  }
+  
+  const uint8 = new Uint8Array(buffer)
+  
+  const isValid = fileConfig.signatures.some(signature =>
+    signature.every((byte, index) => uint8[index] === byte)
+  )
+  
+  if (!isValid) {
+    return { 
+      valid: false, 
+      error: `El archivo .${extension} está corrupto o no es un archivo válido` 
+    }
+  }
+  
+  return { valid: true }
+}
+
+// ==========================================
 // Sanitización de Datos (Anti Prompt Injection)
-// ============================================
+// ==========================================
 
 // Patrones maliciosos comunes en intentos de prompt injection
 const INJECTION_PATTERNS = [
@@ -38,9 +98,9 @@ export function sanitizeTransactions<T extends { description: string | null | un
   }))
 }
 
-// ============================================
+// ==========================================
 // API Key Hashing (SHA-256 Consistente)
-// ============================================
+// ==========================================
 
 /**
  * Genera un hash SHA-256 para API keys
@@ -58,9 +118,9 @@ export function verifyApiKey(rawKey: string, storedHash: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'))
 }
 
-// ============================================
+// ==========================================
 // Validación de Webhooks (MercadoPago)
-// ============================================
+// ==========================================
 
 /**
  * Verifica la firma de un webhook de MercadoPago v2
@@ -72,15 +132,15 @@ export function verifyMercadoPagoWebhook(
   webhookSecret: string
 ): boolean {
   if (!signature || !webhookSecret) return false
-
+  
   try {
     const [algorithm, signatureHash] = signature.split('=')
     if (!algorithm || !signatureHash) return false
-
+    
     const hmac = crypto.createHmac('sha256', webhookSecret)
     hmac.update(body)
     const expectedHash = hmac.digest('hex')
-
+    
     return crypto.timingSafeEqual(
       Buffer.from(signatureHash, 'hex'),
       Buffer.from(expectedHash, 'hex')
@@ -90,9 +150,9 @@ export function verifyMercadoPagoWebhook(
   }
 }
 
-// ============================================
+// ==========================================
 // Validación de Variables de Entorno
-// ============================================
+// ==========================================
 
 import { z } from 'zod'
 
@@ -116,16 +176,16 @@ let cachedEnv: Env | null = null
  */
 export function validateEnv(): Env {
   if (cachedEnv) return cachedEnv
-
+  
   const parsed = envSchema.safeParse(process.env)
-
+  
   if (!parsed.success) {
     const missing = parsed.error.issues
       .map(i => `${i.path.join('.')}: ${i.message}`)
       .join('\n  ')
     throw new Error(`❌ Variables de entorno inválidas:\n  ${missing}`)
   }
-
+  
   cachedEnv = parsed.data
   return cachedEnv
 }

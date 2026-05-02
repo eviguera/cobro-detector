@@ -2,9 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { Database } from '@/types/database.types'
 
-export async function createClient() {
+/**
+ * Cliente tipado para el servidor
+ * Retorna un cliente con el tipo Database propagado correctamente
+ */
+export function createClient() {
   const cookieStore = await cookies()
-
+  
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -22,3 +26,13 @@ export async function createClient() {
     }
   )
 }
+
+/**
+ * Helper para operaciones de base de datos
+ * Evita el uso de `as any` manteniendo tipos
+ */
+export function db(supabase: Awaited<ReturnType<typeof createClient>>) {
+  return supabase
+}
+
+export type SupabaseClient = Awaited<ReturnType<typeof createClient>>

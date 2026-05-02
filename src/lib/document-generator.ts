@@ -1,4 +1,11 @@
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle } from 'docx'
+// Dynamic import for docx (heavy library)
+let docxModule: any = null
+const getDocx = async () => {
+  if (!docxModule) {
+    docxModule = await import('docx')
+  }
+  return docxModule
+}
 import type { Analysis, Anomaly } from '@/types/database.types'
 
 interface LetterData {
@@ -11,7 +18,9 @@ interface LetterData {
   date: string
 }
 
-export function generateComplaintLetter(data: LetterData): Document {
+export async function generateComplaintLetter(data: LetterData): Promise<Document> {
+  const docx = await getDocx()
+  const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle } = docx
   const { analysis, anomalies, bankName, businessName, userName, rut, date } = data
 
   const formatCurrency = (amount: number) => {
@@ -209,14 +218,16 @@ export function generateComplaintLetter(data: LetterData): Document {
 }
 
 export async function generateWordDocument(data: LetterData): Promise<Buffer> {
-  const doc = generateComplaintLetter(data)
+  const docx = await getDocx()
+  const { Packer } = docx
+  const doc = await generateComplaintLetter(data)
   const buffer = await Packer.toBuffer(doc)
   return buffer
 }
 
 export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
-  const puppeteer = require('puppeteer')
-  const browser = await puppeteer.launch({ headless: 'new' })
+  const puppeteer = await import('puppeteer')
+  const browser = await puppeteer.launch({ headless: true })
   const page = await browser.newPage()
 
   const html = `

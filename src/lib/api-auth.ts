@@ -7,6 +7,7 @@ export interface ApiAuthResult {
   permissions?: string[]
   api_key_id?: string
   rate_limit_exceeded?: boolean
+  error?: string
 }
 
 export async function authenticateApiRequest(
@@ -35,6 +36,14 @@ export async function authenticateApiRequest(
 
     if (error || !data || !data.valid) {
       return { authenticated: false }
+    }
+
+    // Verificar si la key ha expirado
+    if (data.expires_at) {
+      const expiresAt = new Date(data.expires_at)
+      if (expiresAt < new Date()) {
+        return { authenticated: false, error: 'API key expirada' }
+      }
     }
 
     const result = data
