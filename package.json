@@ -15,7 +15,6 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.9.0",
-    "@sentry/nextjs": "^10.51.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.0",
     "@upstash/ratelimit": "^2.0.8",

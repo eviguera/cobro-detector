@@ -1,6 +1,4 @@
 /** @type {import('next').NextConfig} */
-const { withSentryConfig } = require('@sentry/nextjs');
-
 const nextConfig = {
   typescript: {
     // No ignorar errores de TypeScript en build
@@ -31,7 +29,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.sentry.io https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.vercel.app; font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://*.vercel.app https://*.sentry.io;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.vercel.app; font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://*.vercel.app;",
           },
           {
             key: 'Referrer-Policy',
@@ -47,22 +45,4 @@ const nextConfig = {
   },
 }
 
-  // Configuración de Sentry (DESACTIVADO temporalmente)
-const sentryWebpackPluginOptions = {
-  // Solo activar si hay DSN válido
-  dsn: process.env.SENTRY_DSN && process.env.SENTRY_DSN.includes('@') ? process.env.SENTRY_DSN : undefined,
-  
-  org: process.env.SENTRY_ORG || "deev-aq",
-  project: process.env.SENTRY_PROJECT || "cobro-detector",
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  
-  silent: true,
-  suppressErrors: true,
-  sourcemaps: {
-    disable: true,
-  },
-  
-  widenClientFileUpload: true,
-}
-
-module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
+module.exports = nextConfig;
