@@ -22,13 +22,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Rate limiting real con Redis (Upstash)
-    const rateCheck = await checkAnalyzeRateLimit(user.id)
-    if (!rateCheck.allowed) {
-      return NextResponse.json(
-        { error: 'Demasiadas solicitudes. Intenta más tarde.', retryAfter: rateCheck.retryAfter },
-        { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter || 3600) } }
-      )
+    // Rate limiting (opcional - continuar si falla)
+    try {
+      const rateCheck = await checkAnalyzeRateLimit(user.id)
+      if (!rateCheck.allowed) {
+        return NextResponse.json(
+          { error: 'Demasiadas solicitudes. Intenta más tarde.', retryAfter: rateCheck.retryAfter },
+          { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter || 3600) } }
+        )
+      }
+    } catch (rateError) {
+      console.warn('⚠️ Rate limiting no disponible:', rateError)
+      // Continuar sin rate limiting
     }
 
     // Obtener archivo y company_id
