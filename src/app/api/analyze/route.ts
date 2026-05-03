@@ -57,10 +57,12 @@ export async function POST(request: NextRequest) {
       .eq('status', 'paid')
       .eq('success_plan_active', true)
       .single()
-
+    
     const hasSuccessPlan = !!activeSuccessOrder
+    console.log(`🔍 hasSuccessPlan: ${hasSuccessPlan}, order: ${activeSuccessOrder?.id}`)
 
     let credits: Credits | null = null
+    let creditsLeft = 999999 // Por defecto ilimitado si tiene plan success
 
     // Verificar créditos (solo si no tiene plan de éxito)
     if (!hasSuccessPlan) {
@@ -68,18 +70,21 @@ export async function POST(request: NextRequest) {
         .from('credits')
         .select('*')
         .eq('user_id', user.id)
-
+      
       if (companyId) {
         creditsQuery.eq('company_id', companyId)
       } else {
         creditsQuery.is('company_id', null)
       }
-
+      
       const creditsResult = await creditsQuery.single()
       // TypeScript no infiere bien el tipo de .single(), así que casteamos
       credits = (creditsResult.data ?? null) as Credits | null
+      console.log(`🔍 Créditos hallados:`, credits)
 
-      const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
+      creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
+      console.log(`🔍 Créditos restantes: ${creditsLeft}, total: ${credits?.total}, used: ${credits?.used}`)
+      
       if (creditsLeft <= 0) {
         return NextResponse.json({ error: 'Sin créditos disponibles' }, { status: 402 })
       }
@@ -106,30 +111,41 @@ export async function POST(request: NextRequest) {
     }
 
     // Descontar crédito (solo si no tiene plan de éxito)
-    if (!hasSuccessPlan && credits) {
+    if (!hasSuccessPlan) {
+      if (!credits) {
+        console.error('❌ No se encontró registro de créditos para el usuario');
+        return NextResponse.json({ error: 'No se encontró registro de créditos. Contacta soporte.' }, { status: 500 })
+      }
+
       const newUsed = (credits.used ?? 0) + 1
+      console.log(`🔻 Descontando crédito: ${credits.used} → ${newUsed} (total: ${credits.total})`)
       
-      let error: Error | null = null
+      let updateError: any = null
       
       if (companyId) {
-        const { error: creditError } = await (supabase as any)
+        const { error } = await (supabase as any)
           .from('credits')
           .update({ used: newUsed })
           .eq('user_id', user.id)
           .eq('company_id', companyId)
-        error = creditError
+        updateError = error
       } else {
-        const { error: creditError } = await (supabase as any)
+        const { error } = await (supabase as any)
           .from('credits')
           .update({ used: newUsed })
           .eq('user_id', user.id)
           .is('company_id', null)
-        error = creditError
+        updateError = error
       }
 
-      if (error) {
-        console.error('Error al descontar crédito:', error)
+      if (updateError) {
+        console.error('❌ Error al descontar crédito:', updateError)
+        // No fallar el análisis, pero loguear el error
+      } else {
+        console.log(`✅ Crédito descontado exitosamente. Nuevo used: ${newUsed}`)
       }
+    } else {
+      console.log('✅ Usuario tiene plan de éxito activo, no se descuentan créditos')
     }
 
     // Obtener buffer del archivo para procesamiento asíncrono
