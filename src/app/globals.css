@@ -77,22 +77,22 @@
   .dark {
     /* Sophisticated Bank Dark - Estilo Banca Privada */
     --background: 222 40% 8%;  /* Azul marino muy oscuro */
-    --foreground: 220 20% 98%;  /* Texto casi blanco */
+    --foreground: 220 30% 99%;  /* Texto BLANCO PURO para máximo contraste */
     --card: 222 35% 12%;  /* Tarjetas azul marino oscuro */
-    --card-foreground: 220 20% 98%;
-    --primary: 221 70% 45%;  /* Azul corporativo medio */
+    --card-foreground: 220 30% 99%;  /* Texto blanco en tarjetas */
+    --primary: 221 75% 55%;  /* Azul corporativo más brillante */
     --primary-foreground: 0 0% 100%;  /* Blanco puro */
-    --secondary: 222 30% 15%;  /* Gris azulado oscuro */
-    --secondary-foreground: 220 20% 95%;
-    --muted: 222 25% 15%;
-    --muted-foreground: 220 15% 70%;  /* Gris claro legible */
-    --accent: 222 30% 15%;
-    --accent-foreground: 220 20% 98%;
-    --destructive: 0 70% 45%;
+    --secondary: 222 30% 16%;  /* Gris azulado oscuro */
+    --secondary-foreground: 220 25% 98%;  /* Casi blanco */
+    --muted: 222 25% 16%;  /* Fondo muted */
+    --muted-foreground: 220 20% 75%;  /* Gris claro PERO LEGIBLE (subió de 70% a 75%) */
+    --accent: 222 30% 16%;
+    --accent-foreground: 220 30% 99%;  /* Texto blanco */
+    --destructive: 0 75% 50%;  /* Rojo más brillante */
     --destructive-foreground: 0 0% 100%;
-    --border: 222 25% 20%;  /* Bordes visibles */
-    --input: 222 25% 20%;
-    --ring: 221 70% 50%;
+    --border: 222 25% 22%;  /* Bordes MÁS VISIBLES (subió de 20% a 22%) */
+    --input: 222 25% 22%;
+    --ring: 221 75% 55%;
     
     /* Paleta de marca - Sobria y elegante */
     --brand-50: #0a0e1a;
@@ -100,9 +100,9 @@
     --brand-200: #162033;
     --brand-300: #1e2d44;
     --brand-400: #2a3a5c;
-    --brand-500: #3b4d6c;  /* Azul medio sobrio */
-    --brand-600: #4c6ef5;  /* Azul claro para acentos */
-    --brand-700: #5c7cfa;
+    --brand-500: #4c6ef5;  /* Azul más brillante para mejor contraste */
+    --brand-600: #5c7cfa;  /* Azul claro para acentos */
+    --brand-700: #748ffc;
     --brand-800: #91a7ff;
     --brand-900: #bac8ff;
     --brand-950: #e0e7ff;
@@ -115,7 +115,7 @@
     --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.4);
     --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.4);
     --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -4px rgba(0,0,0,0.4);
-    --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0,0.4);
+    --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.4);
   }
 }
 
