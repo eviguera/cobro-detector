@@ -43,15 +43,79 @@ export async function POST(request: NextRequest) {
 
     console.log(`📄 Archivo: ${file.name} (${file.size} bytes)`)
 
-    // TODO: Re-implementar lógica de créditos y análisis
-    // Por ahora retornar un mensaje de éxito simulado
+    // ===========================================
+    // VERIFICAR CRÉDITOS (SIMPLIFICADO)
+    // ===========================================
+    
+    console.log('💰 Verificando créditos...')
+    
+    try {
+      const { data: credits, error: creditsError } = await supabase
+        .from('credits')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('company_id', null)
+        .single()
+      
+      if (creditsError) {
+        console.error('❌ Error obteniendo créditos:', creditsError.message)
+        return NextResponse.json({ 
+          error: 'Error al verificar créditos',
+          details: creditsError.message 
+        }, { status: 500 })
+      }
+      
+      if (!credits) {
+        console.error('❌ No se encontró registro de créditos')
+        return NextResponse.json({ 
+          error: 'No se encontró registro de créditos' 
+        }, { status: 500 })
+      }
+      
+      // Asegurar tipado correcto
+      const creditsData = credits as any
+      const creditsLeft = (creditsData.total ?? 0) - (creditsData.used ?? 0)
+      console.log(`💰 Créditos: total=${creditsData.total}, used=${creditsData.used}, left=${creditsLeft}`)
+      
+      if (creditsLeft <= 0) {
+        return NextResponse.json({ 
+          error: 'Sin créditos',
+          message: 'Compra más en /precios',
+          redirectTo: '/precios'
+        }, { status: 402 })
+      }
+      
+      // Descontar 1 crédito
+      const newUsed = (creditsData.used ?? 0) + 1
+      console.log(`🔻 Descontando crédito: ${creditsData.used} → ${newUsed}`)
+      
+      const { error: updateError } = await (supabase as any)
+        .from('credits')
+        .update({ used: newUsed })
+        .eq('id', creditsData.id)
+      
+      if (updateError) {
+        console.error('❌ Error descontando crédito:', updateError.message)
+        return NextResponse.json({ 
+          error: 'Error al procesar créditos' 
+        }, { status: 500 })
+      }
+      
+      console.log(`✅ Crédito descontado. Nuevo used: ${newUsed}`)
+      
+    } catch (creditErr) {
+      console.error('❌ Error inesperado con créditos:', creditErr)
+      return NextResponse.json({ 
+        error: 'Error procesando créditos' 
+      }, { status: 500 })
+    }
+
+    // TODO: Implementar análisis asíncrono
     return NextResponse.json({
       success: true,
-      message: 'Análisis iniciado (modo diagnóstico)',
-      analysisId: 'diag-' + Date.now(),
+      message: 'Crédito descontado. Análisis pendiente de implementar.',
       userId: user.id,
       fileName: file.name,
-      fileSize: file.size,
     })
 
   } catch (err) {
