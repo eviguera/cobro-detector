@@ -50,7 +50,7 @@ const nextConfig = {
 // Configuración de Sentry
 const sentryWebpackPluginOptions = {
   // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
+  silent: true,  // Silenciar logs
   
   org: process.env.SENTRY_ORG || "deev-aq",
   project: process.env.SENTRY_PROJECT || "cobro-detector",
@@ -63,7 +63,7 @@ const sentryWebpackPluginOptions = {
   
   // Upload source maps for better error tracking
   sourcemaps: {
-    disable: false,
+    disable: true,  // ← Desactivado temporalmente hasta arreglar auth token
   },
   
   // Opciones adicionales
