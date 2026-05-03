@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // VERIFICAR Y DESCONTAR CRÉDITOS
+    // VERIFICAR Y DESCONTAR CRÉDITOS (SIEMPRE)
     // ============================================
     
     // 1. Buscar registro de créditos
@@ -67,24 +67,56 @@ export async function POST(request: NextRequest) {
     
     if (creditsError || !credits) {
       console.error('❌ Error obteniendo créditos:', creditsError)
-      return NextResponse.json({ error: 'No se encontró registro de créditos.' }, { status: 500 })
+      return NextResponse.json({ 
+        error: 'No se encontró registro de créditos. Contacta soporte.' 
+      }, { status: 500 })
     }
 
-    console.log(`💰 Créditos encontrados: total=${credits.total}, used=${credits.used}`)
+    // Asegurar que credits no es null para TypeScript
+    const creditsData: Credits = credits as Credits
 
-    // 2. Verificar si tiene créditos disponibles
-    const creditsLeft = (credits.total ?? 0) - (credits.used ?? 0)
-    
+    console.log(`💰 Créditos encontrados: total=${creditsData.total}, used=${creditsData.used}`)
+
+    // 2. Calcular créditos restantes
+    const creditsLeft = (creditsData.total ?? 0) - (creditsData.used ?? 0)
+    console.log(`💰 Créditos restantes: ${creditsLeft}`)
+
+    // 3. Si no hay créditos, decir que compre más y redirigir a precios
     if (creditsLeft <= 0) {
       console.log(`❌ Sin créditos: left=${creditsLeft}`)
       return NextResponse.json({ 
         error: 'Sin créditos disponibles', 
         creditsLeft: 0,
-        message: 'Compra más créditos en /precios'
+        message: 'No tienes créditos. Compra más en /precios',
+        redirectTo: '/precios'
       }, { status: 402 })
     }
 
-    console.log(`✅ Créditos disponibles: ${creditsLeft}`)
+    // 4. Descontar crédito AHORA (antes de crear análisis)
+    const newUsed = (credits.used ?? 0) + 1
+    console.log(`🔻 Descontando crédito: ${credits.used} → ${newUsed} (total: ${credits.total})`)
+
+    const updateQuery = (supabase as any)
+      .from('credits')
+      .update({ used: newUsed })
+      .eq('user_id', user.id)
+
+    if (companyId) {
+      updateQuery.eq('company_id', companyId)
+    } else {
+      updateQuery.is('company_id', null)
+    }
+
+    const { error: updateError } = await updateQuery
+
+    if (updateError) {
+      console.error('❌ Error descontando crédito:', updateError)
+      return NextResponse.json({ 
+        error: 'Error al procesar créditos. Intenta nuevamente.' 
+      }, { status: 500 })
+    }
+
+    console.log(`✅ Crédito descontado exitosamente. Nuevo used: ${newUsed}`)
 
     // ============================================
     // REGISTRAR ANÁLISIS
@@ -107,37 +139,11 @@ export async function POST(request: NextRequest) {
 
     if (insertError || !analysis) {
       console.error('❌ Error creando análisis:', insertError)
+      // TODO: Revertir descuento de crédito si falla
       return NextResponse.json({ error: 'Error al crear análisis' }, { status: 500 })
     }
 
     console.log(`📊 Análisis creado: ${analysis.id}`)
-
-    // ============================================
-    // DESCONTAR CRÉDITO (IMPORTANTE: SIEMPRE DESCONTAR)
-    // ============================================
-    
-    const newUsed = (credits.used ?? 0) + 1
-    console.log(`🔻 Descontando crédito: ${credits.used} → ${newUsed}`)
-
-    const updateQuery = (supabase as any)
-      .from('credits')
-      .update({ used: newUsed })
-      .eq('user_id', user.id)
-
-    if (companyId) {
-      updateQuery.eq('company_id', companyId)
-    } else {
-      updateQuery.is('company_id', null)
-    }
-
-    const { error: updateError } = await updateQuery
-
-    if (updateError) {
-      console.error('❌ Error descontando crédito:', updateError)
-      // No fallar el análisis, pero loguear
-    } else {
-      console.log(`✅ Crédito descontado exitosamente. Nuevo used: ${newUsed}`)
-    }
 
     // ============================================
     // PROCESAR ANÁLISIS (ASÍNCRONO)
