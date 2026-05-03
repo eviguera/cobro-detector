@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       .single()
     
     const hasSuccessPlan = !!activeSuccessOrder
-    console.log(`🔍 hasSuccessPlan: ${hasSuccessPlan}, order: ${activeSuccessOrder?.id || 'ninguno'}`)
+    console.log(`🔍 hasSuccessPlan: ${hasSuccessPlan}`)
 
     let credits: Credits | null = null
     let creditsLeft = 999999 // Por defecto ilimitado si tiene plan success
