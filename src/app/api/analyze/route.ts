@@ -16,11 +16,14 @@ if (missingVars.length > 0) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    if (!user) {
+    if (authError || !user) {
+      console.error('❌ Auth error:', authError?.message)
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
+
+    console.log(`👤 Usuario autenticado: ${user.id}`)
 
     // Rate limiting (opcional - continuar si falla)
     try {
