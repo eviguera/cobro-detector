@@ -27,13 +27,31 @@ export async function POST(request: NextRequest) {
 
     console.log(`👤 Usuario autenticado: ${user.id}`)
     
+    // Obtener archivo
+    let file: File | null = null
+    try {
+      const formData = await request.formData()
+      file = formData.get('file') as File | null
+    } catch (formError) {
+      console.error('❌ Error leyendo FormData:', formError)
+      return NextResponse.json({ error: 'Error al leer archivo' }, { status: 400 })
+    }
+
+    if (!file) {
+      return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
+    }
+
+    console.log(`📄 Archivo: ${file.name} (${file.size} bytes)`)
+
     // TODO: Re-implementar lógica de créditos y análisis
     // Por ahora retornar un mensaje de éxito simulado
     return NextResponse.json({
       success: true,
       message: 'Análisis iniciado (modo diagnóstico)',
       analysisId: 'diag-' + Date.now(),
-      creditsLeft: 99,
+      userId: user.id,
+      fileName: file.name,
+      fileSize: file.size,
     })
 
   } catch (err) {
