@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkAnalyzeRateLimit } from '@/lib/rate-limit'
 import type { Credits } from '@/types/database.types'
-import type { Database } from '@/types/database.types'
 import { processAnalysisAsync } from '@/lib/analysis-worker'
 
 export const maxDuration = 10 // 10s timeout para Vercel (solo registro inicial)
@@ -25,7 +24,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Obtener archivo y company_id primero
+    // Obtener archivo y company_id
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const companyId = formData.get('company_id') as string | null
@@ -48,49 +47,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tipo de archivo no permitido. Usa PDF, Excel o CSV.' }, { status: 400 })
     }
 
-    // Verificar si el usuario tiene plan de éxito activo
-    const { data: activeSuccessOrder } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('plan', 'success_fee')
-      .eq('status', 'paid')
-      .eq('success_plan_active', true)
-      .single()
+    // ============================================
+    // VERIFICAR Y DESCONTAR CRÉDITOS
+    // ============================================
     
-    const hasSuccessPlan = !!activeSuccessOrder
-    console.log(`🔍 hasSuccessPlan: ${hasSuccessPlan}`)
+    // 1. Buscar registro de créditos
+    const creditsQuery = supabase
+      .from('credits')
+      .select('*')
+      .eq('user_id', user.id)
 
-    let credits: Credits | null = null
-    let creditsLeft = 999999 // Por defecto ilimitado si tiene plan success
-
-    // Verificar créditos (solo si no tiene plan de éxito)
-    if (!hasSuccessPlan) {
-      const creditsQuery = supabase
-        .from('credits')
-        .select('*')
-        .eq('user_id', user.id)
-      
-      if (companyId) {
-        creditsQuery.eq('company_id', companyId)
-      } else {
-        creditsQuery.is('company_id', null)
-      }
-      
-      const creditsResult = await creditsQuery.single()
-      // TypeScript no infiere bien el tipo de .single(), así que casteamos
-      credits = (creditsResult.data ?? null) as Credits | null
-      console.log(`🔍 Créditos hallados:`, credits)
-
-      creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
-      console.log(`🔍 Créditos restantes: ${creditsLeft}, total: ${credits?.total}, used: ${credits?.used}`)
-      
-      if (creditsLeft <= 0) {
-        return NextResponse.json({ error: 'Sin créditos disponibles' }, { status: 402 })
-      }
+    if (companyId) {
+      creditsQuery.eq('company_id', companyId)
+    } else {
+      creditsQuery.is('company_id', null)
     }
 
-    // Registrar análisis en DB (estado: processing)
+    const { data: credits, error: creditsError } = await creditsQuery.single()
+    
+    if (creditsError || !credits) {
+      console.error('❌ Error obteniendo créditos:', creditsError)
+      return NextResponse.json({ error: 'No se encontró registro de créditos.' }, { status: 500 })
+    }
+
+    console.log(`💰 Créditos encontrados: total=${credits.total}, used=${credits.used}`)
+
+    // 2. Verificar si tiene créditos disponibles
+    const creditsLeft = (credits.total ?? 0) - (credits.used ?? 0)
+    
+    if (creditsLeft <= 0) {
+      console.log(`❌ Sin créditos: left=${creditsLeft}`)
+      return NextResponse.json({ 
+        error: 'Sin créditos disponibles', 
+        creditsLeft: 0,
+        message: 'Compra más créditos en /precios'
+      }, { status: 402 })
+    }
+
+    console.log(`✅ Créditos disponibles: ${creditsLeft}`)
+
+    // ============================================
+    // REGISTRAR ANÁLISIS
+    // ============================================
+    
     const { data: analysis, error: insertError } = await (supabase as any)
       .from('analyses')
       .insert({
@@ -107,51 +106,45 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError || !analysis) {
+      console.error('❌ Error creando análisis:', insertError)
       return NextResponse.json({ error: 'Error al crear análisis' }, { status: 500 })
     }
 
-    // Descontar crédito (solo si no tiene plan de éxito)
-    if (!hasSuccessPlan) {
-      if (!credits) {
-        console.error('❌ No se encontró registro de créditos para el usuario');
-        return NextResponse.json({ error: 'No se encontró registro de créditos. Contacta soporte.' }, { status: 500 })
-      }
+    console.log(`📊 Análisis creado: ${analysis.id}`)
 
-      const newUsed = (credits.used ?? 0) + 1
-      console.log(`🔻 Descontando crédito: ${credits.used} → ${newUsed} (total: ${credits.total})`)
-      
-      let updateError: any = null
-      
-      if (companyId) {
-        const { error } = await (supabase as any)
-          .from('credits')
-          .update({ used: newUsed })
-          .eq('user_id', user.id)
-          .eq('company_id', companyId)
-        updateError = error
-      } else {
-        const { error } = await (supabase as any)
-          .from('credits')
-          .update({ used: newUsed })
-          .eq('user_id', user.id)
-          .is('company_id', null)
-        updateError = error
-      }
+    // ============================================
+    // DESCONTAR CRÉDITO (IMPORTANTE: SIEMPRE DESCONTAR)
+    // ============================================
+    
+    const newUsed = (credits.used ?? 0) + 1
+    console.log(`🔻 Descontando crédito: ${credits.used} → ${newUsed}`)
 
-      if (updateError) {
-        console.error('❌ Error al descontar crédito:', updateError)
-        // No fallar el análisis, pero loguear el error
-      } else {
-        console.log(`✅ Crédito descontado exitosamente. Nuevo used: ${newUsed}`)
-      }
+    const updateQuery = (supabase as any)
+      .from('credits')
+      .update({ used: newUsed })
+      .eq('user_id', user.id)
+
+    if (companyId) {
+      updateQuery.eq('company_id', companyId)
     } else {
-      console.log('✅ Usuario tiene plan de éxito activo, no se descuentan créditos')
+      updateQuery.is('company_id', null)
     }
 
-    // Obtener buffer del archivo para procesamiento asíncrono
+    const { error: updateError } = await updateQuery
+
+    if (updateError) {
+      console.error('❌ Error descontando crédito:', updateError)
+      // No fallar el análisis, pero loguear
+    } else {
+      console.log(`✅ Crédito descontado exitosamente. Nuevo used: ${newUsed}`)
+    }
+
+    // ============================================
+    // PROCESAR ANÁLISIS (ASÍNCRONO)
+    // ============================================
+    
     const buffer = await file.arrayBuffer()
 
-    // Iniciar procesamiento asíncrono (fire and forget)
     processAnalysisAsync(
       analysis.id,
       buffer,
@@ -159,18 +152,19 @@ export async function POST(request: NextRequest) {
       user.id,
       companyId
     ).catch(err => {
-      console.error('Error en procesamiento asíncrono:', err)
+      console.error('❌ Error en procesamiento asíncrono:', err)
     })
 
     // Retornar inmediatamente con el ID del análisis
     return NextResponse.json({
       analysisId: analysis.id,
       status: 'processing',
+      creditsLeft: creditsLeft - 1,
       message: 'Análisis iniciado. Consulta el estado con GET /api/analyses/[id]',
     })
 
   } catch (err) {
-    console.error('Analysis error:', err)
+    console.error('❌ Analysis error:', err)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
