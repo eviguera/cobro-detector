@@ -6,6 +6,13 @@ import { processAnalysisAsync } from '@/lib/analysis-worker'
 
 export const maxDuration = 10 // 10s timeout para Vercel (solo registro inicial)
 
+// Verificar variables de entorno requeridas
+const requiredEnvVars = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']
+const missingVars = requiredEnvVars.filter(v => !process.env[v])
+if (missingVars.length > 0) {
+  console.error('❌ Variables de entorno faltantes:', missingVars)
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
