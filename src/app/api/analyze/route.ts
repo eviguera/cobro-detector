@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Descontar crédito AHORA (antes de crear análisis)
-    const newUsed = (credits.used ?? 0) + 1
-    console.log(`🔻 Descontando crédito: ${credits.used} → ${newUsed} (total: ${credits.total})`)
+    const newUsed = (creditsData.used ?? 0) + 1
+    console.log(`🔻 Descontando crédito: ${creditsData.used} → ${newUsed} (total: ${creditsData.total})`)
 
     const updateQuery = (supabase as any)
       .from('credits')

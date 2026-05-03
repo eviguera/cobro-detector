@@ -31,7 +31,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.sentry.io; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co https://*.vercel.app https://*.sentry.io;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.sentry.io https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.vercel.app; font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://*.vercel.app https://*.sentry.io;",
           },
           {
             key: 'Referrer-Policy',
@@ -47,28 +47,22 @@ const nextConfig = {
   },
 }
 
-// Configuración de Sentry
+  // Configuración de Sentry (DESACTIVADO temporalmente)
 const sentryWebpackPluginOptions = {
-  // Only print logs for uploading source maps in CI
-  silent: true,  // Silenciar logs
+  // Solo activar si hay DSN válido
+  dsn: process.env.SENTRY_DSN && process.env.SENTRY_DSN.includes('@') ? process.env.SENTRY_DSN : undefined,
   
   org: process.env.SENTRY_ORG || "deev-aq",
   project: process.env.SENTRY_PROJECT || "cobro-detector",
-  
-  // Auth token for uploading source maps
   authToken: process.env.SENTRY_AUTH_TOKEN,
   
-  // Suppresses source map uploading logs
+  silent: true,
   suppressErrors: true,
-  
-  // Upload source maps for better error tracking
   sourcemaps: {
-    disable: true,  // ← Desactivado temporalmente hasta arreglar auth token
+    disable: true,
   },
   
-  // Opciones adicionales
   widenClientFileUpload: true,
-  tunnelRoute: "/monitoring",
 }
 
 module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
