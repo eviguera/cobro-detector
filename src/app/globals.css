@@ -76,43 +76,43 @@
 
   .dark {
     --background: 224 71% 4%;
-    --foreground: 220 20% 98%;
+    --foreground: 220 20% 98%;  /* Texto más claro para contraste */
     --card: 224 71% 6%;
     --card-foreground: 220 20% 98%;
     --primary: 221 83% 65%;
-    --primary-foreground: 224 71% 4%;
+    --primary-foreground: 224 71% 4%;  /* Texto oscuro sobre primario */
     --secondary: 215 28% 17%;
     --secondary-foreground: 220 20% 98%;
     --muted: 215 28% 17%;
-    --muted-foreground: 217 10% 65%;
+    --muted-foreground: 217 10% 75%;  /* Más claro para legibilidad */
     --accent: 215 28% 17%;
     --accent-foreground: 220 20% 98%;
     --destructive: 0 63% 50%;
     --destructive-foreground: 220 20% 98%;
-    --border: 215 28% 17%;
-    --input: 215 28% 17%;
+    --border: 215 28% 25%;  /* Bordes más visibles */
+    --input: 215 28% 25%;
     --ring: 221 83% 65%;
-
-    /* Dark mode brand colors */
+    
+    /* Dark mode brand colors - más saturados para mejor contraste */
     --brand-50: #1a1f3a;
     --brand-100: #1e2452;
     --brand-200: #25307a;
     --brand-300: #2f3da0;
     --brand-400: #4c5bc8;
-    --brand-500: #5c7cfa;
+    --brand-500: #5c7cfa;  /* Más brillante */
     --brand-600: #748ffc;
     --brand-700: #91a7ff;
     --brand-800: #bac8ff;
     --brand-900: #dbe4ff;
     --brand-950: #f0f4ff;
-
-    --gradient-subtle: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(92,124,250,0.05) 100%);
-    --gradient-card: linear-gradient(135deg, rgba(30,31,48,1) 0%, rgba(24,24,36,1) 100%);
-
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+    
+    --gradient-subtle: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(92,124,250,0.08) 100%);
+    --gradient-card: linear-gradient(135deg, rgba(40,41,60,1) 0%, rgba(30,30,44,1) 100%);
+    
+    --shadow-sm: 0 1px 2px 0 rgba(255,255,255,0.05);
+    --shadow-md: 0 4px 6px -1px rgba(255,255,255,0.08), 0 2px 4px -2px rgba(255,255,255,0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(255,255,255,0.08), 0 4px 6px -4px rgba(255,255,255,0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(255,255,255,0.08), 0 8px 10px -6px rgba(255,255,255,0.05);
   }
 }
 
