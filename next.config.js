@@ -52,8 +52,8 @@ const sentryWebpackPluginOptions = {
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
   
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
+  org: process.env.SENTRY_ORG || "deev-aq",
+  project: process.env.SENTRY_PROJECT || "cobro-detector",
   
   // Auth token for uploading source maps
   authToken: process.env.SENTRY_AUTH_TOKEN,
@@ -65,6 +65,10 @@ const sentryWebpackPluginOptions = {
   sourcemaps: {
     disable: false,
   },
+  
+  // Opciones adicionales
+  widenClientFileUpload: true,
+  tunnelRoute: "/monitoring",
 }
 
 module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
