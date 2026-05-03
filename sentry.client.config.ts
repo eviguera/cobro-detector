@@ -1,16 +1,19 @@
 // Sentry client configuration for Next.js
 import * as Sentry from '@sentry/nextjs';
 
-// Solo inicializar en producción o si SENTRY_DSN está definido
+// Solo inicializar si SENTRY_DSN está definido y es válido
 const dsn = process.env.SENTRY_DSN;
 const environment = process.env.NODE_ENV || 'development';
 
-if (dsn || environment === 'production') {
+// Validar que el DSN sea válido (contiene @ y no sea el placeholder)
+const isValidDsn = dsn && dsn.includes('@') && !dsn.includes('tu-dsn');
+
+if (isValidDsn && environment === 'production') {
   Sentry.init({
-    dsn: dsn || 'https://tu-dsn@sentry.io/0',
+    dsn: dsn,
     
     // Performance monitoring
-    tracesSampleRate: environment === 'production' ? 0.1 : 1.0,
+    tracesSampleRate: 0.1,
     
     // Session replay
     replaysSessionSampleRate: 0.1,
@@ -24,7 +27,7 @@ if (dsn || environment === 'production') {
     ],
     
     // Set sample rate for profiling
-    profilesSampleRate: environment === 'production' ? 0.1 : 1.0,
+    profilesSampleRate: 0.1,
   });
 }
 
