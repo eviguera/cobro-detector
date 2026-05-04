@@ -4,6 +4,7 @@ import { FileSearch, TrendingDown, AlertTriangle, CheckCircle2, ArrowRight, Plus
 import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
 import type { Analysis, Credits } from '@/types/database.types'
 
+// Force rebuild: remove cacheTag dependency (Next.js 14 compatibility)
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
