@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Shield, LayoutDashboard, FileSearch, History, CreditCard, LogOut, ChevronRight } from 'lucide-react'
 import type { Credits, Profile } from '@/types/database.types'
-import { cacheTag } from 'next/cache'
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -12,11 +11,8 @@ const navItems = [
   { href: '/precios', icon: CreditCard, label: 'Comprar créditos' },
 ]
 
-// Función con caché para datos del dashboard
+// Función para datos del dashboard (sin caché - Next.js 14 no soporta use cache)
 async function getDashboardData(userId: string) {
-  'use cache'
-  cacheTag(`dashboard-${userId}`)
-  
   const supabase = await createClient()
   
   const [profileResult, creditsResult] = await Promise.all([

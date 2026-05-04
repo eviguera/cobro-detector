@@ -3,14 +3,9 @@ import Link from 'next/link'
 import { FileSearch, ArrowRight, Plus, Clock, AlertTriangle, CheckCircle2, FileText, TrendingDown, CalendarDays } from 'lucide-react'
 import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
 import type { Analysis } from '@/types/database.types'
-import { cacheTag } from 'next/cache'
 
-// Función cacheada para obtener análisis
+// Función para obtener análisis (sin caché - Next.js 14 no soporta use cache)
 async function getAnalysesData(userId: string) {
-  'use cache'
-  cacheTag(`analyses-${userId}`)
-  cacheTag(`dashboard-${userId}`)
-  
   const supabase = await createClient()
   
   const { data: analysesData } = await supabase
