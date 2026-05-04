@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import crypto from 'crypto'
+import { authError, handleApiError, successResponse } from '@/lib/api-error'
 
 const createKeySchema = z.object({
   name: z.string().min(3, 'Nombre debe tener al menos 3 caracteres'),
@@ -12,37 +13,36 @@ const createKeySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    if (authErr || !user) {
+      return authError()
     }
 
-    const { data: apiKeys, error } = await (supabase as any)
+    const { data: apiKeys, error } = await supabase
       .from('api_keys')
       .select('id, name, key_prefix, permissions, is_active, last_used_at, expires_at, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) {
-      return NextResponse.json({ error: 'Error obteniendo API keys' }, { status: 500 })
+      return handleApiError(error, 'GET /api/integrations/api-keys')
     }
 
-    return NextResponse.json({ apiKeys })
+    return successResponse({ apiKeys })
 
   } catch (err) {
-    console.error('Error en GET /api/integrations/api-keys:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'GET /api/integrations/api-keys')
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    if (authErr || !user) {
+      return authError()
     }
 
     const body = await request.json()
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       ? new Date(Date.now() + validated.expires_in_days * 24 * 60 * 60 * 1000).toISOString()
       : null
 
-    const { data: apiKey, error } = await (supabase as any)
+    const { data: apiKey, error } = await supabase
       .from('api_keys')
       .insert({
         user_id: user.id,
@@ -71,12 +71,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creando API key:', error)
-      return NextResponse.json({ error: 'Error creando API key' }, { status: 500 })
+      return handleApiError(error, 'POST /api/integrations/api-keys - create')
     }
 
     // Retornar la key completa solo una vez (luego solo se ve el prefix)
-    return NextResponse.json({
+    return successResponse({
       message: 'API key creada. Guárdala en un lugar seguro, no se mostrará nuevamente.',
       apiKey: {
         ...apiKey,
@@ -85,10 +84,6 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (err) {
-    console.error('Error en POST /api/integrations/api-keys:', err)
-    if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: err.errors }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'POST /api/integrations/api-keys')
   }
 }

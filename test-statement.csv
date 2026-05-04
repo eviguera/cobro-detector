@@ -1,16 +1,12 @@
-Fecha,Descripción,Monto,Tipo
-2024-01-15,Cargo Bco Santander - Comisión Administración,-25000,Comisión
-2024-01-15,Cargo Bco Santander - Comisión Administración,-25000,Comisión
-2024-01-20,Compra Tarjeta ****1234 Café,-3500,Compra
-2024-02-15,Cargo Bco Santander - Comisión Administración,-25000,Comisión
-2024-02-15,Cargo Bco Santander - Comisión Administración,-25000,Comisión
-2024-02-20,Compra Tarjeta ****1234 Supermercado,-25000,Compra
-2024-03-15,Cargo Bco Santander - Comisión Administración,-25000,Comisión
-2024-03-20,Seguro Desgravamen,-5200,Seguro
-2024-03-25,Compra Tarjeta ****1234 Combustible,-15000,Compra
-2024-04-15,Cargo Bco Santander - Comisión Administración,-25000,Comisión
-2024-04-20,Compra en Cuotas 1/3 Muebles,-100000,Compra Cuotas
-2024-04-20,Interés Cuota Muebles,-15000,Interés
-2024-05-15,Cargo Bco Santander - Comisión Administración,-25000,Comisión
-2024-05-20,Compra en Cuotas 2/3 Muebles,-100000,Compra Cuotas
-2024-05-20,Interés Cuota Muebles,-15000,Interés
+Fecha,Descripcion,Monto
+2024-01-15,Compra Supermercado,5000
+2024-01-20,Retiro ATM,10000
+2024-01-25,Cargo desconocido STARBUCKS,8500
+2024-02-05,Comisión mantención cuenta corriente,2500
+2024-02-10,Transferencia a terceros,15000
+2024-02-15,Compra Farmacia,12000
+2024-02-20,Retiro ATM,20000
+2024-03-01,Seguro desgravamen cobro doble,3500
+2024-03-05,Compra Almacen,3000
+2024-03-10,Comisión por mantención duplicada,2500
+2024-03-15,Suscripción Netflix,9990

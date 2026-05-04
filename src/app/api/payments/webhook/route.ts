@@ -11,19 +11,38 @@ export async function POST(request: NextRequest) {
     // Obtener body crudo para verificar firma
     const rawBody = await request.text()
     
-    // Verificar firma del webhook (si está configurado el secret)
+    // Verificar firma del webhook (OBLIGATORIO en producción)
     const signature = request.headers.get('x-signature')
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
     
-    if (webhookSecret && signature) {
+    // En producción, el secret debe estar configurado y la firma debe ser válida
+    if (process.env.NODE_ENV === 'production') {
+      if (!webhookSecret) {
+        console.error('❌ Webhook MP: MERCADOPAGO_WEBHOOK_SECRET no configurado en producción')
+        return NextResponse.json({ received: false, error: 'Webhook secret not configured' }, { status: 500 })
+      }
+      
+      if (!signature) {
+        console.error('Webhook MP: falta header x-signature en producción')
+        return NextResponse.json({ received: false, error: 'Falta firma' }, { status: 401 })
+      }
+      
       const isValid = verifyMercadoPagoWebhook(rawBody, signature, webhookSecret)
       if (!isValid) {
         console.error('Webhook MP: firma inválida')
         return NextResponse.json({ received: false, error: 'Firma inválida' }, { status: 401 })
       }
-    } else if (webhookSecret && !signature) {
-      console.warn('Webhook MP: falta header x-signature')
-      return NextResponse.json({ received: false, error: 'Falta firma' }, { status: 401 })
+    } else {
+      // En desarrollo, permitir si no hay secret configurado
+      if (webhookSecret && signature) {
+        const isValid = verifyMercadoPagoWebhook(rawBody, signature, webhookSecret)
+        if (!isValid) {
+          console.warn('⚠️ Webhook MP: firma inválida (desarrollo)')
+          return NextResponse.json({ received: false, error: 'Firma inválida' }, { status: 401 })
+        }
+      } else if (!webhookSecret) {
+        console.warn('⚠️ Webhook MP: verificación desactivada (sin MERCADOPAGO_WEBHOOK_SECRET)')
+      }
     }
     
     const body = JSON.parse(rawBody)

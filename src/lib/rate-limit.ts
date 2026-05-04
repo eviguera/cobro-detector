@@ -1,111 +1,103 @@
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
-// ============================================
-// Rate Limiting Real para Vercel (Upstash Redis)
-// ============================================
-
+// Inicializar Redis solo si las variables están configuradas
 let redis: Redis | null = null
-let rateLimiter: Ratelimit | null = null
+let ratelimit: Ratelimit | null = null
 
-function getRedisClient(): Redis | null {
-  if (redis) return redis
+function getRateLimit() {
+  if (ratelimit) return ratelimit
   
-  const url = process.env.UPSTASH_REDIS_URL
-  const token = process.env.UPSTASH_REDIS_TOKEN
+  const redisUrl = process.env.UPSTASH_REDIS_URL
+  const redisToken = process.env.UPSTASH_REDIS_TOKEN
   
-  if (!url || !token) {
-    console.warn('⚠️ Upstash Redis no configurado. Rate limiting desactivado.')
+  if (!redisUrl || !redisToken) {
+    console.warn('⚠️ Rate limiting disabled: UPSTASH_REDIS_URL or UPSTASH_REDIS_TOKEN not configured')
     return null
   }
   
-  redis = new Redis({ url, token })
-  return redis
-}
-
-function getRateLimiter(): Ratelimit | null {
-  if (rateLimiter) return rateLimiter
-  
-  const client = getRedisClient()
-  if (!client) return null
-  
-  rateLimiter = new Ratelimit({
-    redis: client,
-    limiter: Ratelimit.slidingWindow(10, '1 h'), // 10 requests por hora por usuario
-    analytics: true,
-    prefix: 'cobrodetector_ratelimit',
+  redis = new Redis({
+    url: redisUrl,
+    token: redisToken,
   })
   
-  return rateLimiter
+  ratelimit = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(10, '10 s'), // 10 requests por 10 segundos
+  })
+  
+  return ratelimit
 }
 
-/**
- * Verifica si un usuario/identificador ha excedido el rate limit
- * @param identifier - ID de usuario, IP, o API key
- * @param limit - Límite personalizado (opcional)
- * @param window - Ventana personalizada en segundos (opcional)
- * @returns { allowed: boolean, remaining: number, reset: number }
- */
-export async function checkRateLimit(
-  identifier: string,
-  limit?: number,
-  window?: number
-): Promise<{ allowed: boolean; remaining: number; reset: number; retryAfter?: number }> {
-  const limiter = getRateLimiter()
+export interface RateLimitResult {
+  success: boolean
+  limit?: number
+  remaining?: number
+  reset?: number
+}
+
+// Rate limiting para API routes generales
+export async function checkRateLimit(ip: string): Promise<RateLimitResult> {
+  const rl = getRateLimit()
   
-  // Si no hay Redis configurado, permitir todo (desarrollo)
-  if (!limiter) {
-    return { allowed: true, remaining: 999, reset: 0 }
+  if (!rl) {
+    // Si no está configurado, permitir (modo desarrollo)
+    return { success: true }
   }
   
-  try {
-    const result = await limiter.limit(identifier)
-    
-    return {
-      allowed: result.success,
-      remaining: result.remaining,
-      reset: result.reset,
-      retryAfter: result.success ? undefined : Math.ceil((result.reset - Date.now()) / 1000),
-    }
-  } catch (err) {
-    console.error('Rate limit error:', err)
-    // En caso de error, permitir (fail open)
-    return { allowed: true, remaining: 0, reset: 0 }
+  const result = await rl.limit(ip)
+  
+  return {
+    success: result.success,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: result.reset,
   }
 }
 
-/**
- * Rate limit específico para análisis (10 por hora)
- */
-export async function checkAnalyzeRateLimit(userId: string): Promise<{
-  allowed: boolean
-  remaining: number
-  reset: number
-  retryAfter?: number
-}> {
-  return checkRateLimit(`analyze:${userId}`, 10, 3600)
+// Rate limiting más estricto para endpoints críticos (análisis, pagos)
+export async function checkStrictRateLimit(ip: string): Promise<RateLimitResult> {
+  const rl = getRateLimit()
+  
+  if (!rl) {
+    return { success: true }
+  }
+  
+  // 3 requests por minuto para endpoints críticos
+  const strictRl = new Ratelimit({
+    redis: redis!,
+    limiter: Ratelimit.slidingWindow(3, '60 s'),
+  })
+  
+  const result = await strictRl.limit(`strict:${ip}`)
+  
+  return {
+    success: result.success,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: result.reset,
+  }
 }
 
-/**
- * Rate limit específico para API keys (1000 por hora)
- */
-export async function checkApiKeyRateLimit(apiKeyId: string): Promise<{
-  allowed: boolean
-  remaining: number
-  reset: number
-  retryAfter?: number
-}> {
-  return checkRateLimit(`api:${apiKeyId}`, 1000, 3600)
-}
-
-/**
- * Rate limit por IP para endpoints públicos (5 por minuto)
- */
-export async function checkIPRateLimit(ip: string): Promise<{
-  allowed: boolean
-  remaining: number
-  reset: number
-  retryAfter?: number
-}> {
-  return checkRateLimit(`ip:${ip}`, 5, 60)
+// Rate limiting para API keys (por key ID)
+export async function checkApiKeyRateLimit(keyId: string, limit = 100, window = '60 s'): Promise<RateLimitResult> {
+  const rl = getRateLimit()
+  
+  if (!rl) {
+    return { success: true }
+  }
+  
+  const perKeyRl = new Ratelimit({
+    redis: redis!,
+    limiter: Ratelimit.slidingWindow(limit, window as any),
+  })
+  
+  const result = await perKeyRl.limit(`api-key:${keyId}`)
+  
+  return {
+    success: result.success,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: result.reset,
+  }
 }

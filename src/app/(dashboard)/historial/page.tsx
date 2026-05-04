@@ -3,18 +3,30 @@ import Link from 'next/link'
 import { FileSearch, ArrowRight, Plus, Clock, AlertTriangle, CheckCircle2, FileText, TrendingDown, CalendarDays } from 'lucide-react'
 import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
 import type { Analysis } from '@/types/database.types'
+import { cacheTag } from 'next/cache'
+
+// Función cacheada para obtener análisis
+async function getAnalysesData(userId: string) {
+  'use cache'
+  cacheTag(`analyses-${userId}`)
+  cacheTag(`dashboard-${userId}`)
+  
+  const supabase = await createClient()
+  
+  const { data: analysesData } = await supabase
+    .from('analyses')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  
+  return analysesData as Analysis[] | null
+}
 
 export default async function HistorialPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: analysesData } = await supabase
-    .from('analyses')
-    .select('*')
-    .eq('user_id', user!.id)
-    .order('created_at', { ascending: false })
-
-  const analyses = analysesData as Analysis[] | null
+  const analyses = await getAnalysesData(user!.id)
 
   const totalRecoverable = analyses?.reduce((sum, a) => sum + (a.recoverable_amount ?? 0), 0) ?? 0
   const totalAnomalies = analyses?.reduce((sum, a) => sum + (a.anomalies_count ?? 0), 0) ?? 0

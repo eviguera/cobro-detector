@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Shield, LayoutDashboard, FileSearch, History, CreditCard, LogOut, ChevronRight } from 'lucide-react'
 import type { Credits, Profile } from '@/types/database.types'
+import { cacheTag } from 'next/cache'
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -11,17 +12,32 @@ const navItems = [
   { href: '/precios', icon: CreditCard, label: 'Comprar créditos' },
 ]
 
+// Función con caché para datos del dashboard
+async function getDashboardData(userId: string) {
+  'use cache'
+  cacheTag(`dashboard-${userId}`)
+  
+  const supabase = await createClient()
+  
+  const [profileResult, creditsResult] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', userId).single(),
+    supabase.from('credits').select('*').eq('user_id', userId).single()
+  ])
+  
+  return {
+    profile: profileResult.data as Profile | null,
+    credits: creditsResult.data as Credits | null,
+  }
+}
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')
 
-  const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  const { data: creditsData } = await supabase.from('credits').select('*').eq('user_id', user.id).single()
-
-  const profile = profileData as Profile | null
-  const credits = creditsData as Credits | null
+  // Usar función cacheada
+  const { profile, credits } = await getDashboardData(user.id)
 
   const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
 

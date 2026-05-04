@@ -4,6 +4,14 @@ const nextConfig = {
     // Ignorar errores de TypeScript en build para despliegue rápido
     ignoreBuildErrors: true,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'mcwqqcngfibhgluvixlu.supabase.co',
+      },
+    ],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',

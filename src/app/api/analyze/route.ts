@@ -1,15 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { authError, handleApiError, successResponse } from '@/lib/api-error'
+import { checkStrictRateLimit } from '@/lib/rate-limit'
+import { consumeCreditAtomic, enqueueAnalysis as enqueueAnalysisService } from '@/lib/services/credit.service'
+import { revalidateTag } from 'next/cache'
 
-export const maxDuration = 10
+export const maxDuration = 30
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Rate limiting
+    const ip = request.ip ?? '127.0.0.1'
+    const rateCheck = await checkStrictRateLimit(ip)
+    
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': String(rateCheck.limit ?? 3),
+            'X-RateLimit-Remaining': String(rateCheck.remaining ?? 0),
+            'X-RateLimit-Reset': String(rateCheck.reset ?? 60),
+          }
+        }
+      )
+    }
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const supabase = await createClient()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+
+    if (authErr || !user) {
+      return authError()
     }
 
     // Obtener archivo
@@ -20,67 +42,98 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
     }
 
-    console.log(`📄 Usuario: ${user.id}, Archivo: ${file.name}`)
-
-    // ============================================
-    // VERIFICAR Y DESCONTAR CRÉDITOS
-    // ============================================
-
-    // 1. Obtener créditos (usar any para evitar errores TS)
-    const creditsResult = await supabase
-      .from('credits')
-      .select('*')
-      .eq('user_id', user.id)
-      .is('company_id', null)
-      .single()
-
-    const credits: any = creditsResult.data
-    const creditsError = creditsResult.error
-
-    if (creditsError || !credits) {
-      console.error('❌ Error créditos:', creditsError?.message)
-      return NextResponse.json({ error: 'Error verificando créditos' }, { status: 500 })
+    // Validar tipo de archivo
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel'
+    ]
+    
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Tipo de archivo no soportado. Use PDF o Excel.' },
+        { status: 400 }
+      )
     }
 
-    const total = credits.total ?? 0
-    const used = credits.used ?? 0
-    const left = total - used
+    // Validar tamaño (10MB máximo)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: 'Archivo demasiado grande. Máximo 10MB.' },
+        { status: 400 }
+      )
+    }
 
-    console.log(`💰 total=${total}, used=${used}, left=${left}`)
+    console.log(`📄 Usuario: ${user.id}, Archivo: ${file.name}`)
 
-    if (left <= 0) {
+    // Guardar archivo
+    const fileBuffer = await file.arrayBuffer()
+    const fileName = `${user.id}/${Date.now()}-${file.name}`
+    
+    // Subir a Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('analysis-files')
+      .upload(fileName, fileBuffer, {
+        contentType: file.type,
+        upsert: false
+      })
+
+    if (uploadError) {
+      console.error('Error subiendo archivo:', uploadError)
+      return handleApiError(uploadError, 'POST /api/analyze - upload file')
+    }
+
+    // Obtener URL pública
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('analysis-files')
+      .getPublicUrl(fileName)
+
+    // Crear registro de análisis usando el servicio
+    const analysisId = await enqueueAnalysisService(
+      supabase,
+      user.id,
+      file.name,
+      publicUrl,
+      null // companyId
+    )
+
+    if (!analysisId) {
+      // Obtener créditos restantes
+      const { data: credits } = await supabase
+        .from('credits')
+        .select('total, used')
+        .eq('user_id', user.id)
+        .is('company_id', null)
+        .single()
+
+      const left = (credits?.total ?? 0) - (credits?.used ?? 0)
+      
       return NextResponse.json({
-        error: 'Sin créditos',
-        redirectTo: '/precios'
+        error: left <= 0 ? 'Sin créditos' : 'Error procesando créditos',
+        redirectTo: '/precios',
+        creditsLeft: Math.max(0, left)
       }, { status: 402 })
     }
 
-    // 2. Descontar 1 crédito
-    const newUsed = used + 1
-    console.log(`🔻 Descontando: ${used} → ${newUsed}`)
+    // TODO: Implementar procesamiento asíncrono con cola
+    // Por ahora, el análisis se procesa síncronamente
+    // TODO: Mover a worker/queue en el futuro
 
-    const updateResult = await supabase
-      .from('credits')
-      .update({ used: newUsed })
-      .eq('id', credits.id)
+    console.log(`✅ Análisis creado: ${analysisId}`)
 
-    if (updateResult.error) {
-      console.error('❌ Error actualizando:', updateResult.error.message)
-      return NextResponse.json({ error: 'Error procesando créditos' }, { status: 500 })
-    }
+    // Invalidar caché del dashboard y análisis
+    revalidateTag(`dashboard-${user.id}`)
+    revalidateTag(`analyses-${user.id}`)
 
-    console.log(`✅ Crédito descontado. Nuevo used: ${newUsed}`)
-
-    // TODO: Procesar análisis asíncrono
-    return NextResponse.json({
+    return successResponse({
       success: true,
-      message: 'Crédito descontado. Análisis en proceso.',
-      creditsLeft: left - 1,
-      fileName: file.name,
+      message: 'Análisis creado. Se procesará en breve.',
+      analysisId,
     })
 
   } catch (err) {
-    console.error('❌ Error:', err)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    return handleApiError(err, 'POST /api/analyze')
   }
 }

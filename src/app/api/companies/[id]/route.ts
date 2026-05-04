@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { Company } from '@/types/database.types'
 import { z } from 'zod'
+import { authError, handleApiError, successResponse } from '@/lib/api-error'
+import { getCompanyById, updateCompany, deleteCompany } from '@/lib/services/company.service'
 
 const updateCompanySchema = z.object({
   company_name: z.string().min(2).optional(),
@@ -20,47 +22,26 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    if (authErr || !user) {
+      return authError()
     }
 
-    const { data: company, error } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', params.id)
-      .eq('accountant_id', user.id)
-      .single()
+    const company = await getCompanyById(supabase, params.id, user.id)
 
-    if (error || !company) {
+    if (!company) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 })
     }
 
-    // Obtener créditos de la empresa
-    const { data: credits } = await supabase
-      .from('credits')
-      .select('*')
-      .eq('company_id', params.id)
-      .single()
-
-    // Obtener análisis recientes
-    const { data: analyses } = await supabase
-      .from('analyses')
-      .select('id, file_name, bank, status, created_at')
-      .eq('company_id', params.id)
-      .order('created_at', { ascending: false })
-      .limit(5)
-
-    return NextResponse.json({
+    return successResponse({
       company: company as Company,
-      credits: credits || null,
-      recentAnalyses: analyses || [],
+      credits: company.credits?.[0] || null,
+      recentAnalyses: company.analyses || [],
     })
 
   } catch (err) {
-    console.error('Error en GET /api/companies/[id]:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'GET /api/companies/[id]')
   }
 }
 
@@ -70,36 +51,21 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    if (authErr || !user) {
+      return authError()
     }
 
     const body = await request.json()
     const validated = updateCompanySchema.parse(body)
 
-    const { data: company, error } = await (supabase as any)
-      .from('companies')
-      .update(validated)
-      .eq('id', params.id)
-      .eq('accountant_id', user.id)
-      .select()
-      .single()
+    const company = await updateCompany(supabase, params.id, user.id, validated)
 
-    if (error) {
-      console.error('Error actualizando empresa:', error)
-      return NextResponse.json({ error: 'Error actualizando empresa' }, { status: 500 })
-    }
-
-    return NextResponse.json({ company: company as Company })
+    return successResponse({ company })
 
   } catch (err) {
-    console.error('Error en PATCH /api/companies/[id]:', err)
-    if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: err.errors }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'PATCH /api/companies/[id]')
   }
 }
 
@@ -109,28 +75,17 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    if (authErr || !user) {
+      return authError()
     }
 
-    // Soft delete: marcar como inactiva
-    const { error } = await (supabase as any)
-      .from('companies')
-      .update({ is_active: false })
-      .eq('id', params.id)
-      .eq('accountant_id', user.id)
+    await deleteCompany(supabase, params.id, user.id)
 
-    if (error) {
-      console.error('Error eliminando empresa:', error)
-      return NextResponse.json({ error: 'Error eliminando empresa' }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
 
   } catch (err) {
-    console.error('Error en DELETE /api/companies/[id]:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'DELETE /api/companies/[id]')
   }
 }

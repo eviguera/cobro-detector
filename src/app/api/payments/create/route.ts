@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getMPClient, Preference } from '@/lib/mercadopago'
 import { PLANS } from '@/lib/plans'
 import { z } from 'zod'
+import { authError, handleApiError, successResponse } from '@/lib/api-error'
 
 const bodySchema = z.object({
   planKey: z.enum(['starter', 'professional', 'enterprise', 'success_fee']),
@@ -12,9 +13,10 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Autenticación
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    
+    if (authErr || !user) {
+      return authError()
     }
 
     // 2. Validar body
@@ -27,14 +29,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Obtener perfil del usuario
-    const { data: profile } = await (supabase as any)
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('email, full_name')
       .eq('id', user.id)
       .single()
 
+    if (profileError) {
+      return handleApiError(profileError, 'POST /api/payments/create - get profile')
+    }
+
     // 4. Crear orden pendiente en DB
-    const orderData: any = {
+    const orderData = {
       user_id: user.id,
       plan: planKey,
       credits_purchased: plan.credits,
@@ -48,23 +54,22 @@ export async function POST(request: NextRequest) {
       orderData.credits_purchased = 999999 // Ilimitado
       orderData.amount_clp = 0
       orderData.payment_provider = 'success_fee'
-      orderData.fee_percentage = 10
+      Object.assign(orderData, { fee_percentage: 10 })
     }
 
-    const { data: order, error: orderError } = await (supabase as any)
+    const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert(orderData)
       .select()
       .single()
 
     if (orderError || !order) {
-      console.error('Error creando orden:', orderError)
-      return NextResponse.json({ error: 'Error creando la orden' }, { status: 500 })
+      return handleApiError(orderError, 'POST /api/payments/create - create order')
     }
 
     // Plan de éxito: no necesita preferencia de Mercado Pago
     if (planKey === 'success_fee') {
-      return NextResponse.json({
+      return successResponse({
         orderId: order.id,
         message: 'Plan de éxito activado. Se cobrará el 10% de lo recuperado.',
       })
@@ -112,12 +117,16 @@ export async function POST(request: NextRequest) {
     })
 
     // 6. Guardar preference_id en la orden
-    await (supabase as any)
+    const { error: updateError } = await supabase
       .from('orders')
       .update({ mp_preference_id: preferenceData.id })
       .eq('id', order.id)
 
-    return NextResponse.json({
+    if (updateError) {
+      return handleApiError(updateError, 'POST /api/payments/create - update order')
+    }
+
+    return successResponse({
       orderId: order.id,
       preferenceId: preferenceData.id,
       initPoint: preferenceData.init_point,
@@ -125,21 +134,17 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (err) {
-    console.error('Error en POST /api/payments/create:', err)
-    if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: err.errors }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'POST /api/payments/create')
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
     
-    if (!user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    if (authErr || !user) {
+      return authError()
     }
 
     // Obtener orden por ID
@@ -158,13 +163,12 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (error || !order) {
-      return NextResponse.json({ error: 'Orden no encontrada' }, { status: 404 })
+      return handleApiError(error, 'GET /api/payments/create - get order')
     }
 
-    return NextResponse.json({ order })
+    return successResponse({ order })
 
   } catch (err) {
-    console.error('Error en GET /api/payments/create:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'GET /api/payments/create')
   }
 }
