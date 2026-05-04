@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { authError, handleApiError, successResponse } from '@/lib/api-error'
-import { checkStrictRateLimit } from '@/lib/rate-limit'
 import { consumeCreditAtomic, enqueueAnalysis as enqueueAnalysisService } from '@/lib/services/credit.service'
 import { revalidateTag } from 'next/cache'
 
@@ -9,24 +8,6 @@ export const maxDuration = 30
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting
-    const ip = request.ip ?? '127.0.0.1'
-    const rateCheck = await checkStrictRateLimit(ip)
-    
-    if (!rateCheck.success) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { 
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': String(rateCheck.limit ?? 3),
-            'X-RateLimit-Remaining': String(rateCheck.remaining ?? 0),
-            'X-RateLimit-Reset': String(rateCheck.reset ?? 60),
-          }
-        }
-      )
-    }
-
     const supabase = await createClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
