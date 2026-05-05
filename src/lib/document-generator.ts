@@ -1,10 +1,18 @@
-// Dynamic import for docx (heavy library)
+// Dynamic imports for heavy libraries
 let docxModule: any = null
 const getDocx = async () => {
   if (!docxModule) {
     docxModule = await import('docx')
   }
   return docxModule
+}
+
+let pdfLibModule: any = null
+const getPdfLib = async () => {
+  if (!pdfLibModule) {
+    pdfLibModule = await import('pdf-lib')
+  }
+  return pdfLibModule
 }
 import type { Analysis, Anomaly } from '@/types/database.types'
 
@@ -226,14 +234,191 @@ export async function generateWordDocument(data: LetterData): Promise<Buffer> {
 }
 
 export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
-  // TODO: Implementar generación de PDF sin Puppeteer
-  // Opciones: 
-  // 1. Usar librerías ligeras (pdfkit, pdf-lib)
-  // 2. Servicio externo (PDFShift, etc.)
-  // 3. Generar solo Word por ahora
+  const pdfLib = await getPdfLib()
+  const { PDFDocument, rgb, StandardFonts } = pdfLib
   
-  console.warn('⚠️ Generación de PDF pendiente de implementación sin Puppeteer')
+  const pdfDoc = await PDFDocument.create()
+  const page = pdfDoc.addPage([595.28, 841.89]) // A4 size
+  const { height } = page.getSize()
+  const fontSize = 12
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   
-  // Por ahora retornamos un error indicando usar Word
-  throw new Error('Generación de PDF temporalmente no disponible. Use el documento Word.')
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount)
+  }
+  
+  const totalRecoverable = data.anomalies.reduce((sum, a) => sum + a.recoverable_amount, 0)
+  
+  let yPosition = height - 50
+  
+  // Título
+  page.drawText('CARTA DE RECLAMO FORMAL', {
+    x: 50,
+    y: yPosition,
+    size: 18,
+    font: boldFont,
+    color: rgb(0, 0, 0),
+  })
+  yPosition -= 30
+  
+  // Fecha
+  page.drawText(`Fecha: ${data.date}`, {
+    x: 50,
+    y: yPosition,
+    size: fontSize,
+    font: boldFont,
+  })
+  yPosition -= 25
+  
+  // Datos del reclamante
+  page.drawText('DATOS DEL RECLAMANTE', {
+    x: 50,
+    y: yPosition,
+    size: 14,
+    font: boldFont,
+  })
+  yPosition -= 20
+  
+  page.drawText(`Nombre: ${data.userName}`, { x: 50, y: yPosition, size: fontSize, font })
+  yPosition -= 18
+  page.drawText(`RUT: ${data.rut || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font })
+  yPosition -= 18
+  page.drawText(`Empresa: ${data.businessName || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font })
+  yPosition -= 25
+  
+  // Datos del banco
+  page.drawText('DATOS DEL BANCO', {
+    x: 50,
+    y: yPosition,
+    size: 14,
+    font: boldFont,
+  })
+  yPosition -= 20
+  
+  page.drawText(`Banco: ${data.bankName}`, { x: 50, y: yPosition, size: fontSize, font })
+  yPosition -= 18
+  page.drawText(`Período: ${data.analysis.period_start || 'N/A'} al ${data.analysis.period_end || 'N/A'}`, { x: 50, y: yPosition, size: fontSize, font })
+  yPosition -= 25
+  
+  // Motivo
+  page.drawText('MOTIVO DEL RECLAMO', {
+    x: 50,
+    y: yPosition,
+    size: 14,
+    font: boldFont,
+  })
+  yPosition -= 20
+  
+  const motivo = 'Por medio de la presente, me dirijo a Uds. para formular reclamo formal por cobros indebidos detectados en el estado de cuenta correspondiente al período antes mencionado.'
+  page.drawText(motivo, { x: 50, y: yPosition, size: fontSize, font, maxWidth: 495 })
+  yPosition -= 40
+  
+  // Anomalías detectadas
+  page.drawText('ANOMALÍAS DETECTADAS', {
+    x: 50,
+    y: yPosition,
+    size: 14,
+    font: boldFont,
+  })
+  yPosition -= 25
+  
+  for (const anomaly of data.anomalies) {
+    if (yPosition < 100) {
+      // Nueva página si no hay espacio
+      const newPage = pdfDoc.addPage([595.28, 841.89])
+      yPosition = height - 50
+      // Dibujar en la nueva página
+      newPage.drawText('ANOMALÍAS DETECTADAS (continuación)', {
+        x: 50,
+        y: yPosition,
+        size: 14,
+        font: boldFont,
+      })
+      yPosition -= 25
+      // Continuar con el bucle usando newPage
+      // Para simplificar, continuamos usando 'page' pero actualizamos referencia
+      Object.assign(page, newPage)
+    }
+    
+    page.drawText(`• ${anomaly.type.replace('_', ' ').toUpperCase()}: ${anomaly.title}`, {
+      x: 50,
+      y: yPosition,
+      size: 10,
+      font: boldFont,
+    })
+    yPosition -= 15
+    
+    page.drawText(`  ${anomaly.description || ''}`, {
+      x: 50,
+      y: yPosition,
+      size: 9,
+      font,
+      maxWidth: 495,
+    })
+    yPosition -= 12
+    
+    page.drawText(`  Monto: ${formatCurrency(anomaly.recoverable_amount)}`, {
+      x: 50,
+      y: yPosition,
+      size: 10,
+      font,
+    })
+    yPosition -= 20
+  }
+  
+  // Total
+  page.drawText(`TOTAL A RECUPERAR: ${formatCurrency(totalRecoverable)}`, {
+    x: 50,
+    y: yPosition - 20,
+    size: 14,
+    font: boldFont,
+    color: rgb(0.2, 0.4, 0.8),
+  })
+  yPosition -= 50
+  
+  // Solicitud
+  page.drawText('SOLICITUD', {
+    x: 50,
+    y: yPosition,
+    size: 14,
+    font: boldFont,
+  })
+  yPosition -= 20
+  
+  const solicitud = `En virtud de lo expuesto, solicito formalmente la devolución de la suma de ${formatCurrency(totalRecoverable)}, correspondiente a cargos indebidos, comisiones duplicadas y/o errores en el cobro de cuotas detectados en el análisis de mi estado de cuenta.`
+  page.drawText(solicitud, { x: 50, y: yPosition, size: fontSize, font, maxWidth: 495 })
+  yPosition -= 40
+  
+  page.drawText('Sin otro particular, saluda atentamente,', {
+    x: 50,
+    y: yPosition,
+    size: fontSize,
+    font,
+  })
+  yPosition -= 30
+  
+  page.drawText(data.userName || 'Firma', {
+    x: 50,
+    y: yPosition,
+    size: fontSize,
+    font: boldFont,
+  })
+  yPosition -= 18
+  page.drawText(`RUT: ${data.rut || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font })
+  yPosition -= 18
+  page.drawText(`Empresa: ${data.businessName || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font })
+  yPosition -= 30
+  
+  // Footer
+  page.drawText('Este documento fue generado automáticamente por CobroDetector.cl', {
+    x: 50,
+    y: 30,
+    size: 8,
+    font,
+    color: rgb(0.5, 0.5, 0.5),
+  })
+  
+  const pdfBytes = await pdfDoc.save()
+  return Buffer.from(pdfBytes)
 }

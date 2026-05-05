@@ -108,13 +108,13 @@ export default function LoginPage() {
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <Shield className="w-4 h-4 text-white" />
             </div>
-            <span className="font-semibold text-gray-900">CobroDetector</span>
+            <span className="font-semibold text-foreground">CobroDetector</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-bold text-foreground mb-2">
             {mode === 'login' ? 'Bienvenido de vuelta' : 'Crea tu cuenta gratis'}
           </h1>
-          <p className="text-gray-500 text-sm mb-8">
+          <p className="text-muted-foreground text-sm mb-8">
             {mode === 'login'
               ? 'Ingresa a tu cuenta para ver tus análisis'
               : 'Incluye 1 análisis gratis · Sin tarjeta de crédito'}

@@ -65,10 +65,10 @@ export default async function DashboardPage() {
               Panel de control
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-display font-bold text-gray-900 dark:text-gray-50 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-display font-bold text-foreground tracking-tight">
             Dashboard
           </h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md leading-relaxed">
+            <p className="mt-2 text-sm text-muted-foreground max-w-md leading-relaxed">
             Resumen de tus análisis y anomalías detectadas en tus estados de cuenta
           </p>
         </div>
@@ -109,10 +109,10 @@ export default async function DashboardPage() {
               <Activity className="w-4 h-4 text-gray-300 dark:text-gray-600" />
             </div>
 
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide uppercase mb-1.5">
+            <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase mb-1.5">
               {stat.label}
             </p>
-            <p className={`font-display font-bold text-gray-900 dark:text-gray-50 ${stat.large ? 'text-2xl sm:text-3xl' : 'text-2xl sm:text-3xl'}`}>
+            <p className={`font-display font-bold text-foreground ${stat.large ? 'text-2xl sm:text-3xl' : 'text-2xl sm:text-3xl'}`}>
               <span className="tabular-nums">{stat.value}</span>
             </p>
             {stat.subLink ? (
@@ -124,7 +124,7 @@ export default async function DashboardPage() {
                 {stat.sub} →
               </Link>
             ) : (
-              <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">{stat.sub}</p>
+              <p className="mt-2 text-xs text-muted-foreground">{stat.sub}</p>
             )}
           </div>
         ))}
@@ -134,7 +134,7 @@ export default async function DashboardPage() {
       <section className="card-fintech rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800/60">
           <div>
-            <h2 className="font-display font-semibold text-gray-900 dark:text-gray-50 text-base">
+            <h2 className="font-display font-semibold text-foreground text-base">
               Análisis recientes
             </h2>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
@@ -156,10 +156,10 @@ export default async function DashboardPage() {
             <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
               <FileSearch className="w-7 h-7 text-gray-400 dark:text-gray-500" />
             </div>
-            <h3 className="text-base font-display font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            <h3 className="text-base font-display font-semibold text-foreground mb-2">
               Aún no tienes análisis
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 max-w-sm mx-auto leading-relaxed">
+            <p className="text-sm text-muted-foreground mb-8 max-w-sm mx-auto leading-relaxed">
               Sube tu primer estado de cuenta y descubre en minutos si te están cobrando de más
             </p>
             <Link
@@ -172,30 +172,30 @@ export default async function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50 dark:divide-gray-800/50">
+          <div className="divide-y divide-border">
             {analyses.map((analysis, i) => (
               <Link
                 key={analysis.id}
                 href={`/historial/${analysis.id}`}
-                className="group flex items-center justify-between px-6 py-4 sm:py-5 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
+                className="group flex items-center justify-between px-6 py-4 sm:py-5 hover:bg-muted/50 transition-colors"
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-brand-50 dark:group-hover:bg-brand-950 transition-colors">
+                  <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-brand-50 dark:group-hover:bg-brand-950 transition-colors">
                     <FileSearch className="w-5 h-5 text-gray-400 dark:text-gray-500 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                    <p className="text-sm font-medium text-foreground group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
                       {analysis.file_name}
                     </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
+            <p className="text-xs text-muted-foreground mt-0.5 font-mono">
                       {analysis.bank ?? 'Banco desconocido'} · {formatDate(analysis.created_at)}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6 sm:gap-8">
                   <div className="text-right">
-                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono">Anomalías</p>
+                    <p className="text-xs text-muted-foreground font-mono">Anomalías</p>
                     <p className={`text-sm font-semibold tabular-nums ${
                       analysis.anomalies_count > 0
                         ? 'text-danger-600 dark:text-danger-400'
@@ -205,8 +205,8 @@ export default async function DashboardPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono">Recuperable</p>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+                    <p className="text-xs text-muted-foreground font-mono">Recuperable</p>
+                    <p className="text-sm font-semibold text-foreground tabular-nums">
                       {formatCLP(analysis.recoverable_amount)}
                     </p>
                   </div>
@@ -217,7 +217,7 @@ export default async function DashboardPage() {
                   }`}>
                     {getStatusLabel(analysis.status)}
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-all group-hover:translate-x-0.5" />
+                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-all group-hover:translate-x-0.5" />
                 </div>
               </Link>
             ))}

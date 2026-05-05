@@ -51,10 +51,10 @@ export default async function AnalysisDetailPage({ params }: Props) {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <Link href="/historial" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-3 transition-colors">
+          <Link href="/historial" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors">
             <ArrowLeft className="w-4 h-4" /> Volver al historial
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">{analysis.file_name}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{analysis.file_name}</h1>
           <p className="text-sm text-gray-400 mt-1">
             {analysis.bank ?? 'Banco no detectado'} · Analizado el {formatDate(analysis.created_at)}
           </p>
@@ -72,7 +72,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
         ].map(m => (
           <div key={m.label} className="bg-white rounded-xl border border-gray-200 p-5">
             <p className="text-xs text-gray-400 mb-1">{m.label}</p>
-            <p className={`font-bold ${m.lg ? 'text-xl' : 'text-2xl'} ${m.color || 'text-gray-900'}`}>{m.value}</p>
+            <p className={`font-bold ${m.lg ? 'text-xl' : 'text-2xl'} ${m.color || 'text-foreground'}`}>{m.value}</p>
             {m.sub && <p className="text-xs text-gray-400 mt-0.5">{m.sub}</p>}
           </div>
         ))}
@@ -89,7 +89,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
       {/* Anomalies */}
       {anomalies.length > 0 ? (
         <div className="mb-8">
-          <h2 className="font-semibold text-gray-900 mb-4">
+          <h2 className="font-semibold text-foreground mb-4">
             Cobros incorrectos detectados
             <span className="ml-2 text-sm font-normal text-gray-400">({anomalies.length})</span>
           </h2>
@@ -103,11 +103,11 @@ export default async function AnalysisDetailPage({ params }: Props) {
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${SEVERITY_BADGE[anomaly.severity]}`}>
                         {getSeverityLabel(anomaly.severity)}
                       </span>
-                      <span className="text-xs text-gray-500 bg-white/80 px-2 py-0.5 rounded-full border border-gray-200">
+                      <span className="text-xs text-muted-foreground bg-white/80 px-2 py-0.5 rounded-full border border-border">
                         {getAnomalyTypeLabel(anomaly.type)}
                       </span>
                     </div>
-                    <p className="font-semibold text-gray-900 text-sm mb-1">{anomaly.title}</p>
+                    <p className="font-semibold text-foreground text-sm mb-1">{anomaly.title}</p>
                     <p className="text-sm text-gray-600 mb-1">{anomaly.description}</p>
                     {anomaly.detail && (
                       <p className="text-xs text-gray-400 font-mono bg-white/60 rounded px-2 py-1 inline-block mt-1">
@@ -116,15 +116,15 @@ export default async function AnalysisDetailPage({ params }: Props) {
                     )}
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-xs text-gray-400 mb-1">Monto recuperable</p>
-                    <p className="text-xl font-bold text-gray-900">{formatCLP(anomaly.recoverableAmount)}</p>
+                    <p className="text-xs text-muted-foreground mb-1">Monto recuperable</p>
+                    <p className="text-xl font-bold text-foreground">{formatCLP(anomaly.recoverableAmount)}</p>
                   </div>
                 </div>
 
                 {/* How to claim */}
                 <div className="mt-4 pt-4 border-t border-white/60">
                   <p className="text-xs font-medium text-gray-600 mb-1">¿Cómo reclamar?</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     {anomaly.type === 'duplicate_commission' &&
                       'Presenta este reporte en sucursal o por ejecutivo de cuenta. Solicita reverso de comisiones duplicadas citando los montos y fechas. El banco tiene 10 días hábiles para responder.'}
                     {anomaly.type === 'installment_error' &&
@@ -147,11 +147,11 @@ export default async function AnalysisDetailPage({ params }: Props) {
 
       {/* Transactions table */}
       {transactions.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900 text-sm">
+          <div className="bg-card rounded-xl border border-border">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <h2 className="font-semibold text-foreground text-sm">
               Transacciones
-              <span className="ml-2 text-sm font-normal text-gray-400">({transactions.length})</span>
+              <span className="ml-2 text-sm font-normal text-muted-foreground">({transactions.length})</span>
             </h2>
             <div className="flex items-center gap-3 text-xs text-gray-400">
               <span className="flex items-center gap-1">
@@ -162,21 +162,21 @@ export default async function AnalysisDetailPage({ params }: Props) {
 
           <div className="overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-gray-50 border-b border-gray-100">
+              <thead className="sticky top-0 bg-muted border-b border-border">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Fecha</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Descripción</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">Monto</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500">Estado</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground">Descripción</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground">Monto</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {transactions.map(tx => {
                   const isFlagged = flaggedIds.has(tx.id)
                   return (
-                    <tr key={tx.id} className={isFlagged ? 'bg-red-50' : 'hover:bg-gray-50'}>
-                      <td className="px-6 py-3 text-gray-500 text-xs whitespace-nowrap">{tx.date}</td>
-                      <td className="px-6 py-3 text-gray-900 max-w-xs truncate">
+                    <tr key={tx.id} className={isFlagged ? 'bg-red-50' : 'hover:bg-muted'}>
+                      <td className="px-6 py-3 text-muted-foreground text-xs whitespace-nowrap">{tx.date}</td>
+                      <td className="px-6 py-3 text-foreground max-w-xs truncate">
                         {tx.description}
                         {isFlagged && (
                           <AlertTriangle className="inline w-3 h-3 text-red-400 ml-1.5" />
@@ -204,8 +204,8 @@ export default async function AnalysisDetailPage({ params }: Props) {
       )}
 
       {/* CMF info */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-500">
-        <p className="font-medium text-gray-700 mb-1">¿El banco no responde? Puedes escalar a la CMF</p>
+      <div className="mt-6 p-4 bg-muted/50 rounded-xl border border-border text-xs text-muted-foreground">
+        <p className="font-medium text-foreground mb-1">¿El banco no responde? Puedes escalar a la CMF</p>
         <p>La Comisión para el Mercado Financiero (CMF) es el regulador bancario en Chile. Puedes presentar un reclamo en <strong>cmfchile.cl</strong> si el banco no resuelve tu caso en 10 días hábiles.</p>
       </div>
     </div>

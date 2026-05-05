@@ -34,15 +34,15 @@ export default async function PagoExitosoPage({ searchParams }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl border border-gray-200 p-10 max-w-md w-full text-center shadow-sm">
+    <div className="min-h-screen bg-muted/50 flex items-center justify-center p-6">
+          <div className="bg-card rounded-2xl border border-border p-10 max-w-md w-full text-center shadow-sm">
         {isPending ? (
           <>
             <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Clock className="w-8 h-8 text-amber-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-3">Pago en proceso</h1>
-            <p className="text-gray-500 mb-6">
+            <h1 className="text-2xl font-bold text-foreground mb-3">Pago en proceso</h1>
+            <p className="text-muted-foreground mb-6">
               Tu pago está siendo procesado. Recibirás un email de confirmación cuando se acrediten los créditos (usualmente en minutos).
             </p>
           </>
@@ -51,8 +51,8 @@ export default async function PagoExitosoPage({ searchParams }: Props) {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-3">¡Pago exitoso!</h1>
-            <p className="text-gray-500 mb-6">
+            <h1 className="text-2xl font-bold text-foreground mb-3">¡Pago exitoso!</h1>
+            <p className="text-muted-foreground mb-6">
               Tu compra fue procesada correctamente. Los créditos ya están disponibles en tu cuenta.
             </p>
           </>
@@ -63,16 +63,16 @@ export default async function PagoExitosoPage({ searchParams }: Props) {
             <p className="text-xs text-blue-500 font-medium mb-3 uppercase tracking-wide">Resumen de compra</p>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Plan</span>
+                <span className="text-muted-foreground">Plan</span>
                 <span className="font-medium capitalize">{planName}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Créditos</span>
+                <span className="text-muted-foreground">Créditos</span>
                 <span className="font-medium text-blue-700">+{credits} análisis</span>
               </div>
               {amount > 0 && (
                 <div className="flex justify-between text-sm border-t border-blue-100 pt-2 mt-2">
-                  <span className="text-gray-500">Total pagado</span>
+                  <span className="text-muted-foreground">Total pagado</span>
                   <span className="font-semibold">{formatCLP(amount)}</span>
                 </div>
               )}
@@ -88,7 +88,7 @@ export default async function PagoExitosoPage({ searchParams }: Props) {
             Analizar estado de cuenta
             <ArrowRight className="w-4 h-4" />
           </Link>
-          <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-900">
+          <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
             Volver al dashboard
           </Link>
         </div>
