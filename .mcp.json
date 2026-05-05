@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "remote",
+      "url": "https://mcp.supabase.com/mcp"
+    },
+    "vercel": {
+      "type": "remote",
+      "url": "https://mcp.vercel.com/mcp"
+    }
+  }
+}
