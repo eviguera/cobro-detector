@@ -75,47 +75,44 @@
   }
 
   .dark {
-    /* Sophisticated Bank Dark - Estilo Banca Privada */
-    --background: 222 40% 8%;  /* Azul marino muy oscuro */
-    --foreground: 220 20% 98%;  /* Texto casi blanco */
-    --card: 222 35% 12%;  /* Tarjetas azul marino oscuro */
+    --background: 224 71% 4%;
+    --foreground: 220 20% 98%;
+    --card: 224 71% 6%;
     --card-foreground: 220 20% 98%;
-    --primary: 221 70% 45%;  /* Azul corporativo medio */
-    --primary-foreground: 0 0% 100%;  /* Blanco puro */
-    --secondary: 222 30% 15%;  /* Gris azulado oscuro */
-    --secondary-foreground: 220 20% 95%;
-    --muted: 222 25% 15%;
-    --muted-foreground: 220 15% 70%;  /* Gris claro legible */
-    --accent: 222 30% 15%;
+    --primary: 221 83% 65%;
+    --primary-foreground: 224 71% 4%;
+    --secondary: 215 28% 17%;
+    --secondary-foreground: 220 20% 98%;
+    --muted: 215 28% 17%;
+    --muted-foreground: 217 10% 65%;
+    --accent: 215 28% 17%;
     --accent-foreground: 220 20% 98%;
-    --destructive: 0 70% 45%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 222 25% 20%;  /* Bordes visibles */
-    --input: 222 25% 20%;
-    --ring: 221 70% 50%;
-    
-    /* Paleta de marca - Sobria y elegante */
-    --brand-50: #0a0e1a;
-    --brand-100: #0f1629;
-    --brand-200: #162033;
-    --brand-300: #1e2d44;
-    --brand-400: #2a3a5c;
-    --brand-500: #3b4d6c;  /* Azul medio sobrio */
-    --brand-600: #4c6ef5;  /* Azul claro para acentos */
-    --brand-700: #5c7cfa;
-    --brand-800: #91a7ff;
-    --brand-900: #bac8ff;
-    --brand-950: #e0e7ff;
-    
-    /* Gradientes elegantes */
-    --gradient-subtle: linear-gradient(180deg, rgba(15,22,41,1) 0%, rgba(26,35,60,1) 100%);
-    --gradient-card: linear-gradient(135deg, rgba(26,35,60,0.95) 0%, rgba(15,22,41,0.95) 100%);
-    
-    /* Sombras sofisticadas */
-    --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.4);
-    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.4);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -4px rgba(0,0,0,0.4);
-    --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0,0.4);
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 220 20% 98%;
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 221 83% 65%;
+
+    /* Dark mode brand colors */
+    --brand-50: #1a1f3a;
+    --brand-100: #1e2452;
+    --brand-200: #25307a;
+    --brand-300: #2f3da0;
+    --brand-400: #4c5bc8;
+    --brand-500: #5c7cfa;
+    --brand-600: #748ffc;
+    --brand-700: #91a7ff;
+    --brand-800: #bac8ff;
+    --brand-900: #dbe4ff;
+    --brand-950: #f0f4ff;
+
+    --gradient-subtle: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(92,124,250,0.05) 100%);
+    --gradient-card: linear-gradient(135deg, rgba(30,31,48,1) 0%, rgba(24,24,36,1) 100%);
+
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
   }
 }
 
