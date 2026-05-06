@@ -149,9 +149,8 @@ export default function AnalisisPage() {
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          className={`upload-zone rounded-2xl p-8 sm:p-12 text-center transition-all duration-300 ${
-            dragging ? 'dragging bg-brand-50 dark:bg-brand-950/50' :
-            file ? 'has-file' : 'card-fintech hover:border-brand-300 dark:hover:border-brand-700'
+          className={`upload-zone card-fintech rounded-2xl p-8 sm:p-12 text-center transition-all duration-300 ${
+            dragging ? 'dragging scale-[1.02]' : ''
           }`}
           role="button"
           tabIndex={0}
@@ -182,16 +181,16 @@ export default function AnalisisPage() {
               <div className={`w-16 h-16 mx-auto mb-5 rounded-2xl flex items-center justify-center transition-all duration-300 ${
                 dragging
                   ? 'bg-brand-100 dark:bg-brand-900/50 scale-110'
-                  : 'bg-gray-200 dark:bg-gray-800'
+                  : 'bg-brand-50 dark:bg-brand-950 text-brand-600 dark:text-brand-400'
               }`}>
                 <Upload className={`w-7 h-7 transition-colors duration-300 ${
-                  dragging ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 dark:text-gray-500'
+                  dragging ? 'text-brand-600 dark:text-brand-400' : 'text-brand-500'
                 }`} />
               </div>
               <p className="font-display font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
                 Arrastra tu estado de cuenta aquí
               </p>
-              <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                 o haz clic para seleccionar un archivo
               </p>
               <label className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
