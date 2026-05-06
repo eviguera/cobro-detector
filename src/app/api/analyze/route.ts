@@ -1,21 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { successResponse } from '@/lib/api-error'
-import { enqueueAnalysis as enqueueAnalysisService } from '@/lib/services/credit.service'
-import { processAnalysis } from '@/lib/analysis-queue'
+import { authError, handleApiError, successResponse } from '@/lib/api-error'
+import { checkStrictRateLimit } from '@/lib/rate-limit'
+import { consumeCreditAtomic, enqueueAnalysis as enqueueAnalysisService } from '@/lib/services/credit.service'
+import { enqueueAnalysis } from '@/lib/analysis-queue'
 import { revalidateTag } from 'next/cache'
 
-export const maxDuration = 60
+export const maxDuration = 30
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const ip = request.ip ?? '127.0.0.1'
+    const rateCheck = await checkStrictRateLimit(ip)
+    
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': String(rateCheck.limit ?? 3),
+            'X-RateLimit-Remaining': String(rateCheck.remaining ?? 0),
+            'X-RateLimit-Reset': String(rateCheck.reset ?? 60),
+          }
+        }
+      )
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
     if (authErr || !user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+      return authError()
     }
 
+    // Obtener archivo
     const formData = await request.formData()
     const file = formData.get('file') as File | null
 
@@ -23,19 +43,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
     }
 
+    // Validar tipo de archivo
     const allowedTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel'
     ]
     
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|xlsx|xls|csv)$/i)) {
+    if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Tipo de archivo no soportado. Use PDF, Excel o CSV.' },
+        { error: 'Tipo de archivo no soportado. Use PDF o Excel.' },
         { status: 400 }
       )
     }
 
+    // Validar tamaño (10MB máximo)
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json(
         { error: 'Archivo demasiado grande. Máximo 10MB.' },
@@ -43,25 +65,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: credits } = await supabase
-      .from('credits')
-      .select('total, used')
-      .eq('user_id', user.id)
-      .is('company_id', null)
-      .single()
-    
-    const left = (credits?.total ?? 0) - (credits?.used ?? 0)
-    
-    if (left <= 0) {
-      return NextResponse.json({
-        error: 'Sin créditos',
-        redirectTo: '/precios',
-      }, { status: 402 })
-    }
+    console.log(`📄 Usuario: ${user.id}, Archivo: ${file.name}`)
 
+    // Guardar archivo
     const fileBuffer = await file.arrayBuffer()
     const fileName = `${user.id}/${Date.now()}-${file.name}`
     
+    // Subir a Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase
       .storage
       .from('analysis-files')
@@ -70,71 +80,71 @@ export async function POST(request: NextRequest) {
         upsert: false
       })
 
-    const fileUrl = uploadError ? '' : supabase.storage.from('analysis-files').getPublicUrl(fileName).data.publicUrl
+    if (uploadError) {
+      console.error('Error subiendo archivo:', uploadError)
+      return handleApiError(uploadError, 'POST /api/analyze - upload file')
+    }
 
+    // Obtener URL pública
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('analysis-files')
+      .getPublicUrl(fileName)
+
+    // Crear registro de análisis usando el servicio
     const analysisId = await enqueueAnalysisService(
       supabase,
       user.id,
       file.name,
-      fileUrl || '',
-      null
+      publicUrl,
+      null // companyId
     )
 
     if (!analysisId) {
+      // Obtener créditos restantes
+      const { data: credits } = await supabase
+        .from('credits')
+        .select('total, used')
+        .eq('user_id', user.id)
+        .is('company_id', null)
+        .single()
+      
+      const left = (credits?.total ?? 0) - (credits?.used ?? 0)
+      
       return NextResponse.json({
-        error: 'Error procesando créditos',
+        error: left <= 0 ? 'Sin créditos' : 'Error procesando créditos',
         redirectTo: '/precios',
+        creditsLeft: Math.max(0, left)
       }, { status: 402 })
     }
 
+    // Encolar el análisis para procesamiento asíncrono
     try {
-      await processAnalysis({
+      await enqueueAnalysis({
         userId: user.id,
         fileName: file.name,
-        filePath: fileUrl || '',
+        filePath: publicUrl,
         fileType: file.type,
         companyId: null,
         analysisId,
       })
-    } catch (processError: any) {
-      console.error('Error procesando análisis:', processError)
-      return NextResponse.json({
-        success: true,
-        message: 'Análisis creado pero falló el procesamiento',
-        analysisId,
-        error: processError.message,
-      })
+      console.log(`✅ Análisis encolado: ${analysisId}`)
+    } catch (queueError) {
+      console.error('Error encolando análisis:', queueError)
+      // No fallar la petición, el análisis se puede procesar luego
     }
 
-    const { data: analysisData } = await supabase
-      .from('analyses')
-      .select('*')
-      .eq('id', analysisId)
-      .single()
-
-    const { data: anomaliesData } = await supabase
-      .from('anomalies')
-      .select('*')
-      .eq('analysis_id', analysisId)
-
+    // Invalidar caché del dashboard y análisis
     revalidateTag(`dashboard-${user.id}`)
     revalidateTag(`analyses-${user.id}`)
 
     return successResponse({
       success: true,
+      message: 'Análisis creado. Se procesará en breve.',
       analysisId,
-      totalTransactions: analysisData?.total_transactions ?? 0,
-      anomaliesCount: analysisData?.anomalies_count ?? 0,
-      recoverableAmount: analysisData?.recoverable_amount ?? 0,
-      anomalies: (analysisData?.anomalies as any) ?? anomaliesData ?? [],
-      summary: analysisData?.ai_summary ?? '',
     })
 
-  } catch (err: any) {
-    console.error('Error en POST /api/analyze:', err)
-    return NextResponse.json(
-      { error: err.message || 'Error interno del servidor' },
-      { status: 500 }
-    )
+  } catch (err) {
+    return handleApiError(err, 'POST /api/analyze')
   }
 }

@@ -190,7 +190,7 @@ export default function AnalisisPage() {
               <p className="font-display font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
                 Arrastra tu estado de cuenta aquí
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
                 o haz clic para seleccionar un archivo
               </p>
               <label className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
