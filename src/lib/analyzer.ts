@@ -12,6 +12,7 @@ export interface AnalysisResult {
   period?: { start: string; end: string }
   bank?: string
   aiSummary?: string
+  success?: boolean
 }
 
 export async function analyzeTransactionsWithAI(

@@ -3,10 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import { authError, handleApiError, successResponse } from '@/lib/api-error'
 import { checkStrictRateLimit } from '@/lib/rate-limit'
 import { consumeCreditAtomic, enqueueAnalysis as enqueueAnalysisService } from '@/lib/services/credit.service'
-import { enqueueAnalysis } from '@/lib/analysis-queue'
+import { processAnalysis } from '@/lib/analysis-queue'
 import { revalidateTag } from 'next/cache'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
@@ -118,9 +118,10 @@ export async function POST(request: NextRequest) {
       }, { status: 402 })
     }
 
-    // Encolar el análisis para procesamiento asíncrono
+    // Procesar el análisis síncronamente y esperar resultados
+    let analysisResult = null
     try {
-      await enqueueAnalysis({
+      analysisResult = await processAnalysis({
         userId: user.id,
         fileName: file.name,
         filePath: publicUrl,
@@ -128,11 +129,29 @@ export async function POST(request: NextRequest) {
         companyId: null,
         analysisId,
       })
-      console.log(`✅ Análisis encolado: ${analysisId}`)
-    } catch (queueError) {
-      console.error('Error encolando análisis:', queueError)
-      // No fallar la petición, el análisis se puede procesar luego
+      console.log(`✅ Análisis completado: ${analysisId}`)
+    } catch (processError) {
+      console.error('Error procesando análisis:', processError)
+      // El análisis fue creado pero falló el procesamiento
+      return successResponse({
+        success: true,
+        message: 'Análisis creado pero falló el procesamiento.',
+        analysisId,
+      })
     }
+
+    // Obtener el análisis completo para devolver
+    const { data: analysisData } = await supabase
+      .from('analyses')
+      .select('*')
+      .eq('id', analysisId)
+      .single()
+
+    // Obtener anomalías
+    const { data: anomaliesData } = await supabase
+      .from('anomalies')
+      .select('*')
+      .eq('analysis_id', analysisId)
 
     // Invalidar caché del dashboard y análisis
     revalidateTag(`dashboard-${user.id}`)
@@ -140,8 +159,12 @@ export async function POST(request: NextRequest) {
 
     return successResponse({
       success: true,
-      message: 'Análisis creado. Se procesará en breve.',
       analysisId,
+      totalTransactions: analysisData?.total_transactions ?? 0,
+      anomaliesCount: analysisData?.anomalies_count ?? 0,
+      recoverableAmount: analysisData?.recoverable_amount ?? 0,
+      anomalies: (analysisData?.anomalies as any) ?? anomaliesData ?? [],
+      summary: analysisData?.ai_summary ?? '',
     })
 
   } catch (err) {

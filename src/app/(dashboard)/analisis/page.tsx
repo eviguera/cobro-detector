@@ -151,7 +151,7 @@ export default function AnalisisPage() {
           onDrop={handleDrop}
           className={`upload-zone rounded-2xl p-8 sm:p-12 text-center transition-all duration-300 ${
             dragging ? 'dragging bg-brand-50 dark:bg-brand-950/50' :
-            file ? 'has-file' : 'bg-gray-50/50 dark:bg-gray-900/50 hover:border-gray-300 dark:hover:border-gray-600'
+            file ? 'has-file' : 'card-fintech hover:border-brand-300 dark:hover:border-brand-700'
           }`}
           role="button"
           tabIndex={0}
