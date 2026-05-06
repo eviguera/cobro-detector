@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { authError, handleApiError, successResponse } from '@/lib/api-error'
 import { checkStrictRateLimit } from '@/lib/rate-limit'
 import { consumeCreditAtomic, enqueueAnalysis as enqueueAnalysisService } from '@/lib/services/credit.service'
+import { enqueueAnalysis } from '@/lib/analysis-queue'
 import { revalidateTag } from 'next/cache'
 
 export const maxDuration = 30
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
         .eq('user_id', user.id)
         .is('company_id', null)
         .single()
-
+      
       const left = (credits?.total ?? 0) - (credits?.used ?? 0)
       
       return NextResponse.json({
@@ -117,11 +118,21 @@ export async function POST(request: NextRequest) {
       }, { status: 402 })
     }
 
-    // TODO: Implementar procesamiento asíncrono con cola
-    // Por ahora, el análisis se procesa síncronamente
-    // TODO: Mover a worker/queue en el futuro
-
-    console.log(`✅ Análisis creado: ${analysisId}`)
+    // Encolar el análisis para procesamiento asíncrono
+    try {
+      await enqueueAnalysis({
+        userId: user.id,
+        fileName: file.name,
+        filePath: publicUrl,
+        fileType: file.type,
+        companyId: null,
+        analysisId,
+      })
+      console.log(`✅ Análisis encolado: ${analysisId}`)
+    } catch (queueError) {
+      console.error('Error encolando análisis:', queueError)
+      // No fallar la petición, el análisis se puede procesar luego
+    }
 
     // Invalidar caché del dashboard y análisis
     revalidateTag(`dashboard-${user.id}`)

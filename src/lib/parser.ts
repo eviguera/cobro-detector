@@ -85,6 +85,13 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
     .filter(tx => tx.description && tx.amount !== 0)
 }
 
+// Parser para archivos PDF usando pdf-parse
+export async function parsePDFFile(buffer: Buffer): Promise<ParsedTransaction[]> {
+  const pdfParse = (await import('pdf-parse')).default
+  const data = await pdfParse(buffer)
+  return parsePDFText(data.text)
+}
+
 // Parser simplificado para PDF (texto extraído)
 export function parsePDFText(text: string): ParsedTransaction[] {
   const lines = text.split('\n').filter(l => l.trim())

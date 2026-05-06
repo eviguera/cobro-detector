@@ -1,8 +1,18 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { ParsedTransaction, DetectedAnomaly } from '@/types/database.types'
 import { sanitizeDescription, sanitizeTransactions } from '@/lib/security'
+import { parseExcelFile, parsePDFFile, detectBank as detectBankFromParser } from './parser'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!)
+
+export interface AnalysisResult {
+  anomalies: DetectedAnomaly[]
+  totalTransactions: number
+  totalRecoverable: number
+  period?: { start: string; end: string }
+  bank?: string
+  aiSummary?: string
+}
 
 export async function analyzeTransactionsWithAI(
   transactions: ParsedTransaction[],
@@ -221,4 +231,96 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
   })
 
   return anomalies
+}
+
+export async function analyzeFile(
+  filePath: string,
+  fileType: string,
+  options?: { userId?: string; companyId?: string; fileName?: string }
+): Promise<AnalysisResult> {
+  try {
+    // Leer el archivo (puede ser una URL de Supabase o un path local)
+    let buffer: Buffer
+    
+    if (filePath.startsWith('http')) {
+      // Es una URL (Supabase Storage) - descargar
+      const response = await fetch(filePath)
+      if (!response.ok) throw new Error(`Error descargando archivo: ${response.statusText}`)
+      const arrayBuffer = await response.arrayBuffer()
+      buffer = Buffer.from(arrayBuffer)
+    } else {
+      // Es un path local
+      const fs = await import('fs/promises')
+      buffer = await fs.readFile(filePath)
+    }
+
+    // Parsear según el tipo
+    let transactions: ParsedTransaction[] = []
+
+    if (fileType.includes('pdf')) {
+      const { parsePDFFile } = await import('./parser')
+      transactions = await parsePDFFile(buffer)
+    } else if (fileType.includes('spreadsheet') || fileType.includes('excel') || filePath.endsWith('.xlsx') || filePath.endsWith('.xls') || filePath.endsWith('.csv')) {
+      const { parseExcelFile } = await import('./parser')
+      transactions = await parseExcelFile(buffer as unknown as ArrayBuffer)
+    } else {
+      throw new Error(`Tipo de archivo no soportado: ${fileType}`)
+    }
+
+    // Detectar banco
+    const bank = detectBankFromParser('', transactions.map(tx => tx.description).join(' '))
+
+    // Ejecutar detección por reglas
+    const ruleAnomalies = detectAnomaliesRules(transactions)
+
+    // Ejecutar análisis con IA
+    const aiResult = await analyzeTransactionsWithAI(transactions, bank)
+
+    // Combinar resultados (IA + reglas)
+    const allAnomalies = [...ruleAnomalies, ...aiResult.anomalies]
+
+    // Calcular período
+    const dates = transactions.map(tx => tx.date).sort()
+    const period = dates.length > 0 ? {
+      start: dates[0],
+      end: dates[dates.length - 1]
+    } : undefined
+
+    // Calcular monto total recuperable
+    const totalRecoverable = allAnomalies.reduce((sum, a) => sum + a.recoverableAmount, 0)
+
+    return {
+      anomalies: allAnomalies,
+      totalTransactions: transactions.length,
+      totalRecoverable,
+      period,
+      bank,
+      aiSummary: aiResult.summary,
+    }
+
+  } catch (error) {
+    console.error('Error en analyzeFile:', error)
+    return {
+      anomalies: [],
+      totalTransactions: 0,
+      totalRecoverable: 0,
+    }
+  }
+}
+
+function detectBank(transactions: ParsedTransaction[]): string | undefined {
+  const descriptions = transactions.map(tx => tx.description.toLowerCase()).join(' ')
+  
+  if (descriptions.includes('santander')) return 'Santander'
+  if (descriptions.includes('banco de chile') || descriptions.includes('bco chile')) return 'Banco de Chile'
+  if (descriptions.includes('estado') || descriptions.includes('bancoestado')) return 'BancoEstado'
+  if (descriptions.includes('bci')) return 'BCI'
+  if (descriptions.includes('scotiabank')) return 'Scotiabank'
+  if (descriptions.includes('itau')) return 'Itaú'
+  if (descriptions.includes('falabella')) return 'Banco Falabella'
+  if (descriptions.includes('ripley')) return 'Banco Ripley'
+  if (descriptions.includes('security')) return 'Banco Security'
+  if (descriptions.includes('corpbanca')) return 'CorpBanca'
+  
+  return undefined
 }

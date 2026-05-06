@@ -1,19 +1,17 @@
-import { Queue } from '@vercel/queue'
 import { createClient } from '@/lib/supabase/server'
 import { analyzeFile } from '@/lib/analyzer'
 import type { AnalysisResult } from '@/lib/analyzer'
 
-// Crear la cola de análisis
-export const analysisQueue = new Queue('analysis', {
-  // Configuración de reintentos
-  retries: 3,
-  // Tiempo máximo de ejecución (10 minutos)
-  maxDuration: 600,
-})
-
-// Procesar trabajos en la cola
-analysisQueue.process(async (job) => {
-  const { userId, fileName, filePath, fileType, companyId, analysisId } = job.data
+// Procesar análisis de forma asíncrona (sin cola externa)
+export async function processAnalysis(data: {
+  userId: string
+  fileName: string
+  filePath: string
+  fileType: string
+  companyId?: string | null
+  analysisId: string
+}) {
+  const { userId, fileName, filePath, fileType, companyId, analysisId } = data
 
   const supabase = await createClient()
 
@@ -43,6 +41,8 @@ analysisQueue.process(async (job) => {
         period_start: result.period?.start ?? null,
         period_end: result.period?.end ?? null,
         bank: result.bank ?? null,
+        anomalies: result.anomalies ?? [],
+        ai_summary: result.aiSummary ?? null,
       })
       .eq('id', analysisId)
       .eq('user_id', userId)
@@ -74,13 +74,6 @@ analysisQueue.process(async (job) => {
       }
     }
 
-    // Actualizar créditos usados (incrementar)
-    await supabase
-      .from('credits')
-      .update({ used: supabase.rpc('increment', { row_id: userId }) })
-      .eq('user_id', userId)
-      .is('company_id', null)
-
     return { success: true, analysisId }
 
   } catch (error) {
@@ -95,9 +88,9 @@ analysisQueue.process(async (job) => {
 
     throw error
   }
-})
+}
 
-// Función helper para encolar análisis
+// Función helper para encolar análisis (compatible con la API)
 export async function enqueueAnalysis(data: {
   userId: string
   fileName: string
@@ -106,6 +99,10 @@ export async function enqueueAnalysis(data: {
   companyId?: string | null
   analysisId: string
 }) {
-  const job = await analysisQueue.add(data)
-  return job.id
+  // Procesar en background (no esperar)
+  processAnalysis(data).catch(err => {
+    console.error('Error en processAnalysis:', err)
+  })
+  
+  return data.analysisId
 }

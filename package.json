@@ -30,6 +30,7 @@
     "react-dom": "^18",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.0"
   },
   "devDependencies": {
