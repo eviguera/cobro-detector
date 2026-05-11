@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateWordDocument } from '@/lib/document-generator'
 import type { Analysis, Anomaly } from '@/types/database.types'
+import { z } from 'zod'
+
+const bodySchema = z.object({
+  analysisId: z.string().uuid('analysisId debe ser un UUID válido'),
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,14 +18,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { analysisId } = body
-
-    if (!analysisId) {
-      return NextResponse.json({ error: 'analysisId es requerido' }, { status: 400 })
+    const parsed = bodySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
     }
 
-    // Obtener el análisis
-    const { data: analysis, error: analysisError } = await (supabase as any)
+    const { analysisId } = parsed.data
+
+    const { data: analysis, error: analysisError } = await supabase
       .from('analyses')
       .select('*')
       .eq('id', analysisId)
@@ -31,8 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Análisis no encontrado' }, { status: 404 })
     }
 
-    // Obtener anomalías del análisis
-    const { data: anomalies, error: anomaliesError } = await (supabase as any)
+    const { data: anomalies, error: anomaliesError } = await supabase
       .from('anomalies')
       .select('*')
       .eq('analysis_id', analysisId)
@@ -42,8 +46,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Error obteniendo anomalías' }, { status: 500 })
     }
 
-    // Obtener perfil del usuario
-    const { data: profile } = await (supabase as any)
+    const { data: profile } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     const letterData = {
       analysis: analysis as unknown as Analysis,
-      anomalies: anomalies as unknown as Anomaly[],
+      anomalies: (anomalies ?? []) as unknown as Anomaly[],
       bankName: analysis.bank || 'No especificado',
       businessName: profile?.business_name || '',
       userName: profile?.full_name || user.email || 'Usuario',
@@ -59,14 +62,15 @@ export async function POST(request: NextRequest) {
       date: new Date().toLocaleDateString('es-CL'),
     }
 
-    // Generar documento Word
     const buffer = await generateWordDocument(letterData)
 
-    // Retornar el documento como descarga
+    const bankSlug = (analysis.bank || 'banco').toLowerCase().replace(/\s+/g, '_')
+    const today = new Date().toISOString().split('T')[0]
+
     return new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="carta_reclamo_${analysis.bank || 'banco'}_${new Date().toISOString().split('T')[0]}.docx"`,
+        'Content-Disposition': `attachment; filename="carta_reclamo_${bankSlug}_${today}.docx"`,
       },
     })
 

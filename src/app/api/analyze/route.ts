@@ -5,6 +5,23 @@ import { checkStrictRateLimit } from '@/lib/rate-limit'
 import { consumeCreditAtomic, enqueueAnalysis as enqueueAnalysisService } from '@/lib/services/credit.service'
 import { enqueueAnalysis } from '@/lib/analysis-queue'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'text/csv',
+] as const
+
+const analyzeSchema = z.object({
+  file: z.instanceof(File, { message: 'Se requiere un archivo' })
+    .refine(f => f.size > 0, { message: 'El archivo está vacío' })
+    .refine(f => f.size <= 10 * 1024 * 1024, { message: 'Archivo demasiado grande. Máximo 10MB.' })
+    .refine(f => ALLOWED_MIME_TYPES.includes(f.type as typeof ALLOWED_MIME_TYPES[number]) || /\.(pdf|xlsx|xls|csv)$/i.test(f.name), {
+      message: 'Tipo de archivo no soportado. Use PDF, Excel o CSV.',
+    }),
+})
 
 export const maxDuration = 30
 
@@ -35,41 +52,26 @@ export async function POST(request: NextRequest) {
       return authError()
     }
 
-    // Obtener archivo
+    // Obtener y validar archivo con Zod
     const formData = await request.formData()
-    const file = formData.get('file') as File | null
+    const rawFile = formData.get('file')
 
-    if (!file) {
-      return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
-    }
-
-    // Validar tipo de archivo
-    const allowedTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel'
-    ]
-    
-    if (!allowedTypes.includes(file.type)) {
+    const parsed = analyzeSchema.safeParse({ file: rawFile })
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Tipo de archivo no soportado. Use PDF o Excel.' },
+        { error: parsed.error.issues[0].message },
         { status: 400 }
       )
     }
 
-    // Validar tamaño (10MB máximo)
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'Archivo demasiado grande. Máximo 10MB.' },
-        { status: 400 }
-      )
-    }
+    const file = parsed.data.file
 
-    console.log(`📄 Usuario: ${user.id}, Archivo: ${file.name}`)
+    console.log(`Usuario: ${user.id}, Archivo: ${file.name}`)
 
     // Guardar archivo
     const fileBuffer = await file.arrayBuffer()
-    const fileName = `${user.id}/${Date.now()}-${file.name}`
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const fileName = `${user.id}/${Date.now()}-${safeFileName}`
     
     // Subir a Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase

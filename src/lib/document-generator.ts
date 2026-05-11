@@ -42,7 +42,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
       {
         properties: {},
         children: [
-          // Header
           new Paragraph({
             text: 'CARTA DE RECLAMO FORMAL',
             heading: HeadingLevel.HEADING_1,
@@ -50,7 +49,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
             spacing: { after: 400 },
           }),
 
-          // Fecha
           new Paragraph({
             children: [
               new TextRun({
@@ -61,7 +59,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
             spacing: { after: 200 },
           }),
 
-          // Datos del reclamante
           new Paragraph({
             text: 'DATOS DEL RECLAMANTE',
             heading: HeadingLevel.HEADING_2,
@@ -87,7 +84,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
             spacing: { after: 200 },
           }),
 
-          // Datos del banco
           new Paragraph({
             text: 'DATOS DEL BANCO',
             heading: HeadingLevel.HEADING_2,
@@ -107,7 +103,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
             spacing: { after: 200 },
           }),
 
-          // Motivo del reclamo
           new Paragraph({
             text: 'MOTIVO DEL RECLAMO',
             heading: HeadingLevel.HEADING_2,
@@ -123,11 +118,9 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
             spacing: { before: 200, after: 200 },
           }),
 
-          // Tabla de anomalías
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
-              // Header row
               new TableRow({
                 children: [
                   new TableCell({
@@ -144,7 +137,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
                   }),
                 ],
               }),
-              // Data rows
               ...anomalies.map(anomaly =>
                 new TableRow({
                   children: [
@@ -160,7 +152,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
                   ],
                 })
               ),
-              // Total row
                 new TableRow({
                 children: [
                   new TableCell({
@@ -177,7 +168,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
 
           new Paragraph({ text: '', spacing: { before: 200 } }),
 
-          // Solicitud
           new Paragraph({
             text: 'SOLICITUD',
             heading: HeadingLevel.HEADING_2,
@@ -192,7 +182,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
             spacing: { after: 400 },
           }),
 
-          // Cierre
           new Paragraph({
             text: 'Sin otro particular, saluda atentamente,',
             spacing: { before: 400, after: 200 },
@@ -213,7 +202,6 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
             ],
           }),
 
-          // Footer
           new Paragraph({
             text: 'Este documento fue generado automáticamente por CobroDetector.cl',
             spacing: { before: 400 },
@@ -236,189 +224,131 @@ export async function generateWordDocument(data: LetterData): Promise<Buffer> {
 export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
   const pdfLib = await getPdfLib()
   const { PDFDocument, rgb, StandardFonts } = pdfLib
-  
+
   const pdfDoc = await PDFDocument.create()
-  const page = pdfDoc.addPage([595.28, 841.89]) // A4 size
+  const page = pdfDoc.addPage([595.28, 841.89])
   const { height } = page.getSize()
   const fontSize = 12
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-  
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount)
   }
-  
+
   const totalRecoverable = data.anomalies.reduce((sum, a) => sum + a.recoverable_amount, 0)
-  
+
+  let currentPage = page
   let yPosition = height - 50
-  
-  // Título
-  page.drawText('CARTA DE RECLAMO FORMAL', {
-    x: 50,
-    y: yPosition,
-    size: 18,
-    font: boldFont,
-    color: rgb(0, 0, 0),
+
+  function drawOrNewPage(drawFn: (page: typeof currentPage) => number): void {
+    if (yPosition < 100) {
+      currentPage = pdfDoc.addPage([595.28, 841.89])
+      yPosition = height - 50
+    }
+    yPosition = drawFn(currentPage)
+  }
+
+  currentPage.drawText('CARTA DE RECLAMO FORMAL', {
+    x: 50, y: yPosition, size: 18, font: boldFont, color: rgb(0, 0, 0),
   })
   yPosition -= 30
-  
-  // Fecha
-  page.drawText(`Fecha: ${data.date}`, {
-    x: 50,
-    y: yPosition,
-    size: fontSize,
-    font: boldFont,
+
+  currentPage.drawText(`Fecha: ${data.date}`, {
+    x: 50, y: yPosition, size: fontSize, font: boldFont,
   })
   yPosition -= 25
-  
-  // Datos del reclamante
-  page.drawText('DATOS DEL RECLAMANTE', {
-    x: 50,
-    y: yPosition,
-    size: 14,
-    font: boldFont,
+
+  currentPage.drawText('DATOS DEL RECLAMANTE', {
+    x: 50, y: yPosition, size: 14, font: boldFont,
   })
   yPosition -= 20
-  
-  page.drawText(`Nombre: ${data.userName}`, { x: 50, y: yPosition, size: fontSize, font })
+
+  drawOrNewPage((p) => { p.drawText(`Nombre: ${data.userName}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
   yPosition -= 18
-  page.drawText(`RUT: ${data.rut || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font })
+  drawOrNewPage((p) => { p.drawText(`RUT: ${data.rut || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
   yPosition -= 18
-  page.drawText(`Empresa: ${data.businessName || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font })
+  drawOrNewPage((p) => { p.drawText(`Empresa: ${data.businessName || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 25 })
   yPosition -= 25
-  
-  // Datos del banco
-  page.drawText('DATOS DEL BANCO', {
-    x: 50,
-    y: yPosition,
-    size: 14,
-    font: boldFont,
+
+  currentPage.drawText('DATOS DEL BANCO', {
+    x: 50, y: yPosition, size: 14, font: boldFont,
   })
   yPosition -= 20
-  
-  page.drawText(`Banco: ${data.bankName}`, { x: 50, y: yPosition, size: fontSize, font })
+  drawOrNewPage((p) => { p.drawText(`Banco: ${data.bankName}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
   yPosition -= 18
-  page.drawText(`Período: ${data.analysis.period_start || 'N/A'} al ${data.analysis.period_end || 'N/A'}`, { x: 50, y: yPosition, size: fontSize, font })
+  drawOrNewPage((p) => { p.drawText(`Período: ${data.analysis.period_start || 'N/A'} al ${data.analysis.period_end || 'N/A'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 25 })
   yPosition -= 25
-  
-  // Motivo
-  page.drawText('MOTIVO DEL RECLAMO', {
-    x: 50,
-    y: yPosition,
-    size: 14,
-    font: boldFont,
+
+  currentPage.drawText('MOTIVO DEL RECLAMO', {
+    x: 50, y: yPosition, size: 14, font: boldFont,
   })
   yPosition -= 20
-  
+
   const motivo = 'Por medio de la presente, me dirijo a Uds. para formular reclamo formal por cobros indebidos detectados en el estado de cuenta correspondiente al período antes mencionado.'
-  page.drawText(motivo, { x: 50, y: yPosition, size: fontSize, font, maxWidth: 495 })
+  drawOrNewPage((p) => { p.drawText(motivo, { x: 50, y: yPosition, size: fontSize, font, maxWidth: 495 }); return yPosition - 40 })
   yPosition -= 40
-  
-  // Anomalías detectadas
-  page.drawText('ANOMALÍAS DETECTADAS', {
-    x: 50,
-    y: yPosition,
-    size: 14,
-    font: boldFont,
+
+  currentPage.drawText('ANOMALÍAS DETECTADAS', {
+    x: 50, y: yPosition, size: 14, font: boldFont,
   })
   yPosition -= 25
-  
+
   for (const anomaly of data.anomalies) {
     if (yPosition < 100) {
-      // Nueva página si no hay espacio
-      const newPage = pdfDoc.addPage([595.28, 841.89])
+      currentPage = pdfDoc.addPage([595.28, 841.89])
       yPosition = height - 50
-      // Dibujar en la nueva página
-      newPage.drawText('ANOMALÍAS DETECTADAS (continuación)', {
-        x: 50,
-        y: yPosition,
-        size: 14,
-        font: boldFont,
+      currentPage.drawText('ANOMALÍAS DETECTADAS (continuación)', {
+        x: 50, y: yPosition, size: 14, font: boldFont,
       })
       yPosition -= 25
-      // Continuar con el bucle usando newPage
-      // Para simplificar, continuamos usando 'page' pero actualizamos referencia
-      Object.assign(page, newPage)
     }
-    
-    page.drawText(`• ${anomaly.type.replace('_', ' ').toUpperCase()}: ${anomaly.title}`, {
-      x: 50,
-      y: yPosition,
-      size: 10,
-      font: boldFont,
+
+    currentPage.drawText(`• ${anomaly.type.replace('_', ' ').toUpperCase()}: ${anomaly.title}`, {
+      x: 50, y: yPosition, size: 10, font: boldFont,
     })
     yPosition -= 15
-    
-    page.drawText(`  ${anomaly.description || ''}`, {
-      x: 50,
-      y: yPosition,
-      size: 9,
-      font,
-      maxWidth: 495,
+
+    currentPage.drawText(`  ${anomaly.description || ''}`, {
+      x: 50, y: yPosition, size: 9, font, maxWidth: 495,
     })
     yPosition -= 12
-    
-    page.drawText(`  Monto: ${formatCurrency(anomaly.recoverable_amount)}`, {
-      x: 50,
-      y: yPosition,
-      size: 10,
-      font,
+
+    currentPage.drawText(`  Monto: ${formatCurrency(anomaly.recoverable_amount)}`, {
+      x: 50, y: yPosition, size: 10, font,
     })
     yPosition -= 20
   }
-  
-  // Total
-  page.drawText(`TOTAL A RECUPERAR: ${formatCurrency(totalRecoverable)}`, {
-    x: 50,
-    y: yPosition - 20,
-    size: 14,
-    font: boldFont,
-    color: rgb(0.2, 0.4, 0.8),
+
+  yPosition -= 20
+  currentPage.drawText(`TOTAL A RECUPERAR: ${formatCurrency(totalRecoverable)}`, {
+    x: 50, y: yPosition, size: 14, font: boldFont, color: rgb(0.2, 0.4, 0.8),
   })
   yPosition -= 50
-  
-  // Solicitud
-  page.drawText('SOLICITUD', {
-    x: 50,
-    y: yPosition,
-    size: 14,
-    font: boldFont,
+
+  currentPage.drawText('SOLICITUD', {
+    x: 50, y: yPosition, size: 14, font: boldFont,
   })
   yPosition -= 20
-  
+
   const solicitud = `En virtud de lo expuesto, solicito formalmente la devolución de la suma de ${formatCurrency(totalRecoverable)}, correspondiente a cargos indebidos, comisiones duplicadas y/o errores en el cobro de cuotas detectados en el análisis de mi estado de cuenta.`
-  page.drawText(solicitud, { x: 50, y: yPosition, size: fontSize, font, maxWidth: 495 })
+  drawOrNewPage((p) => { p.drawText(solicitud, { x: 50, y: yPosition, size: fontSize, font, maxWidth: 495 }); return yPosition - 40 })
   yPosition -= 40
-  
-  page.drawText('Sin otro particular, saluda atentamente,', {
-    x: 50,
-    y: yPosition,
-    size: fontSize,
-    font,
-  })
+
+  drawOrNewPage((p) => { p.drawText('Sin otro particular, saluda atentamente,', { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 30 })
   yPosition -= 30
-  
-  page.drawText(data.userName || 'Firma', {
-    x: 50,
-    y: yPosition,
-    size: fontSize,
-    font: boldFont,
-  })
+
+  drawOrNewPage((p) => { p.drawText(data.userName || 'Firma', { x: 50, y: yPosition, size: fontSize, font: boldFont }); return yPosition - 18 })
   yPosition -= 18
-  page.drawText(`RUT: ${data.rut || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font })
+  drawOrNewPage((p) => { p.drawText(`RUT: ${data.rut || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
   yPosition -= 18
-  page.drawText(`Empresa: ${data.businessName || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font })
+  drawOrNewPage((p) => { p.drawText(`Empresa: ${data.businessName || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 30 })
   yPosition -= 30
-  
-  // Footer
-  page.drawText('Este documento fue generado automáticamente por CobroDetector.cl', {
-    x: 50,
-    y: 30,
-    size: 8,
-    font,
-    color: rgb(0.5, 0.5, 0.5),
+
+  currentPage.drawText('Este documento fue generado automáticamente por CobroDetector.cl', {
+    x: 50, y: 30, size: 8, font, color: rgb(0.5, 0.5, 0.5),
   })
-  
+
   const pdfBytes = await pdfDoc.save()
   return Buffer.from(pdfBytes)
 }

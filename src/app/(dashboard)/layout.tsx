@@ -1,25 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Shield, LayoutDashboard, FileSearch, History, CreditCard, LogOut, ChevronRight } from 'lucide-react'
+import { Shield, LayoutDashboard, FileSearch, History, CreditCard, LogOut, ChevronRight, Sparkles } from 'lucide-react'
 import type { Credits, Profile } from '@/types/database.types'
 
 const navItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Panel' },
   { href: '/analisis', icon: FileSearch, label: 'Nuevo análisis' },
-  { href: '/historial', icon: History, label: 'Mis análisis' },
-  { href: '/precios', icon: CreditCard, label: 'Comprar créditos' },
+  { href: '/historial', icon: History, label: 'Historial' },
+  { href: '/precios', icon: CreditCard, label: 'Créditos' },
 ]
 
-// Función para datos del dashboard (sin caché - Next.js 14 no soporta use cache)
 async function getDashboardData(userId: string) {
   const supabase = await createClient()
-  
   const [profileResult, creditsResult] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', userId).single(),
-    supabase.from('credits').select('*').eq('user_id', userId).single()
+    supabase.from('credits').select('*').eq('user_id', userId).single(),
   ])
-  
   return {
     profile: profileResult.data as Profile | null,
     credits: creditsResult.data as Credits | null,
@@ -29,70 +26,72 @@ async function getDashboardData(userId: string) {
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
   if (!user) redirect('/login')
 
-  // Usar función cacheada
   const { profile, credits } = await getDashboardData(user.id)
-
   const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <aside className="w-60 bg-white border-r border-gray-100 flex flex-col fixed h-full">
-        <div className="p-5 border-b border-gray-100">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Shield className="w-3.5 h-3.5 text-white" />
+    <div className="min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0f] flex">
+      <aside className="w-64 bg-white/80 dark:bg-[#0d0d14]/90 backdrop-blur-xl border-r border-gray-100 dark:border-gray-800/40 flex flex-col fixed h-full z-30">
+        <div className="p-5 border-b border-gray-100 dark:border-gray-800/30">
+          <Link href="/dashboard" className="group flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20 group-hover:shadow-brand-500/30 group-hover:scale-105 transition-all duration-300">
+              <Shield className="w-4 h-4 text-white" />
             </div>
-            <span className="font-semibold text-gray-900 text-sm">CobroDetector</span>
+            <div>
+              <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm tracking-tight">CobroDetector</span>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium tracking-wider uppercase">Dashboard</p>
+            </div>
           </Link>
         </div>
 
-        {/* Créditos */}
-        <div className="px-4 py-3 mx-3 mt-4 bg-blue-50 rounded-xl border border-blue-100">
-          <p className="text-xs text-blue-600 font-medium mb-0.5">Créditos disponibles</p>
-          <p className="text-2xl font-bold text-blue-700">{creditsLeft}</p>
-          {creditsLeft === 0 && (
-            <Link href="/precios" className="text-xs text-blue-600 hover:underline flex items-center gap-0.5 mt-1">
-              Comprar más <ChevronRight className="w-3 h-3" />
+        <div className="px-4 py-3 mx-3 mt-4 bg-gradient-to-br from-brand-50 to-brand-100/80 dark:from-brand-950/60 dark:to-brand-900/20 rounded-2xl border border-brand-200/60 dark:border-brand-800/30 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-brand-400/10 to-transparent rounded-full -translate-y-8 translate-x-8" />
+          <p className="text-[11px] text-brand-600 dark:text-brand-400 font-semibold tracking-wider uppercase mb-1">Créditos</p>
+          <p className="text-3xl font-bold text-brand-700 dark:text-brand-300 tracking-tight">{creditsLeft}</p>
+          {creditsLeft === 0 ? (
+            <Link href="/precios" className="inline-flex items-center gap-1 mt-2 text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors">
+              <Sparkles className="w-3 h-3" />
+              Comprar créditos <ChevronRight className="w-3 h-3" />
             </Link>
+          ) : (
+            <p className="text-[11px] text-brand-500/70 dark:text-brand-400/60 mt-2">
+              de {credits?.total ?? 0} totales
+            </p>
           )}
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 p-3 mt-2">
-          <ul className="space-y-1">
+        <nav className="flex-1 px-3 mt-4">
+          <ul className="space-y-0.5">
             {navItems.map(item => (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                  className="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-all duration-200"
                 >
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
+                  <item.icon className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
+                  <span className="font-medium">{item.label}</span>
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
 
-        {/* User */}
-        <div className="p-4 border-t border-gray-100">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-blue-700 text-xs font-semibold">
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800/30">
+          <div className="flex items-center gap-3 mb-3 px-1">
+            <div className="w-9 h-9 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+              <span className="text-white text-sm font-bold">
                 {(profile?.full_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
               </span>
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-gray-900 truncate">{profile?.full_name ?? 'Usuario'}</p>
-              <p className="text-xs text-gray-400 truncate">{user.email}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-tight">{profile?.full_name ?? 'Usuario'}</p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{user.email}</p>
             </div>
           </div>
           <form action="/api/logout" method="POST">
-            <button type="submit" className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            <button type="submit" className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-xl transition-all duration-200">
               <LogOut className="w-3.5 h-3.5" />
               Cerrar sesión
             </button>
@@ -100,9 +99,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 ml-60 p-8">
-        {children}
+      <main className="flex-1 ml-64 min-h-screen">
+        <div className="max-w-6xl mx-auto p-6 lg:p-8 xl:p-10">
+          {children}
+        </div>
       </main>
     </div>
   )

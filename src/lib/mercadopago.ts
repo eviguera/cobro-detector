@@ -18,7 +18,9 @@ export async function chargeSuccessFee(
   cardToken: string,
   amount: number,
   description: string,
-  externalReference: string
+  externalReference: string,
+  payerEmail: string,
+  paymentMethodId?: string,
 ) {
   const mpClient = getMPClient()
   const paymentClient = new Payment(mpClient)
@@ -29,9 +31,9 @@ export async function chargeSuccessFee(
       installments: 1,
       transaction_amount: amount,
       description,
-      payment_method_id: 'visa', // Se determina dinámicamente en producción
+      payment_method_id: paymentMethodId,
       payer: {
-        email: 'test@test.com', // Se debe pasar el email real del usuario
+        email: payerEmail,
       },
       external_reference: externalReference,
       statement_descriptor: 'COBRO DETECTOR',

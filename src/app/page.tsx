@@ -209,7 +209,7 @@ export default function LandingPage() {
             </div>
             <span className="text-sm font-medium text-gray-900">CobroDetector</span>
           </div>
-          <p className="text-xs text-gray-400">© 2024 · Hecho en Chile para emprendedores chilenos</p>
+          <p className="text-xs text-gray-400">© {new Date().getFullYear()} · Hecho en Chile para emprendedores chilenos</p>
         </div>
       </footer>
     </div>

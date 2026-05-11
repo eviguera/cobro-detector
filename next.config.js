@@ -1,21 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // NOTA: ignoreBuildErrors está activo porque @supabase/ssr v0.8.0 tiene problemas
+  // de inferencia de tipos con el Database genérico. Para arreglarlo:
+  // 1. npm install @supabase/supabase-js@latest @supabase/ssr@latest
+  // 2. Ejecutar: npx supabase gen types --lang=ts --linked > src/types/database.types.ts
   typescript: {
-    // Ignorar errores de TypeScript en build para despliegue rápido
     ignoreBuildErrors: true,
-  },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'mcwqqcngfibhgluvixlu.supabase.co',
-      },
-    ],
-  },
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '10mb',
-    },
   },
   images: {
     remotePatterns: [
