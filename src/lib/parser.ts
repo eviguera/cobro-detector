@@ -18,7 +18,7 @@ function parseAmount(raw: string | number): number {
 
 // Normaliza fecha a YYYY-MM-DD
 function parseDate(raw: string): string {
-  if (!raw) return new Date().toISOString().split('T')[0]
+  if (!raw) return today()
 
   // DD/MM/YYYY o DD-MM-YYYY
   const ddmmyyyy = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/)
@@ -32,25 +32,58 @@ function parseDate(raw: string): string {
   const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (iso) return iso[0]
 
-  return raw
+  // M/D/YY o M/D/YYYY (formato que xlsx asigna a serial dates con raw:false)
+  const usDate = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
+  if (usDate) {
+    const [, m, d, y] = usDate
+    const year = y.length === 2 ? `20${y}` : y
+    return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+
+  return today()
+}
+
+function today(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
+// Convierte serial date de Excel a YYYY-MM-DD
+function excelSerialToDate(serial: number, XLSX: any): string {
+  try {
+    const dateObj = XLSX.SSF.parse_date_code(serial)
+    if (dateObj && dateObj.y && dateObj.m && dateObj.d) {
+      return `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`
+    }
+  } catch {}
+  return today()
 }
 
 // Parser para archivos Excel/CSV usando xlsx
 export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransaction[]> {
-  // Importación dinámica para evitar problemas de SSR
   const XLSX = await import('xlsx')
+
+  // Detectar si es CSV puro (no ZIP/OLE2) para evitar auto-conversión de fechas de xlsx
+  const uint8 = new Uint8Array(buffer.slice(0, 4))
+  const isCSV = !(
+    (uint8[0] === 0x50 && uint8[1] === 0x4B) || // ZIP header (xlsx)
+    (uint8[0] === 0xD0 && uint8[1] === 0xCF)    // OLE2 header (xls)
+  )
+
+  if (isCSV) {
+    return parseCSVBuffer(buffer)
+  }
+
+  // Excel real: usar xlsx con raw:false para formatear fechas correctamente
   const workbook = XLSX.read(buffer, { type: 'array' })
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   const rows: Record<string, string | number>[] = XLSX.utils.sheet_to_json(sheet, { raw: false })
 
   return rows
     .filter(row => {
-      // Filtra filas vacías o headers duplicados
       const values = Object.values(row)
       return values.some(v => v && v.toString().trim() !== '')
     })
     .map((row, i): ParsedTransaction => {
-      // Detectar columnas de forma flexible (distintos bancos usan distintos nombres)
       const keys = Object.keys(row).map(k => k.toLowerCase())
 
       const dateKey = keys.find(k => k.includes('fecha') || k.includes('date')) ?? keys[0]
@@ -63,7 +96,6 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
       const rawDate = String(row[Object.keys(row)[keys.indexOf(dateKey)]] ?? '')
       const rawType = typeKey ? String(row[Object.keys(row)[keys.indexOf(typeKey)]] ?? '') : ''
 
-      // Determinar si es crédito o débito
       let amount = rawAmount
       let type: 'credit' | 'debit' = rawAmount >= 0 ? 'credit' : 'debit'
       if (rawType.toLowerCase().includes('cargo') || rawType.toLowerCase().includes('deb')) {
@@ -83,6 +115,71 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
       }
     })
     .filter(tx => tx.description && tx.amount !== 0)
+}
+
+function parseCSVBuffer(buffer: ArrayBuffer): ParsedTransaction[] {
+  const text = new TextDecoder('utf-8').decode(buffer)
+  const lines = text.split(/\r?\n/).filter(l => l.trim())
+  if (lines.length < 2) return []
+
+  const rawHeaders = parseCSVLine(lines[0])
+  const headerKeys = rawHeaders.map(h => h.toLowerCase().trim())
+
+  const dateKey = headerKeys.findIndex(k => k.includes('fecha') || k.includes('date'))
+  const descKey = headerKeys.findIndex(k => k.includes('desc') || k.includes('glosa') || k.includes('concepto') || k.includes('detalle'))
+  const amountKey = headerKeys.findIndex(k => k.includes('monto') || k.includes('importe') || k.includes('amount') || k.includes('valor'))
+  const typeKey = headerKeys.findIndex(k => k.includes('tipo') || k.includes('type') || k.includes('mov'))
+
+  return lines.slice(1)
+    .map((line, i) => {
+      const values = parseCSVLine(line)
+      const rawDate = values[dateKey >= 0 ? dateKey : 0] ?? ''
+      const rawDesc = values[descKey >= 0 ? descKey : 1] ?? ''
+      const rawAmount = values[amountKey >= 0 ? amountKey : 2] ?? ''
+      const rawType = typeKey >= 0 ? (values[typeKey] ?? '') : ''
+
+      const amount = parseAmount(rawAmount)
+      let type: 'credit' | 'debit' = amount >= 0 ? 'credit' : 'debit'
+      if (rawType.toLowerCase().includes('cargo') || rawType.toLowerCase().includes('deb')) {
+        type = 'debit'
+      } else if (rawType.toLowerCase().includes('abono') || rawType.toLowerCase().includes('cred')) {
+        type = 'credit'
+      }
+
+      return {
+        id: generateId(i),
+        date: parseDate(rawDate.trim()),
+        description: sanitizeDescription(rawDesc.trim()),
+        amount,
+        type,
+      }
+    })
+    .filter(tx => tx.description && tx.amount !== 0)
+}
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current)
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  result.push(current)
+  return result
 }
 
 // Parser para archivos PDF usando pdf-parse

@@ -13,6 +13,7 @@ export interface AnalysisResult {
   bank?: string
   aiSummary?: string
   success?: boolean
+  transactions?: ParsedTransaction[]
 }
 
 export async function analyzeTransactionsWithAI(
@@ -94,7 +95,7 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
   const anomalies: DetectedAnomaly[] = []
 
   // Regla 1: Comisión de crédito duplicada en ventas a cuotas (CASO SANTANDER)
-  const commissionKeywords = ['comision credito', 'com credito', 'comision tc', 'comisión crédito', 'com. credito', 'comision']
+  const commissionKeywords = ['comision credito', 'com credito', 'comision tc', 'comisión crédito', 'com. credito', 'comissao credito']
   const saleKeywords = ['venta', 'venta tc', 'venta debito', 'abono']
   
   // Buscar patrones: Venta X cuotas + Comisión repetida
@@ -114,31 +115,38 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
     }
   })
   
-  // Para cada grupo de ventas detectadas, buscar comisiones en cuotas consecutivas
+  // Para cada grupo de ventas detectadas, buscar comisiones relacionadas
   Object.entries(saleGroups).forEach(([key, sales]: [string, any[]]) => {
     const month = sales[0].date.substring(0, 7)
-    // Buscar comisiones en el mismo mes
-    const monthCommissions = sortedTxs.filter((tx: any) => 
+    // Extraer palabras clave del comercio desde la descripción de venta
+    const saleDesc = sales[0].description.toLowerCase()
+    const stopWords = ['venta', 'tc', 'cuotas', 'cota', 'sin', 'interes', 'credito', 'debito', 'abono', 'sale', 'cuota']
+    const merchantWords = saleDesc
+      .split(/[\s]+/)
+      .filter(w => w.length > 2 && !stopWords.includes(w))
+    // Buscar comisiones que compartan palabras con la venta (ej: "RIPLEY")
+    const relatedCommissions = sortedTxs.filter((tx: any) =>
       tx.date.startsWith(month) &&
-      commissionKeywords.some(kw => tx.description.toLowerCase().includes(kw))
+      commissionKeywords.some(kw => tx.description.toLowerCase().includes(kw)) &&
+      merchantWords.some(w => tx.description.toLowerCase().includes(w))
     )
     
-    if (monthCommissions.length > 1) {
+    if (relatedCommissions.length > 1) {
       // Verificar que sea la misma operación (mismo monto aprox)
-      const amounts = monthCommissions.map((c: any) => Math.abs(c.amount))
+      const amounts = relatedCommissions.map((c: any) => Math.abs(c.amount))
       const avgAmount = amounts.reduce((a: number, b: number) => a + b, 0) / amounts.length
       const isSameCommission = amounts.every((a: number) => Math.abs(a - avgAmount) < 100) // Tolerancia $100
       
       if (isSameCommission) {
-        const totalExtra = monthCommissions.slice(1).reduce((sum: number, tx: any) => sum + Math.abs(tx.amount), 0)
+        const totalExtra = relatedCommissions.slice(1).reduce((sum: number, tx: any) => sum + Math.abs(tx.amount), 0)
         anomalies.push({
           type: 'duplicate_commission',
           severity: 'high',
-          title: `Comisión de crédito cobrada ${monthCommissions.length} veces en ${month}`,
-          description: `Caso típico: Venta en cuotas sin interés. La comisión de $${Math.abs(monthCommissions[0].amount).toLocaleString('es-CL')} se cobró ${monthCommissions.length} veces, pero debe ser solo 1 vez.`,
-          detail: `Banco: Santander/otro · Período: ${month} · Total cobrado: $${amounts.reduce((a: number, b: number) => a + b, 0).toLocaleString('es-CL')} · Cobro justo: $${Math.abs(monthCommissions[0].amount).toLocaleString('es-CL')} · Recuperable: $${totalExtra.toLocaleString('es-CL')}`,
+          title: `Comisión de crédito cobrada ${relatedCommissions.length} veces en ${month}`,
+          description: `Caso típico: Venta en cuotas sin interés. La comisión de $${Math.abs(relatedCommissions[0].amount).toLocaleString('es-CL')} se cobró ${relatedCommissions.length} veces, pero debe ser solo 1 vez.`,
+          detail: `Banco: Santander/otro · Período: ${month} · Total cobrado: $${amounts.reduce((a: number, b: number) => a + b, 0).toLocaleString('es-CL')} · Cobro justo: $${Math.abs(relatedCommissions[0].amount).toLocaleString('es-CL')} · Recuperable: $${totalExtra.toLocaleString('es-CL')}`,
           recoverableAmount: totalExtra,
-          transactionRefs: monthCommissions.slice(1).map((t: any) => t.id),
+          transactionRefs: relatedCommissions.slice(1).map((t: any) => t.id),
         })
       }
     }
@@ -149,25 +157,28 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
     commissionKeywords.some(kw => tx.description.toLowerCase().includes(kw))
   )
 
-  // Agrupar comisiones por mes
-  const commissionsByMonth: Record<string, ParsedTransaction[]> = {}
+  // Agrupar comisiones por mes y monto (evita mezclar distintos tipos de comisión)
+  const commissionsByGroup: Record<string, ParsedTransaction[]> = {}
   commissions.forEach(tx => {
-    const month = tx.date.substring(0, 7) // YYYY-MM
-    if (!commissionsByMonth[month]) commissionsByMonth[month] = []
-    commissionsByMonth[month].push(tx)
+    const month = tx.date.substring(0, 7)
+    const amountKey = Math.round(Math.abs(tx.amount) / 100).toString()
+    const group = `${month}-${amountKey}`
+    if (!commissionsByGroup[group]) commissionsByGroup[group] = []
+    commissionsByGroup[group].push(tx)
   })
 
-  Object.entries(commissionsByMonth).forEach(([month, txs]) => {
+  Object.entries(commissionsByGroup).forEach(([group, txs]) => {
     if (txs.length > 1) {
       const totalExtra = txs.slice(1).reduce((sum, tx) => sum + Math.abs(tx.amount), 0)
-      // Evitar duplicados
+      const month = group.split('-')[0]
+      // Evitar duplicados con Regla 1a
       if (!anomalies.some(a => a.title.includes(month))) {
         anomalies.push({
           type: 'duplicate_commission',
           severity: 'high',
           title: `Comisión de crédito cobrada ${txs.length} veces en ${month}`,
-          description: `La comisión de crédito debe cobrarse solo una vez por operación, pero se detectaron ${txs.length} cobros en el mismo período.`,
-          detail: `Período: ${month} · Cobros: ${txs.map(t => `$${Math.abs(t.amount).toLocaleString('es-CL')}`).join(', ')} · Monto recuperable: $${totalExtra.toLocaleString('es-CL')}`,
+          description: `La comisión de crédito debe cobrarse solo una vez por operación, pero se detectaron ${txs.length} cobros del mismo monto en el mismo período.`,
+          detail: `Período: ${month} · Monto: $${Math.abs(txs[0].amount).toLocaleString('es-CL')} cada una · Cobros: ${txs.length} · Monto recuperable: $${totalExtra.toLocaleString('es-CL')}`,
           recoverableAmount: totalExtra,
           transactionRefs: txs.slice(1).map(t => t.id),
         })
@@ -297,6 +308,7 @@ export async function analyzeFile(
       period,
       bank,
       aiSummary: aiResult.summary,
+      transactions,
     }
 
   } catch (error) {
@@ -305,6 +317,7 @@ export async function analyzeFile(
       anomalies: [],
       totalTransactions: 0,
       totalRecoverable: 0,
+      success: false,
     }
   }
 }

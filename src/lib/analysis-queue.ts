@@ -30,19 +30,29 @@ export async function processAnalysis(data: {
       fileName,
     })
 
+    const txCount = result.totalTransactions ?? 0
+    const anomalyCount = result.anomalies?.length ?? 0
+
+    console.log(`📊 Análisis ${analysisId}: ${txCount} transacciones, ${anomalyCount} anomalías encontradas`)
+
+    if (result.success === false) {
+      throw new Error('analyzeFile retornó error')
+    }
+
     // Actualizar estado a 'completed'
     const { error: updateError } = await supabase
       .from('analyses')
       .update({
         status: 'completed',
-        anomalies_count: result.anomalies?.length ?? 0,
-        total_transactions: result.totalTransactions ?? 0,
+        anomalies_count: anomalyCount,
+        total_transactions: txCount,
         recoverable_amount: result.totalRecoverable ?? 0,
         period_start: result.period?.start ?? null,
         period_end: result.period?.end ?? null,
         bank: result.bank ?? null,
         anomalies: result.anomalies ?? [],
         ai_summary: result.aiSummary ?? null,
+        raw_data: result.transactions ?? [],
       })
       .eq('id', analysisId)
       .eq('user_id', userId)
