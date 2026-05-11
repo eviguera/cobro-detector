@@ -138,16 +138,45 @@ Los cobros duplicados van en pares donde cada registro apunta al otro con `id_tr
 
 ### Commits Realizados
 ```
-ecfa1c8 - feat: detectar anomalías pre-etiquetadas desde CSV (tipo_anomalia, id_transaccion_referencia, reclamable, motivo_reclamo)
+ecfa1c8 - feat: detectar anomalías pre-etiquetadas desde CSV
+1219499 - fix: procesamiento síncrono de análisis (+120s timeout) y BOM handling en CSV
+2598c19 - fix: propagar error real a la UI para diagnóstico
 ```
 
-### Deploy
-- Push a `main` → Vercel production: **BUILDING** (triggered at 18:16)
-- URL: https://cobro-detector-9rgqql1xd-evigueras-projects.vercel.app
+### Deploy History
+| Commit | Hora | Estado | URL |
+|--------|------|--------|-----|
+| `ecfa1c8` | 23:16 | READY | cobro-detector-9rgqql1xd |
+| `1219499` | 23:50 | READY | cobro-detector-c8snvgn3x |
+| `2598c19` | ~00:30 | BUILDING | cobro-detector-joh8a4r2c |
+
+---
+
+## Tercera Parte: Análisis se quedaba en "Procesando..."
+
+### Causa Raíz
+- Vercel serverless mata fire-and-forget: `enqueueAnalysis()` iniciaba `processAnalysis` en background pero no lo await-eba
+- La función se cerraba después de enviar la respuesta, matando el procesamiento antes de completar
+- `maxDuration = 30` era muy corto para 3.000 transacciones + Gemini AI
+
+### Fix: Procesamiento síncrono (`src/app/api/analyze/route.ts`)
+- Cambio de `maxDuration: 30` → `maxDuration: 120`
+- `analyzeFile()` se ejecuta síncronamente dentro del route handler
+- DB updates inline (status, anomalías, transacciones)
+- Resultados devueltos directo en la respuesta HTTP
+- Fallback async por si falla
+
+### Fix: BOM handling (`src/lib/parser.ts`)
+- CSVs de Excel con BOM (`\ufeff`) rompían matching de `id_transaccion`
+- Fix: `cleanText = text.replace(/^\ufeff/, '')`
+
+### Fix: Propagación de errores (`src/lib/analyzer.ts`, route.ts, page.tsx)
+- `AnalysisResult.error?: string` — el error real viaja hasta la UI
+- Frontend muestra el error en pantalla si `syncError` está presente
+- Ya no se queda pegado en "Procesando..."
 
 ## Próximos Pasos Sugeridos
-1. Probar subiendo `prueba.csv` desde la UI para verificar端-to-end
-2. Agregar más casos de prueba (PDF, Excel con distintos bancos)
-3. Considerar deduplicación de anomalías detectadas por múltiples reglas
-4. Subir CSV de 3.000 transacciones para validar detección masiva
-5. Verificar que el deploy production con los nuevos cambios esté funcionando
+1. Probar subiendo CSV de 3.000 filas desde la UI
+2. Si falla, leer el error que aparece en pantalla
+3. Verificar anomalías detectadas en la UI
+4. Probar con CSV normal (sin anomalías) para verificar que no hay falsos positivos

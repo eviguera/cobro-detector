@@ -116,29 +116,136 @@ T009,15/03/2024,COMISION MENSUAL,Comisiones,-15000,COBRO_INCORRECTO,,SI,Motivo d
 
 ---
 
+---
+
+## Procesamiento del Análisis
+
+### Flujo API (`src/app/api/analyze/route.ts`)
+```
+POST /api/analyze (FormData: file)
+  → Validación Zod (tipo, tamaño < 10MB)
+  → Rate limiting (Upstash)
+  → Auth (Supabase session)
+  → Upload a Supabase Storage (bucket: analysis-files)
+  → Crear registro analysis en BD + consumir crédito
+  → **Sincrónico**: analyzeFile(url, fileType, options) [maxDuration: 120s]
+  → Guardar resultados en BD (status, anomalies, transactions)
+  → Insertar anomalías en tabla `anomalies`
+  → Devolver resultados en response HTTP
+```
+
+**⚠️ Crítico:** El procesamiento es SÍNCRONO. Vercel serverless mata fire-and-forget. No usar `enqueueAnalysis()` para el flujo principal.
+
+### Estructura del response exitoso
+```typescript
+{
+  success: true,
+  analysisId: string,
+  totalTransactions: number,
+  anomaliesCount: number,
+  recoverableAmount: number,
+  anomalies: DetectedAnomaly[],
+  summary?: string,
+  bank?: string,
+}
+```
+
+### Manejo de errores
+- `analyzeFile()` captura errores internos y retorna `{ success: false, error: "mensaje" }`
+- El route handler propaga `result.error` al frontend como `syncError`
+- El frontend muestra el error en pantalla con el mensaje real
+- Fallback a `enqueueAnalysis()` async si el síncrono falla
+
+---
+
+## Problemas Conocidos y Debugging
+
+### 1. Análisis no detecta anomalías
+Posibles causas:
+- **CSV sin BOM cleaning**: CSVs de Excel en Windows tienen BOM → `cleanText = text.replace(/^\ufeff/, '')`
+- **Columnas incorrectas**: Verificar que `tipo_anomalia`, `id_transaccion_referencia`, etc. matcheen los keywords del parser
+- **Referencias sin resolver**: `id_transaccion_referencia` debe apuntar a un `id_transaccion` existente en el mismo CSV
+
+### 2. Análisis se queda "Procesando..."
+- **Causa**: Fire-and-forget no funciona en Vercel serverless
+- **Fix**: Hacer el análisis síncrono con `maxDuration: 120`
+- **Verificar**: El route handler await-eba `analyzeFile()` directamente
+
+### 3. Error sin mensaje específico
+- `analyzeFile` devuelve `{ success: false, error: "..." }` con el mensaje real
+- El frontend muestra `syncError` en pantalla
+- Revisar Vercel runtime logs para más detalles
+
+### 4. TypeScript errors con Supabase
+- Errores de tipo `'never'` en `supabase.from(...)` son pre-existentes
+- Causa: `database.types.ts` no está sincronizado con el schema real de Supabase
+- No afectan runtime, solo TypeScript strict mode
+- Se pueden ignorar para desarrollo
+
+---
+
+## CSV con Anomalías Pre-Etiquetadas
+
+### Formato completo
+```
+id_transaccion,fecha,descripcion,categoria,monto,tipo_anomalia,id_transaccion_referencia,reclamable,motivo_reclamo
+T001,01/03/2024,RIPLEY VESTUARIO,Vestuario,-45000,COBRO_DOBLE,T002,SI,Cobro duplicado
+T002,01/03/2024,RIPLEY VESTUARIO,Vestuario,-45000,COBRO_DOBLE,T001,SI,Cobro duplicado
+T009,15/03/2024,COMISION MENSUAL,Comisiones,-15000,COBRO_INCORRECTO,,SI,No corresponde según contrato
+```
+
+### Columnas reconocidas por el parser
+| Columna | Keywords de matching | Campo en código |
+|---------|---------------------|-----------------|
+| `id_transaccion` | `id_transaccion`, `id`, `id transaccion` | (mapa de referencias) |
+| `fecha` / `date` | `fecha`, `date` | `date` |
+| `desc` / `glosa` / `concepto` / `detalle` | `desc`, `glosa`, `concepto`, `detalle` | `description` |
+| `monto` / `importe` / `amount` / `valor` | `monto`, `importe`, `amount`, `valor` | `amount` |
+| `tipo` / `type` / `mov` | `tipo`, `type`, `mov` | `type` (credit/debit) |
+| `tipo_anomalia` / `anomalia` | `tipo_anomalia`, `tipo anomalia`, `anomalia` | `tipoAnomalia` |
+| `id_transaccion_referencia` / `referencia` | `id_transaccion_referencia`, `id transaccion referencia`, `id_transaccion_ref`, `referencia` | `idTransaccionReferencia` |
+| `reclamable` | `reclamable` | `reclamable` (boolean) |
+| `motivo_reclamo` / `motivo` | `motivo_reclamo`, `motivo reclamo`, `motivo` | `motivoReclamo` |
+
+### Mapeo tipos CSV → internos
+| `tipo_anomalia` | Type interno | Severidad | Comportamiento |
+|----------------|--------------|-----------|----------------|
+| `COBRO_DOBLE` | `duplicate_commission` | high | Busca par por referencia; recuperable = copia |
+| `COBRO_ALTO_DUPLICADO` | `duplicate_commission` | high | Igual que COBRO_DOBLE |
+| `COBRO_INCORRECTO` | `incorrect_charge` | medium | Individual; recuperable = monto total |
+
+---
+
 ## Archivos Clave
 
 ### Core
-- `src/lib/parser.ts` — Parser CSV/Excel/PDF
-- `src/lib/analyzer.ts` — Motor de detección (reglas + AI + etiquetadas)
-- `src/lib/analysis-queue.ts` — Procesamiento asíncrono
-- `src/lib/security.ts` — Sanitización, validación
-- `src/lib/utils.ts` — formatCLP, formatDate, labels
+| Archivo | Propósito |
+|---------|-----------|
+| `src/lib/parser.ts` | Parser CSV/Excel/PDF con detección de BOM y columnas de anomalías |
+| `src/lib/analyzer.ts` | Motor de detección: rules + labeled + AI |
+| `src/lib/analysis-queue.ts` | Procesamiento async (fallback) |
+| `src/lib/security.ts` | Sanitización, validación |
+| `src/lib/utils.ts` | formatCLP, formatDate, labels |
+| `src/types/database.types.ts` | ParsedTransaction, DetectedAnomaly, DB types |
 
 ### API Routes
-- `src/app/api/analyze/route.ts` — Upload + análisis
-- `src/app/api/anomalies/[id]/route.ts` — Actualizar estado
-- `src/app/api/documents/complaint-letter/route.ts` — Carta reclamo DOCX
-- `src/app/api/documents/complaint-letter/pdf/route.ts` — Carta reclamo PDF
-- `src/app/api/companies/route.ts` — Multi-empresa
-- `src/app/api/payments/` — Mercado Pago (create, webhook, link-card)
-- `src/app/api/v1/analyses/[id]/route.ts` — Public API
+| Ruta | Propósito |
+|------|-----------|
+| `/api/analyze` | Upload + análisis síncrono + guardar resultados |
+| `/api/anomalies/[id]` | Actualizar estado de anomalía |
+| `/api/documents/complaint-letter` | Carta reclamo DOCX |
+| `/api/documents/complaint-letter/pdf` | Carta reclamo PDF |
+| `/api/companies` | Multi-empresa (CRUD) |
+| `/api/payments/*` | Mercado Pago (create, webhook, link-card) |
+| `/api/v1/analyses/[id]` | Public API (API key auth) |
 
 ### Frontend
-- `src/app/(dashboard)/analisis/page.tsx` — Upload + resultados
-- `src/app/(dashboard)/historial/page.tsx` — Historial de análisis
-- `src/app/(dashboard)/historial/[id]/page.tsx` — Detalle de análisis
-- `src/app/(dashboard)/dashboard/page.tsx` — Dashboard principal
+| Ruta | Propósito |
+|------|-----------|
+| `analisis/page.tsx` | Upload + resultados + errores visibles |
+| `historial/page.tsx` | Historial de análisis |
+| `historial/[id]/page.tsx` | Detalle con anomalías |
+| `dashboard/page.tsx` | Dashboard principal |
 
 ---
 
@@ -152,16 +259,19 @@ npm run dev
 npm run build
 
 # Tests
-npx jest
-
-# E2E (Playwright)
-npx playwright test
-
-# Despliegue
-git add <files> && git commit -m "mensaje" && git push
+npx jest --no-cache
 
 # TypeScript check
 npx tsc --noEmit
+
+# E2E tests
+npx playwright test
+
+# Tests + Build (pre-deploy)
+npx jest --no-cache && npm run build
+
+# Deploy
+git add <files> && git commit -m "tipo: descripción" && git push
 ```
 
 ## Variables de Entorno Requeridas
@@ -182,3 +292,4 @@ NEXT_PUBLIC_APP_URL=
 - **Vercel:** https://vercel.com/evigueras-projects/cobro-detector
 - **Supabase:** https://supabase.com/dashboard/project/mcwqqcngfibhgluvixlu
 - **GitHub:** https://github.com/eviguera/cobro-detector
+- **Último deploy:** `vercel ls --format json` → buscar `target: "production"` más reciente
