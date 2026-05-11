@@ -64,7 +64,90 @@ c300174 - fix: corregir detección de cobros en CSV - fechas corruptas por xlsx 
 - Push a `main` → Vercel production: **READY** ✅
 - URL: https://cobro-detector.vercel.app
 
+---
+
+## Segunda Parte: Detección de anomalías pre-etiquetadas desde CSV
+
+El usuario creó un CSV con columnas de anomalías (`tipo_anomalia`, `id_transaccion_referencia`, `reclamable`, `motivo_reclamo`) pero la app las ignoraba completamente.
+
+### Causa Raíz
+- **Archivo:** `src/lib/parser.ts` — El parser solo extraía `fecha`, `descripcion`, `monto` y `tipo`. Ignoraba todas las columnas extra del CSV.
+- **Archivo:** `src/lib/analyzer.ts` — Solo tenía reglas determinísticas (comisiones Santander, ventana 7 días, cargos genéricos) y AI (Gemini). No existía lógica para leer anomalías ya etiquetadas.
+
+### Cambios Realizados
+
+#### 1. `src/types/database.types.ts` (+4 líneas)
+- Se agregaron 4 campos opcionales a `ParsedTransaction`:
+  - `tipoAnomalia?: string`
+  - `idTransaccionReferencia?: string`
+  - `reclamable?: boolean`
+  - `motivoReclamo?: string`
+
+#### 2. `src/lib/parser.ts` (+78/-7 líneas)
+- `parseCSVBuffer()`: 
+  - Detecta columnas `tipo_anomalia`, `id_transaccion_referencia`, `reclamable`, `motivo_reclamo`, `id_transaccion`
+  - Lee `id_transaccion` para construir mapa de IDs originales → IDs generados
+  - Resuelve `id_transaccion_referencia` al ID generado correspondiente
+- `parseExcelFile()`: Mismo soporte para Excel (.xlsx/.xls)
+
+#### 3. `src/lib/analyzer.ts` (+95 líneas)
+- Nueva función `detectLabeledAnomalies()`:
+  - Mapea tipos CSV a internos:
+    - `COBRO_DOBLE` → `duplicate_commission` (high)
+    - `COBRO_ALTO_DUPLICADO` → `duplicate_commission` (high)
+    - `COBRO_INCORRECTO` → `incorrect_charge` (medium)
+  - Agrupa pares mediante `idTransaccionReferencia`
+  - Calcula montos recuperables: para pares, la copia; para incorrectos, el total
+  - Usa `motivoReclamo` como título/descripción de la anomalía
+- Integrada en `analyzeFile()` junto a reglas y AI
+
+#### 4. UI - Labels
+- `src/lib/utils.ts`: `incorrect_charge: 'Cobro incorrecto'`
+- `src/app/(dashboard)/analisis/page.tsx`: Mismo label
+- `src/app/(dashboard)/historial/[id]/page.tsx`: Texto "¿Cómo reclamar?" para `incorrect_charge`
+
+### Archivos Modificados
+- `src/types/database.types.ts` — +4 líneas
+- `src/lib/parser.ts` — +78/-7 líneas
+- `src/lib/analyzer.ts` — +95 líneas
+- `src/lib/utils.ts` — +1 línea
+- `src/app/(dashboard)/analisis/page.tsx` — +1 línea
+- `src/app/(dashboard)/historial/[id]/page.tsx` — +2 líneas
+
+### Resultado con test-anomalias.csv (15 transacciones)
+- **6 anomalías detectadas:**
+  1. COBRO_DOBLE RIPLEY VESTUARIO: $45.000 recuperable
+  2. COBRO_DOBLE PARIS ELECTRO: $120.000 recuperable
+  3. COBRO_ALTO_DUPLICADO Mercedes Servicio: $350.000 recuperable
+  4. COBRO_ALTO_DUPLICADO Mercedes Repuestos: $280.000 recuperable
+  5. COBRO_INCORRECTO Comisión mensual: $15.000 recuperable
+  6. COBRO_INCORRECTO Interés por moratoria: $25.000 recuperable
+- **Total recuperable: $835.000**
+- Tests existentes pasan (7/7) ✅
+- Build/TypeScript sin errores nuevos ✅
+
+### Formato CSV Soportado
+```
+id_transaccion,fecha,descripcion,categoria,monto,tipo_anomalia,id_transaccion_referencia,reclamable,motivo_reclamo
+T001,01/03/2024,RIPLEY VESTUARIO,Vestuario,-45000,COBRO_DOBLE,T002,SI,Cobro duplicado de RIPLEY VESTUARIO
+T002,01/03/2024,RIPLEY VESTUARIO,Vestuario,-45000,COBRO_DOBLE,T001,SI,Cobro duplicado de RIPLEY VESTUARIO
+T009,15/03/2024,COMISION MENSUAL TARJETA,Comisiones,-15000,COBRO_INCORRECTO,,SI,Comisión mensual no corresponde
+```
+
+Los cobros duplicados van en pares donde cada registro apunta al otro con `id_transaccion_referencia`.
+
+### Commits Realizados
+```
+ecfa1c8 - feat: detectar anomalías pre-etiquetadas desde CSV (tipo_anomalia, id_transaccion_referencia, reclamable, motivo_reclamo)
+```
+
+### Deploy
+- Push a `main` → Vercel production: **BUILDING** (triggered at 18:16)
+- URL: https://cobro-detector-9rgqql1xd-evigueras-projects.vercel.app
+
 ## Próximos Pasos Sugeridos
 1. Probar subiendo `prueba.csv` desde la UI para verificar端-to-end
 2. Agregar más casos de prueba (PDF, Excel con distintos bancos)
 3. Considerar deduplicación de anomalías detectadas por múltiples reglas
+4. Subir CSV de 3.000 transacciones para validar detección masiva
+5. Verificar que el deploy production con los nuevos cambios esté funcionando
