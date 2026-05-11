@@ -47,15 +47,46 @@ export async function consumeCreditAtomic(
   userId: string,
   companyId?: string | null
 ): Promise<boolean> {
+  // Intentar RPC consume_credit (función PostgreSQL)
   const { data, error } = await supabase
     .rpc('consume_credit', { p_user_id: userId })
   
-  if (error) {
-    console.error('Error consuming credit:', error)
-    throw error
+  if (!error) {
+    return data ?? false
   }
-  
-  return data ?? false
+
+  // Si la función RPC no existe (PGRST202), hacer update directo
+  if (error.code === 'PGRST202' || error.message?.includes('function not found')) {
+    console.warn('consume_credit RPC not found, using fallback update')
+
+    const { data: credits, error: fetchError } = await supabase
+      .from('credits')
+      .select('total, used')
+      .eq('user_id', userId)
+      .is('company_id', companyId ?? null)
+      .single()
+
+    if (fetchError || !credits) return false
+
+    const left = (credits.total ?? 0) - (credits.used ?? 0)
+    if (left <= 0) return false
+
+    const { error: updateError } = await supabase
+      .from('credits')
+      .update({ used: (credits.used ?? 0) + 1 })
+      .eq('user_id', userId)
+      .is('company_id', companyId ?? null)
+
+    if (updateError) {
+      console.error('Error updating credit fallback:', updateError)
+      return false
+    }
+
+    return true
+  }
+
+  console.error('Error consuming credit:', error)
+  return false
 }
 
 // Función para encolar análisis (crea registro y descuenta crédito)
