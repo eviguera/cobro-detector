@@ -1,8 +1,23 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { FileSearch, TrendingDown, AlertTriangle, CheckCircle2, ArrowRight, Plus, BarChart3, Activity, ArrowUpRight, ArrowDownRight, Clock, Sparkles, Banknote, Shield } from 'lucide-react'
+import { FileSearch, TrendingDown, AlertTriangle, CheckCircle2, ArrowRight, Plus, BarChart3, Activity, ArrowUpRight, ArrowDownRight, Clock, Sparkles, Banknote, Shield, CalendarDays, Building2, Percent, Brain } from 'lucide-react'
 import { formatCLP, formatDate } from '@/lib/utils'
 import type { Analysis, Credits } from '@/types/database.types'
+import { DashboardClient } from './dashboard-client'
+
+function getDayLabel(date: Date, today: Date): string {
+  const diff = today.getTime() - date.getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  if (days === 0) return 'Hoy'
+  if (days === 1) return 'Ayer'
+  if (days < 7) return `Hace ${days} días`
+  return formatDate(date.toISOString())
+}
+
+function getWeekdayLabel(date: Date): string {
+  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  return days[date.getDay()]
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -22,12 +37,39 @@ export default async function DashboardPage() {
   const totalAnalyses = analyses?.length ?? 0
   const creditUsage = credits?.total ? Math.round(((credits?.used ?? 0) / credits.total) * 100) : 0
 
+  const analysesWithAnomalies = analyses?.filter(a => (a.anomalies_count ?? 0) > 0).length ?? 0
+  const detectionRate = totalAnalyses > 0 ? Math.round((analysesWithAnomalies / totalAnalyses) * 100) : 0
+
+  const bankStats = analyses?.reduce<Record<string, { count: number; anomalies: number; recoverable: number }>>((acc, a) => {
+    const bank = a.bank ?? 'Desconocido'
+    if (!acc[bank]) acc[bank] = { count: 0, anomalies: 0, recoverable: 0 }
+    acc[bank].count++
+    acc[bank].anomalies += a.anomalies_count ?? 0
+    acc[bank].recoverable += a.recoverable_amount ?? 0
+    return acc
+  }, {}) ?? {}
+
+  const topBank = Object.entries(bankStats)
+    .filter(([name]) => name !== 'Desconocido')
+    .sort(([, a], [, b]) => b.anomalies - a.anomalies)[0]
+
+  const dailyAnalyses: { date: string; count: number; dateObj: Date }[] = []
+  const today = new Date()
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const dateStr = d.toISOString().split('T')[0]
+    const count = analyses?.filter(a => a.created_at?.startsWith(dateStr)).length ?? 0
+    dailyAnalyses.push({ date: dateStr, count, dateObj: d })
+  }
+  const maxDailyCount = Math.max(...dailyAnalyses.map(d => d.count), 1)
+
   const stats = [
     {
       label: 'Créditos disponibles',
       value: String(creditsLeft),
       icon: Banknote,
-      trend: creditsLeft === 0 ? 'empty' : creditsLeft >= 3 ? 'good' : 'low',
+      trend: creditsLeft === 0 ? 'empty' as const : creditsLeft >= 3 ? 'good' as const : 'low' as const,
       sub: creditsLeft === 0 ? 'Sin créditos' : `${credits?.total ?? 0} totales`,
       subLink: creditsLeft === 0 ? '/precios' : undefined,
       detail: creditsLeft === 0 ? 'Compra créditos para seguir analizando' : creditUsage > 0 ? `${creditUsage}% utilizado` : 'Aún sin uso',
@@ -37,25 +79,25 @@ export default async function DashboardPage() {
       label: 'Análisis realizados',
       value: String(totalAnalyses),
       icon: BarChart3,
-      trend: totalAnalyses === 0 ? 'empty' : 'good',
+      trend: totalAnalyses === 0 ? 'empty' as const : 'good' as const,
       sub: `${completedAnalyses} completados`,
       detail: completedAnalyses === 0 ? 'Comienza subiendo tu primer estado de cuenta' : `${totalAnalyses - completedAnalyses} en proceso`,
       accent: 'success' as const,
     },
     {
-      label: 'Anomalías detectadas',
-      value: String(totalAnomalies),
-      icon: AlertTriangle,
-      trend: totalAnomalies === 0 ? 'low' : totalAnomalies > 10 ? 'high' : 'good',
-      sub: totalAnomalies === 0 ? 'Sin irregularidades' : 'cobros incorrectos',
-      detail: totalAnomalies === 0 ? 'Tus cuentas están limpias' : 'Revisa los detalles para reclamar',
-      accent: totalAnomalies > 0 ? 'danger' as const : 'muted' as const,
+      label: 'Tasa de detección',
+      value: `${detectionRate}%`,
+      icon: Percent,
+      trend: detectionRate === 0 ? 'empty' as const : detectionRate > 50 ? 'high' as const : 'low' as const,
+      sub: `${analysesWithAnomalies} de ${totalAnalyses} con anomalías`,
+      detail: detectionRate === 0 ? 'Sin anomalías detectadas aún' : 'de análisis tienen cobros incorrectos',
+      accent: detectionRate > 0 ? 'danger' as const : 'muted' as const,
     },
     {
       label: 'Monto recuperable',
       value: formatCLP(totalRecoverable),
       icon: TrendingDown,
-      trend: totalRecoverable === 0 ? 'empty' : 'high',
+      trend: totalRecoverable === 0 ? 'empty' as const : 'high' as const,
       sub: totalRecoverable === 0 ? '$0 detectado' : 'estimado total',
       detail: totalRecoverable > 0 ? 'Listo para reclamar al banco' : 'Sube un estado de cuenta para comenzar',
       accent: totalRecoverable > 0 ? 'danger' as const : 'muted' as const,
@@ -66,9 +108,10 @@ export default async function DashboardPage() {
   const recentAnalyses = analyses?.slice(0, 5) ?? []
 
   return (
-    <div className="animate-fade-in-up space-y-8">
+    <div className="animate-fade-in-up space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
+        <div className="relative">
+          <div className="absolute -left-4 top-0 w-1 h-12 bg-gradient-to-b from-brand-500 to-brand-300 rounded-full hidden sm:block" />
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse-subtle" />
             <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-brand-600 dark:text-brand-400">
@@ -122,8 +165,8 @@ export default async function DashboardPage() {
             <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
               {stat.label}
             </p>
-            <p className={`font-display font-bold text-gray-900 dark:text-gray-100 tracking-tight ${stat.large ? 'text-xl' : 'text-2xl'}`}>
-              <span className="tabular-nums">{stat.value}</span>
+            <p className={`font-display font-bold text-gray-900 dark:text-gray-100 tracking-tight tabular-nums ${stat.large ? 'text-xl' : 'text-2xl'}`}>
+              {stat.value}
             </p>
             <div className="mt-2 flex items-center justify-between">
               {stat.subLink ? (
@@ -139,134 +182,144 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <section className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800/30">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
-              <Activity className="w-[18px] h-[18px] text-brand-600 dark:text-brand-400" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 stagger-children">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 sm:p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
+                <Activity className="w-[18px] h-[18px] text-brand-600 dark:text-brand-400" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                  Actividad semanal
+                </h2>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                  Últimos 7 días
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
-                Actividad reciente
-              </h2>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                {recentAnalyses.length > 0 ? 'Últimos análisis realizados' : 'Aún no hay actividad'}
-              </p>
-            </div>
+            {totalAnalyses > 0 && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                {dailyAnalyses.reduce((s, d) => s + d.count, 0)} total
+              </span>
+            )}
           </div>
-          {recentAnalyses.length > 0 && (
-            <Link
-              href="/historial"
-              className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-xl transition-all duration-200"
-            >
-              Ver todo
-              <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
-            </Link>
+
+          {totalAnalyses === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-12 h-12 rounded-xl bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center mb-3">
+                <BarChart3 className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+              </div>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Sin actividad aún</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Los análisis aparecerán aquí</p>
+            </div>
+          ) : (
+            <div className="flex items-end gap-2 sm:gap-3 h-32 sm:h-36">
+              {dailyAnalyses.map((day, i) => {
+                const height = day.count > 0 ? Math.max((day.count / maxDailyCount) * 100, 8) : 4
+                const isToday = i === dailyAnalyses.length - 1
+                return (
+                  <div key={day.date} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 tabular-nums">
+                      {day.count}
+                    </span>
+                    <div
+                      className={`w-full rounded-lg transition-all duration-500 hover:opacity-80 cursor-pointer ${
+                        isToday
+                          ? 'bg-gradient-to-t from-brand-500 to-brand-400 shadow-sm shadow-brand-500/20'
+                          : day.count > 0
+                            ? 'bg-brand-200 dark:bg-brand-800'
+                            : 'bg-gray-100 dark:bg-gray-800'
+                      }`}
+                      style={{ height: `${height}%`, minHeight: '4px' }}
+                    />
+                    <span className={`text-[10px] font-medium mt-1 ${isToday ? 'text-brand-600 dark:text-brand-400 font-semibold' : 'text-gray-400 dark:text-gray-500'}`}>
+                      {getWeekdayLabel(day.dateObj)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
 
-        {recentAnalyses.length === 0 ? (
-          <div className="text-center py-20 px-6">
-            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 flex items-center justify-center shadow-inner">
-              <FileSearch className="w-7 h-7 text-gray-300 dark:text-gray-600" />
+        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 sm:p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+              <Brain className="w-[18px] h-[18px] text-amber-600 dark:text-amber-400" />
             </div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Aún no tienes análisis
-            </h3>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mb-8 max-w-xs mx-auto leading-relaxed">
-              Sube tu primer estado de cuenta y descubre si tu banco te está cobrando de más
-            </p>
-            <Link
-              href="/analisis"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-brand-600/20 dark:shadow-brand-600/30"
-            >
-              <Sparkles className="w-4 h-4" />
-              Primer análisis gratis
-            </Link>
+            <div>
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Insights</h2>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">Resumen inteligente</p>
+            </div>
           </div>
-        ) : (
-          <div className="divide-y divide-gray-50 dark:divide-gray-800/20">
-            {recentAnalyses.map((analysis, i) => {
-              const isCompleted = analysis.status === 'completed'
-              const isProcessing = analysis.status === 'processing'
-              return (
-                <Link
-                  key={analysis.id}
-                  href={`/historial/${analysis.id}`}
-                  className="group flex items-center gap-4 px-6 py-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-all duration-200"
-                  style={{ animationDelay: `${i * 60}ms` }}
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-                    isCompleted
-                      ? 'bg-emerald-50 dark:bg-emerald-900/20 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/30'
-                      : isProcessing
-                        ? 'bg-brand-50 dark:bg-brand-900/20 group-hover:bg-brand-100 dark:group-hover:bg-brand-900/30'
-                        : 'bg-gray-50 dark:bg-gray-800/50'
-                  }`}>
-                    {isCompleted ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                    ) : isProcessing ? (
-                      <div className="w-5 h-5 rounded-full border-2 border-brand-400 border-t-transparent animate-spin" />
-                    ) : (
-                      <AlertTriangle className="w-5 h-5 text-gray-400" />
-                    )}
-                  </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
-                        {analysis.file_name}
-                      </p>
-                      {analysis.anomalies_count > 0 && (
-                        <span className="flex items-center gap-1 text-[10px] font-semibold text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded-md">
-                          <AlertTriangle className="w-2.5 h-2.5" />
-                          {analysis.anomalies_count}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                        {analysis.bank ?? 'Banco no detectado'}
-                      </span>
-                      <span className="text-[10px] text-gray-300 dark:text-gray-600">·</span>
-                      <span className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatDate(analysis.created_at)}
-                      </span>
-                    </div>
-                  </div>
+          <div className="space-y-3">
+            {topBank && (
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
+                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-4 h-4 text-red-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">{topBank[0]}</p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                    {topBank[1].anomalies} anomalías · {formatCLP(topBank[1].recoverable)} recuperable
+                  </p>
+                </div>
+              </div>
+            )}
 
-                  <div className="hidden sm:flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wider">Anomalías</p>
-                      <p className={`text-sm font-semibold tabular-nums mt-0.5 ${
-                        analysis.anomalies_count > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
-                      }`}>
-                        {analysis.anomalies_count}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wider">Recuperable</p>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 tabular-nums mt-0.5">
-                        {formatCLP(analysis.recoverable_amount)}
-                      </p>
-                    </div>
-                    <div className={`text-[11px] font-medium px-2.5 py-1 rounded-lg ${
-                      isCompleted ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
-                      isProcessing ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400' :
-                      'bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400'
-                    }`}>
-                      {isCompleted ? 'Completado' : isProcessing ? 'Procesando' : 'Error'}
-                    </div>
-                  </div>
+            {totalAnomalies > 0 && (
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Promedio por análisis</p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                    {(totalAnomalies / (analysesWithAnomalies || 1)).toFixed(1)} anomalías por caso detectado
+                  </p>
+                </div>
+              </div>
+            )}
 
-                  <ArrowRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-all duration-200 group-hover:translate-x-0.5 flex-shrink-0" />
-                </Link>
-              )
-            })}
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
+              <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center flex-shrink-0">
+                <CalendarDays className="w-4 h-4 text-brand-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Última actividad</p>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                  {recentAnalyses.length > 0
+                    ? getDayLabel(new Date(recentAnalyses[0].created_at), today)
+                    : 'Sin actividad'}
+                </p>
+              </div>
+            </div>
           </div>
-        )}
-      </section>
+        </div>
+      </div>
+
+      <DashboardClient analyses={analyses ?? []}>
+        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 text-center py-16 px-6 shadow-sm">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 flex items-center justify-center shadow-inner">
+            <FileSearch className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+          </div>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            Aún no tienes análisis
+          </h3>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mb-8 max-w-xs mx-auto leading-relaxed">
+            Sube tu primer estado de cuenta y descubre si tu banco te está cobrando de más
+          </p>
+          <Link
+            href="/analisis"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-brand-600/20 dark:shadow-brand-600/30"
+          >
+            <Sparkles className="w-4 h-4" />
+            Primer análisis gratis
+          </Link>
+        </div>
+      </DashboardClient>
     </div>
   )
 }
