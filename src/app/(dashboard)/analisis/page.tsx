@@ -148,8 +148,8 @@ export default function AnalisisPage() {
       <div className="animate-fade-in-up max-w-2xl mx-auto">
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-brand-500" />
-            <span className="text-xs font-medium uppercase tracking-wider text-brand-600 dark:text-brand-400 font-mono">
+            <Sparkles className="w-4 h-4 text-blue-500" />
+            <span className="text-xs font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400 font-mono">
               Nuevo análisis
             </span>
           </div>
@@ -170,8 +170,8 @@ export default function AnalisisPage() {
             file
               ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/10'
               : dragging
-                ? 'border-brand-400 bg-brand-50/50 dark:bg-brand-900/20 scale-[1.02]'
-                : 'border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600 hover:bg-gray-50/50 dark:hover:bg-gray-800/30'
+                ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-900/20 scale-[1.02]'
+                : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-gray-50/50 dark:hover:bg-gray-800/30'
           }`}
         >
           <input
@@ -196,7 +196,7 @@ export default function AnalisisPage() {
               </p>
               <button
                 onClick={e => { e.stopPropagation(); setFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
               >
                 <X className="w-3 h-3" />
                 Quitar archivo
@@ -206,11 +206,11 @@ export default function AnalisisPage() {
             <div>
               <div className={`w-16 h-16 mx-auto mb-5 rounded-2xl flex items-center justify-center transition-all duration-300 ${
                 dragging
-                  ? 'bg-brand-100 dark:bg-brand-900/50 scale-110'
+                  ? 'bg-blue-100 dark:bg-blue-900/50 scale-110'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
               }`}>
                 <Upload className={`w-7 h-7 transition-colors duration-300 ${
-                  dragging ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 dark:text-gray-500'
+                  dragging ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
                 }`} />
               </div>
               <p className="font-display font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
@@ -250,7 +250,7 @@ export default function AnalisisPage() {
           <button
             onClick={runAnalysis}
             disabled={loading}
-            className="mt-6 w-full flex items-center justify-center gap-2.5 py-3.5 bg-brand-600 hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-brand-600/20 dark:shadow-brand-600/30 hover:shadow-xl hover:shadow-brand-600/30 dark:hover:shadow-brand-500/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            className="mt-6 w-full flex items-center justify-center gap-2.5 py-3.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -271,10 +271,10 @@ export default function AnalisisPage() {
     return (
       <div className="animate-fade-in-up max-w-lg mx-auto pt-16 sm:pt-24">
         <div className="relative w-20 h-20 mx-auto mb-8">
-          <div className="absolute inset-0 bg-brand-100 dark:bg-brand-900/30 rounded-2xl flex items-center justify-center">
-            <Loader2 className="w-10 h-10 text-brand-600 dark:text-brand-400 animate-spin" />
+          <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
+            <Loader2 className="w-10 h-10 text-blue-600 dark:text-blue-400 animate-spin" />
           </div>
-          <div className="absolute -inset-3 border-2 border-brand-200 dark:border-brand-800 rounded-3xl animate-pulse-subtle" />
+          <div className="absolute -inset-3 border-2 border-blue-200 dark:border-blue-800 rounded-3xl animate-pulse-subtle" />
         </div>
 
         <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-gray-50 text-center mb-2">
@@ -287,7 +287,7 @@ export default function AnalisisPage() {
         <div className="mb-8">
           <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-brand-500 to-brand-600 rounded-full transition-all duration-700 ease-out"
+              className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-700 ease-out"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -308,13 +308,13 @@ export default function AnalisisPage() {
                 key={s.label}
                 className={`flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm transition-all duration-300 ${
                   isCompleted ? 'text-emerald-600 dark:text-emerald-400' :
-                  isActive ? 'text-brand-600 dark:text-brand-400 bg-brand-50/50 dark:bg-brand-900/20 font-medium' :
+                  isActive ? 'text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 font-medium' :
                   'text-gray-300 dark:text-gray-600'
                 }`}
               >
                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
                   isCompleted ? 'bg-emerald-50 dark:bg-emerald-900/20' :
-                  isActive ? 'bg-brand-100 dark:bg-brand-900/50' :
+                  isActive ? 'bg-blue-100 dark:bg-blue-900/50' :
                   'bg-gray-100 dark:bg-gray-800'
                 }`}>
                   {isCompleted ? (
@@ -367,8 +367,8 @@ export default function AnalisisPage() {
 
       {isAsync ? (
         <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-8 text-center shadow-sm">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center">
-            <Clock className="w-7 h-7 text-brand-500" />
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+            <Clock className="w-7 h-7 text-blue-500" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
             Análisis en proceso
@@ -379,14 +379,14 @@ export default function AnalisisPage() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={() => router.push(`/historial/${result.analysisId}`)}
-              className="px-6 py-3 bg-brand-600 hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-brand-600/20 dark:shadow-brand-600/30 flex items-center justify-center gap-2"
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 flex items-center justify-center gap-2"
             >
               <FileText className="w-4 h-4" />
               Ver en historial
             </button>
             <button
               onClick={resetForm}
-              className="px-6 py-3 bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 dark:hover:bg-brand-900/50 text-brand-700 dark:text-brand-300 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
+              className="px-6 py-3 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
             >
               <RotateCcw className="w-4 h-4" />
               Nuevo análisis
@@ -429,14 +429,14 @@ export default function AnalisisPage() {
           </div>
 
           {result.summary && (
-            <div className="bg-brand-50 dark:bg-brand-950/50 border border-brand-100 dark:border-brand-800/50 rounded-2xl p-5 mb-6">
+            <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-5 mb-6">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-brand-500" />
-                <p className="text-xs font-medium text-brand-600 dark:text-brand-400 uppercase tracking-wider">
+                <Sparkles className="w-4 h-4 text-blue-500" />
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">
                   Resumen del análisis (IA)
                 </p>
               </div>
-              <p className="text-sm text-brand-900 dark:text-brand-100 leading-relaxed">
+              <p className="text-sm text-blue-900 dark:text-blue-100 leading-relaxed">
                 {result.summary}
               </p>
             </div>
@@ -474,7 +474,7 @@ export default function AnalisisPage() {
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => router.push(`/historial/${result.analysisId}`)}
-              className="flex-1 py-3.5 bg-brand-600 hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-brand-600/20 dark:shadow-brand-600/30 hover:shadow-xl hover:shadow-brand-600/30 dark:hover:shadow-brand-500/40 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+              className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5 flex items-center justify-center gap-2"
             >
               <FileText className="w-4 h-4" />
               Ver reporte completo
@@ -482,7 +482,7 @@ export default function AnalisisPage() {
             </button>
             <button
               onClick={resetForm}
-              className="px-6 py-3.5 bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 dark:hover:bg-brand-900/50 text-brand-700 dark:text-brand-300 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
+              className="px-6 py-3.5 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
             >
               <RotateCcw className="w-4 h-4" />
               Nuevo análisis

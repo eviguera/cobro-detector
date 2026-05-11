@@ -28,8 +28,8 @@ export default async function HistorialPage() {
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse-subtle" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-brand-600 dark:text-brand-400">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse-subtle" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-blue-600 dark:text-blue-400">
               Historial
             </span>
           </div>
@@ -42,7 +42,7 @@ export default async function HistorialPage() {
         </div>
         <Link
           href="/analisis"
-          className="group inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-brand-600/20 dark:shadow-brand-600/30 hover:shadow-xl hover:shadow-brand-600/30 dark:hover:shadow-brand-500/40 hover:-translate-y-0.5"
+          className="group inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5"
         >
           <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" />
           Nuevo análisis
@@ -80,7 +80,7 @@ export default async function HistorialPage() {
           </p>
           <Link
             href="/analisis"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-brand-600/20 dark:shadow-brand-600/30"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30"
           >
             <Plus className="w-4 h-4" />
             Primer análisis gratis
@@ -110,16 +110,16 @@ export default async function HistorialPage() {
                     analysis.status === 'completed'
                       ? 'bg-emerald-50 dark:bg-emerald-900/20 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/30'
                       : analysis.status === 'processing'
-                        ? 'bg-brand-50 dark:bg-brand-900/20 group-hover:bg-brand-100 dark:group-hover:bg-brand-900/30'
+                        ? 'bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30'
                         : 'bg-gray-50 dark:bg-gray-800/50'
                   }`}>
                     <FileText className={`w-[18px] h-[18px] ${
                       analysis.status === 'completed' ? 'text-emerald-500' :
-                      analysis.status === 'processing' ? 'text-brand-500' : 'text-gray-400'
+                      analysis.status === 'processing' ? 'text-blue-500' : 'text-gray-400'
                     }`} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {analysis.file_name}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
@@ -160,13 +160,13 @@ export default async function HistorialPage() {
                   <span className="text-[11px] text-gray-400 dark:text-gray-500 sm:hidden font-medium">Estado</span>
                   <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg whitespace-nowrap ${
                     analysis.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
-                    analysis.status === 'processing' ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400' :
+                    analysis.status === 'processing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' :
                     'bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400'
                   }`}>
                     {analysis.status === 'completed' ? (
                       <CheckCircle2 className="w-3 h-3" />
                     ) : analysis.status === 'processing' ? (
-                      <div className="w-3 h-3 rounded-full border-2 border-brand-400 border-t-transparent animate-spin" />
+                      <div className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
                     ) : (
                       <AlertTriangle className="w-3 h-3" />
                     )}
@@ -175,7 +175,7 @@ export default async function HistorialPage() {
                 </div>
 
                 <div className="hidden sm:flex items-center justify-center">
-                  <ArrowRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-all duration-200 group-hover:translate-x-0.5" />
+                  <ArrowRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-all duration-200 group-hover:translate-x-0.5" />
                 </div>
               </Link>
             ))}

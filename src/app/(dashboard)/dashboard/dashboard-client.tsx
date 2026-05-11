@@ -8,19 +8,12 @@ import type { Analysis } from '@/types/database.types'
 
 interface DashboardClientProps {
   analyses: Analysis[]
-  children: React.ReactNode
+  emptyState: React.ReactNode
 }
 
-export function DashboardClient({ analyses, children }: DashboardClientProps) {
+export function DashboardClient({ analyses, emptyState }: DashboardClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-
-  const statuses = useMemo(() => {
-    const seen = new Set<string>()
-    seen.add('all')
-    analyses.forEach(a => seen.add(a.status))
-    return Array.from(seen)
-  }, [analyses])
 
   const filteredAnalyses = useMemo(() => {
     return analyses.filter(a => {
@@ -29,6 +22,12 @@ export function DashboardClient({ analyses, children }: DashboardClientProps) {
       return matchesSearch && matchesStatus
     })
   }, [analyses, searchQuery, statusFilter])
+
+  const hasActiveFilter = searchQuery || statusFilter !== 'all'
+
+  if (analyses.length === 0 && !hasActiveFilter) {
+    return <>{emptyState}</>
+  }
 
   const filterChips = [
     { value: 'all', label: 'Todos', icon: Filter },
@@ -49,7 +48,7 @@ export function DashboardClient({ analyses, children }: DashboardClientProps) {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Buscar por nombre de archivo..."
-                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-600 transition-all duration-200"
+                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 dark:focus:border-blue-600 transition-all duration-200"
               />
               {searchQuery && (
                 <button
@@ -69,7 +68,7 @@ export function DashboardClient({ analyses, children }: DashboardClientProps) {
                 onClick={() => setStatusFilter(chip.value)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl transition-all duration-200 ${
                   statusFilter === chip.value
-                    ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/20'
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               >
@@ -77,7 +76,7 @@ export function DashboardClient({ analyses, children }: DashboardClientProps) {
                 {chip.label}
               </button>
             ))}
-            {(searchQuery || statusFilter !== 'all') && (
+            {hasActiveFilter && (
               <button
                 onClick={() => { setSearchQuery(''); setStatusFilter('all') }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -93,13 +92,11 @@ export function DashboardClient({ analyses, children }: DashboardClientProps) {
       <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800/30">
           <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full bg-brand-500 animate-pulse-subtle" />
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse-subtle" />
             <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {filteredAnalyses.length === 0
-                ? children
-                : filteredAnalyses.length === 1
-                  ? '1 análisis'
-                  : `${filteredAnalyses.length} análisis`}
+              {filteredAnalyses.length === 1
+                ? '1 análisis'
+                : `${filteredAnalyses.length} análisis`}
             </p>
           </div>
         </div>
@@ -110,12 +107,10 @@ export function DashboardClient({ analyses, children }: DashboardClientProps) {
               <Search className="w-6 h-6 text-gray-300 dark:text-gray-600" />
             </div>
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-              {searchQuery || statusFilter !== 'all' ? 'Sin resultados' : 'Aún no hay análisis'}
+              Sin resultados
             </p>
             <p className="text-sm text-gray-400 dark:text-gray-500">
-              {searchQuery || statusFilter !== 'all'
-                ? 'Intenta con otros términos de búsqueda'
-                : 'Sube tu primer estado de cuenta para comenzar'}
+              Intenta con otros términos de búsqueda
             </p>
           </div>
         ) : (
@@ -134,13 +129,13 @@ export function DashboardClient({ analyses, children }: DashboardClientProps) {
                     isCompleted
                       ? 'bg-emerald-50 dark:bg-emerald-900/20 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/30'
                       : isProcessing
-                        ? 'bg-brand-50 dark:bg-brand-900/20 group-hover:bg-brand-100 dark:group-hover:bg-brand-900/30'
+                        ? 'bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30'
                         : 'bg-gray-50 dark:bg-gray-800/50'
                   }`}>
                     {isCompleted ? (
                       <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                     ) : isProcessing ? (
-                      <div className="w-5 h-5 rounded-full border-2 border-brand-400 border-t-transparent animate-spin" />
+                      <div className="w-5 h-5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
                     ) : (
                       <AlertTriangle className="w-5 h-5 text-gray-400" />
                     )}
@@ -148,7 +143,7 @@ export function DashboardClient({ analyses, children }: DashboardClientProps) {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {analysis.file_name}
                       </p>
                       {analysis.anomalies_count > 0 && (
@@ -183,7 +178,7 @@ export function DashboardClient({ analyses, children }: DashboardClientProps) {
                     </div>
                     <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg ${
                       isCompleted ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
-                      isProcessing ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400' :
+                      isProcessing ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' :
                       'bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400'
                     }`}>
                       {isCompleted ? 'Completado' : isProcessing ? 'Procesando' : 'Error'}

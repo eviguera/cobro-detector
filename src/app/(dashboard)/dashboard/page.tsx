@@ -111,10 +111,10 @@ export default async function DashboardPage() {
     <div className="animate-fade-in-up space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="relative">
-          <div className="absolute -left-4 top-0 w-1 h-12 bg-gradient-to-b from-brand-500 to-brand-300 rounded-full hidden sm:block" />
+          <div className="absolute -left-4 top-0 w-1 h-12 bg-gradient-to-b from-blue-500 to-blue-300 rounded-full hidden sm:block" />
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse-subtle" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-brand-600 dark:text-brand-400">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse-subtle" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-blue-600 dark:text-blue-400">
               Panel de Control
             </span>
           </div>
@@ -127,7 +127,7 @@ export default async function DashboardPage() {
         </div>
         <Link
           href="/analisis"
-          className="group inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-brand-600/20 dark:shadow-brand-600/30 hover:shadow-xl hover:shadow-brand-600/30 dark:hover:shadow-brand-500/40 hover:-translate-y-0.5"
+          className="group inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5"
         >
           <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" />
           Nuevo análisis
@@ -142,14 +142,14 @@ export default async function DashboardPage() {
             style={{ animationDelay: `${i * 80}ms` }}
           >
             <div className={`absolute top-0 left-5 right-5 h-0.5 rounded-full ${
-              stat.accent === 'brand' ? 'bg-brand-500' :
+              stat.accent === 'brand' ? 'bg-blue-500' :
               stat.accent === 'success' ? 'bg-emerald-500' :
               stat.accent === 'danger' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
             }`} />
 
             <div className="flex items-start justify-between mb-3">
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                stat.accent === 'brand' ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400' :
+                stat.accent === 'brand' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
                 stat.accent === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
                 stat.accent === 'danger' ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
                 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
@@ -170,7 +170,7 @@ export default async function DashboardPage() {
             </p>
             <div className="mt-2 flex items-center justify-between">
               {stat.subLink ? (
-                <Link href={stat.subLink} className="text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors">
+                <Link href={stat.subLink} className="text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
                   {stat.sub} →
                 </Link>
               ) : (
@@ -186,8 +186,8 @@ export default async function DashboardPage() {
         <div className="lg:col-span-2 bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 sm:p-6 shadow-sm">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
-                <Activity className="w-[18px] h-[18px] text-brand-600 dark:text-brand-400" />
+              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                <Activity className="w-[18px] h-[18px] text-blue-600 dark:text-blue-400" />
               </div>
               <div>
                 <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
@@ -226,14 +226,14 @@ export default async function DashboardPage() {
                     <div
                       className={`w-full rounded-lg transition-all duration-500 hover:opacity-80 cursor-pointer ${
                         isToday
-                          ? 'bg-gradient-to-t from-brand-500 to-brand-400 shadow-sm shadow-brand-500/20'
+                          ? 'bg-gradient-to-t from-blue-500 to-blue-400 shadow-sm shadow-blue-500/20'
                           : day.count > 0
-                            ? 'bg-brand-200 dark:bg-brand-800'
+                            ? 'bg-blue-200 dark:bg-blue-800'
                             : 'bg-gray-100 dark:bg-gray-800'
                       }`}
                       style={{ height: `${height}%`, minHeight: '4px' }}
                     />
-                    <span className={`text-[10px] font-medium mt-1 ${isToday ? 'text-brand-600 dark:text-brand-400 font-semibold' : 'text-gray-400 dark:text-gray-500'}`}>
+                    <span className={`text-[10px] font-medium mt-1 ${isToday ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-400 dark:text-gray-500'}`}>
                       {getWeekdayLabel(day.dateObj)}
                     </span>
                   </div>
@@ -284,8 +284,8 @@ export default async function DashboardPage() {
             )}
 
             <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
-              <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center flex-shrink-0">
-                <CalendarDays className="w-4 h-4 text-brand-500" />
+              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
+                <CalendarDays className="w-4 h-4 text-blue-500" />
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Última actividad</p>
@@ -300,26 +300,28 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <DashboardClient analyses={analyses ?? []}>
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 text-center py-16 px-6 shadow-sm">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 flex items-center justify-center shadow-inner">
-            <FileSearch className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+      <DashboardClient analyses={analyses ?? []}
+        emptyState={
+          <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 text-center py-16 px-6 shadow-sm">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 flex items-center justify-center shadow-inner">
+              <FileSearch className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+            </div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Aún no tienes análisis
+            </h3>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mb-8 max-w-xs mx-auto leading-relaxed">
+              Sube tu primer estado de cuenta y descubre si tu banco te está cobrando de más
+            </p>
+            <Link
+              href="/analisis"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30"
+            >
+              <Sparkles className="w-4 h-4" />
+              Primer análisis gratis
+            </Link>
           </div>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Aún no tienes análisis
-          </h3>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mb-8 max-w-xs mx-auto leading-relaxed">
-            Sube tu primer estado de cuenta y descubre si tu banco te está cobrando de más
-          </p>
-          <Link
-            href="/analisis"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-brand-600/20 dark:shadow-brand-600/30"
-          >
-            <Sparkles className="w-4 h-4" />
-            Primer análisis gratis
-          </Link>
-        </div>
-      </DashboardClient>
+        }
+      />
     </div>
   )
 }

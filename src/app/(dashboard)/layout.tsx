@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <aside className="w-64 bg-white/80 dark:bg-[#0d0d14]/90 backdrop-blur-xl border-r border-gray-100 dark:border-gray-800/40 flex flex-col fixed h-full z-30">
         <div className="p-5 border-b border-gray-100 dark:border-gray-800/30">
           <Link href="/dashboard" className="group flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20 group-hover:shadow-brand-500/30 group-hover:scale-105 transition-all duration-300">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/30 group-hover:scale-105 transition-all duration-300">
               <Shield className="w-4 h-4 text-white" />
             </div>
             <div>
@@ -46,17 +46,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </Link>
         </div>
 
-        <div className="px-4 py-3 mx-3 mt-4 bg-gradient-to-br from-brand-50 to-brand-100/80 dark:from-brand-950/60 dark:to-brand-900/20 rounded-2xl border border-brand-200/60 dark:border-brand-800/30 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-brand-400/10 to-transparent rounded-full -translate-y-8 translate-x-8" />
-          <p className="text-[11px] text-brand-600 dark:text-brand-400 font-semibold tracking-wider uppercase mb-1">Créditos</p>
-          <p className="text-3xl font-bold text-brand-700 dark:text-brand-300 tracking-tight">{creditsLeft}</p>
+        <div className="px-4 py-3 mx-3 mt-4 bg-gradient-to-br from-blue-50 to-blue-100/80 dark:from-blue-950/60 dark:to-blue-900/20 rounded-2xl border border-blue-200/60 dark:border-blue-800/30 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-blue-400/10 to-transparent rounded-full -translate-y-8 translate-x-8" />
+          <p className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold tracking-wider uppercase mb-1">Créditos</p>
+          <p className="text-3xl font-bold text-blue-700 dark:text-blue-300 tracking-tight">{creditsLeft}</p>
           {creditsLeft === 0 ? (
-            <Link href="/precios" className="inline-flex items-center gap-1 mt-2 text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors">
+            <Link href="/precios" className="inline-flex items-center gap-1 mt-2 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
               <Sparkles className="w-3 h-3" />
               Comprar créditos <ChevronRight className="w-3 h-3" />
             </Link>
           ) : (
-            <p className="text-[11px] text-brand-500/70 dark:text-brand-400/60 mt-2">
+            <p className="text-[11px] text-blue-500/70 dark:text-blue-400/60 mt-2">
               de {credits?.total ?? 0} totales
             </p>
           )}
@@ -80,7 +80,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
         <div className="p-4 border-t border-gray-100 dark:border-gray-800/30">
           <div className="flex items-center gap-3 mb-3 px-1">
-            <div className="w-9 h-9 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
               <span className="text-white text-sm font-bold">
                 {(profile?.full_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
               </span>
