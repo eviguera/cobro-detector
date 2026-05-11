@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
       console.log(`📊 Análisis ${analysisId}: ${txCount} transacciones, ${anomalyCount} anomalías`)
 
       if (result.success === false) {
-        throw new Error('analyzeFile retornó error')
+        throw new Error(result.error || 'El motor de análisis no pudo procesar el archivo')
       }
 
       // Guardar resultados en BD
@@ -193,7 +193,8 @@ export async function POST(request: NextRequest) {
         bank: result.bank ?? undefined,
       }
     } catch (syncError) {
-      console.error('Error en análisis síncrono, fallback a async:', syncError)
+      const errorMsg = syncError instanceof Error ? syncError.message : 'Error desconocido'
+      console.error('❌ Error en análisis síncrono:', errorMsg)
       // Marcar como error
       await supabase.from('analyses').update({ status: 'error' }).eq('id', analysisId).eq('user_id', user.id)
 
@@ -206,6 +207,14 @@ export async function POST(request: NextRequest) {
         companyId: null,
         analysisId,
       }).catch(err => console.error('Error en fallback async:', err))
+
+      // Devolver error visible al usuario
+      return successResponse({
+        success: true,
+        analysisId,
+        syncError: errorMsg,
+        message: 'El análisis falló en línea. Puedes revisar el historial para ver si se completó en segundo plano.',
+      })
     }
 
     // Invalidar caché

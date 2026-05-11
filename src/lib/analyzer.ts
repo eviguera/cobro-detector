@@ -13,6 +13,7 @@ export interface AnalysisResult {
   bank?: string
   aiSummary?: string
   success?: boolean
+  error?: string
   transactions?: ParsedTransaction[]
 }
 
@@ -403,12 +404,14 @@ export async function analyzeFile(
     }
 
   } catch (error) {
-    console.error('Error en analyzeFile:', error)
+    const errorMsg = error instanceof Error ? error.message : 'Error desconocido en analyzeFile'
+    console.error('Error en analyzeFile:', errorMsg)
     return {
       anomalies: [],
       totalTransactions: 0,
       totalRecoverable: 0,
       success: false,
+      error: errorMsg,
     }
   }
 }

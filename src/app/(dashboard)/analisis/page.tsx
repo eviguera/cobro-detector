@@ -340,6 +340,44 @@ export default function AnalisisPage() {
 
   if (!result) return null
 
+  // Si hubo error síncrono, mostrarlo
+  if ((result as any).syncError) {
+    return (
+      <div className="animate-fade-in-up max-w-lg mx-auto pt-16 sm:pt-24">
+        <div className="relative w-16 h-16 mx-auto mb-6">
+          <div className="absolute inset-0 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+          </div>
+        </div>
+        <h2 className="text-xl font-display font-bold text-gray-900 dark:text-gray-50 text-center mb-2">
+          Error al analizar el archivo
+        </h2>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl p-4 mb-6">
+          <p className="text-sm text-red-700 dark:text-red-300 font-mono whitespace-pre-wrap">
+            {(result as any).syncError}
+          </p>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6">
+          Se intentará procesar en segundo plano. Revisa el historial en unos minutos.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={() => router.push(`/historial/${result.analysisId}`)}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all"
+          >
+            Ver en historial
+          </button>
+          <button
+            onClick={resetForm}
+            className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold text-sm transition-all"
+          >
+            Intentar de nuevo
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const anomalies = result.anomalies ?? []
   const highCount = anomalies.filter(a => a.severity === 'high').length
   const totalRecoverable = result.recoverableAmount ?? anomalies.reduce((sum, a) => sum + (a.recoverableAmount ?? 0), 0)
