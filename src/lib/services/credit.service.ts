@@ -58,28 +58,23 @@ export async function consumeCreditAtomic(
   return data ?? false
 }
 
-// Función para encolar análisis (descuenta crédito y crea registro)
+// Función para encolar análisis (crea registro y descuenta crédito)
 export async function enqueueAnalysis(
   supabase: SupabaseClientType,
   userId: string,
   fileName: string,
+  fileType: string,
   fileUrl: string,
   companyId?: string | null
 ): Promise<string | null> {
-  // Descontar crédito atómicamente
-  const consumed = await consumeCreditAtomic(supabase, userId, companyId)
-  
-  if (!consumed) {
-    return null
-  }
-  
-  // Crear registro de análisis con estado 'queued'
+  // Crear registro de análisis PRIMERO
   const { data: analysis, error } = await supabase
     .from('analyses')
     .insert({
       user_id: userId,
       company_id: companyId ?? null,
       file_name: fileName,
+      file_type: fileType,
       file_url: fileUrl,
       status: 'queued',
     })
@@ -87,7 +82,17 @@ export async function enqueueAnalysis(
     .single()
   
   if (error) {
+    console.error('Error creando registro de análisis:', error)
     throw error
+  }
+  
+  // Descontar crédito DESPUÉS (solo si el registro se creó)
+  const consumed = await consumeCreditAtomic(supabase, userId, companyId)
+  
+  if (!consumed) {
+    // Si no hay créditos, eliminar el análisis creado
+    await supabase.from('analyses').delete().eq('id', analysis.id)
+    return null
   }
   
   return analysis.id

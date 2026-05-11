@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
       supabase,
       user.id,
       file.name,
+      file.type,
       publicUrl,
       null // companyId
     )

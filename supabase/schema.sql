@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS analyses (
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   file_name TEXT NOT NULL,
   file_type TEXT NOT NULL, -- 'pdf', 'xlsx', 'csv'
+  file_url TEXT,
   bank TEXT,
   period_start DATE,
   period_end DATE,

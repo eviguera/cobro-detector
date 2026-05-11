@@ -141,6 +141,7 @@ export interface Database {
           user_id: string
           file_name: string
           file_type: string
+          file_url: string | null
           bank: string | null
           period_start: string | null
           period_end: string | null
@@ -159,6 +160,7 @@ export interface Database {
           user_id: string
           file_name: string
           file_type: string
+          file_url?: string | null
           bank?: string | null
           period_start?: string | null
           period_end?: string | null
@@ -177,6 +179,7 @@ export interface Database {
           user_id?: string
           file_name?: string
           file_type?: string
+          file_url?: string | null
           bank?: string | null
           period_start?: string | null
           period_end?: string | null
