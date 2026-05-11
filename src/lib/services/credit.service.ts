@@ -98,17 +98,29 @@ export async function enqueueAnalysis(
   fileUrl: string,
   companyId?: string | null
 ): Promise<string | null> {
-  // Crear registro de análisis PRIMERO
+  // Verificar créditos PRIMERO (sin consumirlos)
+  const creditInfo = await getCreditInfo(supabase, userId, companyId)
+  const creditsLeft = creditInfo ? creditInfo.left : 0
+  if (creditsLeft <= 0) {
+    console.warn(`Usuario ${userId} sin créditos disponibles`)
+    return null
+  }
+
+  // Crear registro de análisis (solo columnas que existen en la tabla)
+  const insertData: Record<string, unknown> = {
+    user_id: userId,
+    file_name: fileName,
+    file_type: fileType,
+    file_url: fileUrl,
+    status: 'processing',
+  }
+  if (companyId) {
+    insertData.company_id = companyId
+  }
+
   const { data: analysis, error } = await supabase
     .from('analyses')
-    .insert({
-      user_id: userId,
-      company_id: companyId ?? null,
-      file_name: fileName,
-      file_type: fileType,
-      file_url: fileUrl,
-      status: 'queued',
-    })
+    .insert(insertData)
     .select()
     .single()
   
@@ -121,9 +133,9 @@ export async function enqueueAnalysis(
   const consumed = await consumeCreditAtomic(supabase, userId, companyId)
   
   if (!consumed) {
-    // Si no hay créditos, eliminar el análisis creado
-    await supabase.from('analyses').delete().eq('id', analysis.id)
-    return null
+    console.error('No se pudo consumir crédito para análisis:', analysis.id)
+    // No eliminar el análisis - se queda para que el usuario vea el error
+    return analysis.id
   }
   
   return analysis.id

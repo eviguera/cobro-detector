@@ -148,6 +148,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (err) {
+    console.error('CRITICAL: Error en /api/analyze:', err instanceof Error ? { message: err.message, name: err.name, stack: err.stack?.split('\n').slice(0, 3).join('\n') } : err)
     return handleApiError(err, 'POST /api/analyze')
   }
 }
