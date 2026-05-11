@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { authError, handleApiError, successResponse } from '@/lib/api-error'
 import { checkStrictRateLimit } from '@/lib/rate-limit'
 import { consumeCreditAtomic, enqueueAnalysis as enqueueAnalysisService } from '@/lib/services/credit.service'
+import { analyzeFile } from '@/lib/analyzer'
 import { enqueueAnalysis } from '@/lib/analysis-queue'
 import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
@@ -23,7 +24,7 @@ const analyzeSchema = z.object({
     }),
 })
 
-export const maxDuration = 30
+export const maxDuration = 120
 
 export async function POST(request: NextRequest) {
   try {
@@ -121,25 +122,103 @@ export async function POST(request: NextRequest) {
       }, { status: 402 })
     }
 
-    // Encolar el análisis para procesamiento asíncrono
+    // Procesar análisis síncronamente (Vercel serverless mata fire-and-forget)
+    let syncSuccess = false
+    let syncResult: any = null
+
     try {
-      await enqueueAnalysis({
+      // Actualizar estado a 'processing'
+      await supabase.from('analyses').update({ status: 'processing' }).eq('id', analysisId).eq('user_id', user.id)
+
+      // Ejecutar análisis (síncrono)
+      const result = await analyzeFile(publicUrl, file.type, {
+        userId: user.id,
+        companyId: null,
+        fileName: file.name,
+      })
+
+      const txCount = result.totalTransactions ?? 0
+      const anomalyCount = result.anomalies?.length ?? 0
+      console.log(`📊 Análisis ${analysisId}: ${txCount} transacciones, ${anomalyCount} anomalías`)
+
+      if (result.success === false) {
+        throw new Error('analyzeFile retornó error')
+      }
+
+      // Guardar resultados en BD
+      await supabase.from('analyses').update({
+        status: 'completed',
+        anomalies_count: anomalyCount,
+        total_transactions: txCount,
+        recoverable_amount: result.totalRecoverable ?? 0,
+        period_start: result.period?.start ?? null,
+        period_end: result.period?.end ?? null,
+        bank: result.bank ?? null,
+        anomalies: result.anomalies ?? [],
+        ai_summary: result.aiSummary ?? null,
+        raw_data: result.transactions ?? [],
+      }).eq('id', analysisId).eq('user_id', user.id)
+
+      // Insertar anomalías en la tabla individual
+      if (result.anomalies && result.anomalies.length > 0) {
+        const anomaliesToInsert = result.anomalies.map((anomaly: any) => ({
+          analysis_id: analysisId,
+          user_id: user.id,
+          type: anomaly.type,
+          severity: anomaly.severity,
+          title: anomaly.title,
+          description: anomaly.description,
+          detail: anomaly.detail ?? null,
+          recoverable_amount: anomaly.recoverableAmount,
+          transaction_refs: anomaly.transactionRefs,
+          status: 'pending',
+        }))
+
+        const { error: insertError } = await supabase
+          .from('anomalies')
+          .insert(anomaliesToInsert)
+
+        if (insertError) {
+          console.error('Error insertando anomalías:', insertError)
+        }
+      }
+
+      syncSuccess = true
+      syncResult = {
+        totalTransactions: txCount,
+        anomaliesCount: anomalyCount,
+        recoverableAmount: result.totalRecoverable ?? 0,
+        anomalies: result.anomalies ?? [],
+        summary: result.aiSummary ?? undefined,
+        bank: result.bank ?? undefined,
+      }
+    } catch (syncError) {
+      console.error('Error en análisis síncrono, fallback a async:', syncError)
+      // Marcar como error
+      await supabase.from('analyses').update({ status: 'error' }).eq('id', analysisId).eq('user_id', user.id)
+
+      // Fallback: intentar procesamiento asíncrono
+      enqueueAnalysis({
         userId: user.id,
         fileName: file.name,
         filePath: publicUrl,
         fileType: file.type,
         companyId: null,
         analysisId,
-      })
-      console.log(`✅ Análisis encolado: ${analysisId}`)
-    } catch (queueError) {
-      console.error('Error encolando análisis:', queueError)
-      // No fallar la petición, el análisis se puede procesar luego
+      }).catch(err => console.error('Error en fallback async:', err))
     }
 
-    // Invalidar caché del dashboard y análisis
+    // Invalidar caché
     revalidateTag(`dashboard-${user.id}`)
     revalidateTag(`analyses-${user.id}`)
+
+    if (syncSuccess) {
+      return successResponse({
+        success: true,
+        analysisId,
+        ...syncResult,
+      })
+    }
 
     return successResponse({
       success: true,

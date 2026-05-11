@@ -141,7 +141,9 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
 
 function parseCSVBuffer(buffer: ArrayBuffer): ParsedTransaction[] {
   const text = new TextDecoder('utf-8').decode(buffer)
-  const lines = text.split(/\r?\n/).filter(l => l.trim())
+  // Eliminar BOM (Byte Order Mark) si existe
+  const cleanText = text.replace(/^\ufeff/, '')
+  const lines = cleanText.split(/\r?\n/).filter(l => l.trim())
   if (lines.length < 2) return []
 
   const rawHeaders = parseCSVLine(lines[0])
