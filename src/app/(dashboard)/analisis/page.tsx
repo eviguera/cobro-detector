@@ -52,6 +52,7 @@ const TYPE_LABELS: Record<string, string> = {
   duplicate_commission: 'Comisión duplicada',
   installment_error: 'Error en cuotas',
   unknown_charge: 'Cargo no reconocido',
+  incorrect_charge: 'Cobro incorrecto',
 }
 
 export default function AnalisisPage() {

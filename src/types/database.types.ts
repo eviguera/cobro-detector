@@ -462,6 +462,10 @@ export interface ParsedTransaction {
   type: 'credit' | 'debit'
   category?: string
   metadata?: Record<string, unknown>
+  tipoAnomalia?: string
+  idTransaccionReferencia?: string
+  reclamable?: boolean
+  motivoReclamo?: string
 }
 
 export interface DetectedAnomaly {

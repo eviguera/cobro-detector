@@ -245,6 +245,94 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
   return anomalies
 }
 
+// Detecta anomalías pre-etiquetadas en el CSV (tipo_anomalia, id_transaccion_referencia, etc.)
+export function detectLabeledAnomalies(transactions: ParsedTransaction[]): DetectedAnomaly[] {
+  const anomalies: DetectedAnomaly[] = []
+  const processed = new Set<string>()
+
+  // Mapa: id → transacción para búsqueda rápida
+  const txMap = new Map<string, ParsedTransaction>()
+  transactions.forEach(tx => txMap.set(tx.id, tx))
+
+  // Mapeo de tipos de anomalía del CSV a tipos internos
+  const typeMap: Record<string, { type: string; severity: 'high' | 'medium' | 'low' }> = {
+    COBRO_DOBLE: { type: 'duplicate_commission', severity: 'high' },
+    COBRO_ALTO_DUPLICADO: { type: 'duplicate_commission', severity: 'high' },
+    COBRO_INCORRECTO: { type: 'incorrect_charge', severity: 'medium' },
+  }
+
+  transactions.forEach(tx => {
+    const rawType = tx.tipoAnomalia
+    if (!rawType || processed.has(tx.id)) return
+
+    const mapping = typeMap[rawType]
+    if (!mapping) return
+
+    // Reunir todas las transacciones de este grupo de anomalía
+    const group: ParsedTransaction[] = [tx]
+    processed.add(tx.id)
+
+    if (tx.idTransaccionReferencia) {
+      const partner = txMap.get(tx.idTransaccionReferencia)
+      if (partner && partner.tipoAnomalia && !processed.has(partner.id)) {
+        group.push(partner)
+        processed.add(partner.id)
+      }
+    }
+
+    // Ordenar por índice de generación para identificar original vs copia
+    group.sort((a, b) => a.id.localeCompare(b.id))
+
+    // Para COBRO_INCORRECTO: toda la transacción es recuperable
+    if (rawType === 'COBRO_INCORRECTO') {
+      const titleDesc = tx.motivoReclamo || `Cobro incorrecto: ${tx.description}`
+      anomalies.push({
+        type: mapping.type,
+        severity: mapping.severity,
+        title: titleDesc,
+        description: tx.motivoReclamo || `Cobro incorrecto de $${Math.abs(tx.amount).toLocaleString('es-CL')} — ${tx.description}`,
+        detail: `Fecha: ${tx.date} · Monto: $${Math.abs(tx.amount).toLocaleString('es-CL')} · Descripción: ${tx.description}${tx.motivoReclamo ? ` · Motivo: ${tx.motivoReclamo}` : ''}`,
+        recoverableAmount: Math.abs(tx.amount),
+        transactionRefs: [tx.id],
+      })
+      return
+    }
+
+    // Para COBRO_DOBLE / COBRO_ALTO_DUPLICADO: la(s) copia(s) son recuperables
+    const extras = group.slice(1)
+    if (extras.length === 0) {
+      // Si no tiene par pero está marcado como duplicado, es recuperable completo
+      anomalies.push({
+        type: mapping.type,
+        severity: mapping.severity,
+        title: `Cobro duplicado: ${tx.description}`,
+        description: tx.motivoReclamo || `Este cobro de $${Math.abs(tx.amount).toLocaleString('es-CL')} aparece duplicado en el estado de cuenta.`,
+        detail: `Fecha: ${tx.date} · Monto: $${Math.abs(tx.amount).toLocaleString('es-CL')} · Descripción: ${tx.description}${tx.motivoReclamo ? ` · Motivo: ${tx.motivoReclamo}` : ''}`,
+        recoverableAmount: Math.abs(tx.amount),
+        transactionRefs: [tx.id],
+      })
+      return
+    }
+
+    const totalExtra = extras.reduce((sum, e) => sum + Math.abs(e.amount), 0)
+    const descriptions = group.map(t => t.description).filter((d, i, a) => a.indexOf(d) === i)
+    const titleDesc = tx.motivoReclamo || descriptions.join(', ')
+    const fechas = group.map(t => t.date).join(', ')
+
+    anomalies.push({
+      type: mapping.type,
+      severity: mapping.severity,
+      title: `Cobro duplicado: ${titleDesc.substring(0, 60)}`,
+      description: tx.motivoReclamo || `Se detectó un cobro duplicado de $${Math.abs(extras[0].amount).toLocaleString('es-CL')}. El cargo se realizó ${group.length} veces.`,
+      detail: `Monto: $${Math.abs(extras[0].amount).toLocaleString('es-CL')} cada uno · Fechas: ${fechas} · Cobros: ${group.length} · Monto recuperable: $${totalExtra.toLocaleString('es-CL')}${tx.motivoReclamo ? `\nMotivo: ${tx.motivoReclamo}` : ''}`,
+      recoverableAmount: totalExtra,
+      transactionRefs: extras.map(e => e.id),
+    })
+  })
+
+  return anomalies
+}
+
 export async function analyzeFile(
   filePath: string,
   fileType: string,
@@ -285,11 +373,14 @@ export async function analyzeFile(
     // Ejecutar detección por reglas
     const ruleAnomalies = detectAnomaliesRules(transactions)
 
+    // Detectar anomalías pre-etiquetadas en el CSV
+    const labeledAnomalies = detectLabeledAnomalies(transactions)
+
     // Ejecutar análisis con IA
     const aiResult = await analyzeTransactionsWithAI(transactions, bank)
 
-    // Combinar resultados (IA + reglas)
-    const allAnomalies = [...ruleAnomalies, ...aiResult.anomalies]
+    // Combinar resultados (IA + reglas + etiquetadas)
+    const allAnomalies = [...ruleAnomalies, ...labeledAnomalies, ...aiResult.anomalies]
 
     // Calcular período
     const dates = transactions.map(tx => tx.date).sort()

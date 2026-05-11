@@ -91,6 +91,11 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
       const amountKey = keys.find(k => k.includes('monto') || k.includes('importe') || k.includes('amount') || k.includes('valor')) ?? keys[2]
       const typeKey = keys.find(k => k.includes('tipo') || k.includes('type') || k.includes('mov'))
 
+      const anomaliaKey = keys.find(k => k.includes('tipo_anomalia') || k.includes('tipo anomalia') || k.includes('anomalia'))
+      const referenciaKey = keys.find(k => k.includes('id_transaccion_referencia') || k.includes('id transaccion referencia') || k.includes('id_transaccion_ref') || k.includes('referencia'))
+      const reclamableKey = keys.find(k => k.includes('reclamable'))
+      const motivoKey = keys.find(k => k.includes('motivo_reclamo') || k.includes('motivo reclamo') || k.includes('motivo'))
+
       const rawAmount = parseAmount(row[Object.keys(row)[keys.indexOf(amountKey)]] ?? 0)
       const rawDesc = String(row[Object.keys(row)[keys.indexOf(descKey)]] ?? '')
       const rawDate = String(row[Object.keys(row)[keys.indexOf(dateKey)]] ?? '')
@@ -106,13 +111,30 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
         amount = Math.abs(amount)
       }
 
-      return {
+      const tx: ParsedTransaction = {
         id: generateId(i),
         date: parseDate(rawDate),
         description: sanitizeDescription(rawDesc.trim()),
         amount,
         type,
       }
+
+      // Leer columnas de anomalías si existen
+      if (anomaliaKey) {
+        tx.tipoAnomalia = String(row[Object.keys(row)[keys.indexOf(anomaliaKey)]] ?? '').trim().toUpperCase()
+      }
+      if (referenciaKey) {
+        tx.idTransaccionReferencia = String(row[Object.keys(row)[keys.indexOf(referenciaKey)]] ?? '').trim()
+      }
+      if (reclamableKey) {
+        const raw = String(row[Object.keys(row)[keys.indexOf(reclamableKey)]] ?? '').trim().toUpperCase()
+        tx.reclamable = raw === 'SI' || raw === 'S' || raw === 'YES' || raw === 'TRUE'
+      }
+      if (motivoKey) {
+        tx.motivoReclamo = String(row[Object.keys(row)[keys.indexOf(motivoKey)]] ?? '').trim()
+      }
+
+      return tx
     })
     .filter(tx => tx.description && tx.amount !== 0)
 }
@@ -130,9 +152,36 @@ function parseCSVBuffer(buffer: ArrayBuffer): ParsedTransaction[] {
   const amountKey = headerKeys.findIndex(k => k.includes('monto') || k.includes('importe') || k.includes('amount') || k.includes('valor'))
   const typeKey = headerKeys.findIndex(k => k.includes('tipo') || k.includes('type') || k.includes('mov'))
 
-  return lines.slice(1)
-    .map((line, i) => {
-      const values = parseCSVLine(line)
+  // Columnas de anomalías pre-etiquetadas
+  const anomaliaKey = headerKeys.findIndex(k =>
+    k.includes('tipo_anomalia') || k.includes('tipo anomalia') || k.includes('anomalia')
+  )
+  const referenciaKey = headerKeys.findIndex(k =>
+    k.includes('id_transaccion_referencia') || k.includes('id transaccion referencia') || k.includes('id_transaccion_ref') || k.includes('referencia')
+  )
+  const reclamableKey = headerKeys.findIndex(k => k.includes('reclamable'))
+  const motivoKey = headerKeys.findIndex(k =>
+    k.includes('motivo_reclamo') || k.includes('motivo reclamo') || k.includes('motivo')
+  )
+  const idOriginalKey = headerKeys.findIndex(k =>
+    k === 'id_transaccion' || k === 'id' || k.includes('id transaccion')
+  )
+
+  // Primera pasada: generar todas las transacciones y construir el mapa ID original → ID generado
+  const rows = lines.slice(1).map(line => parseCSVLine(line))
+  const originalToGenerated: Record<string, string> = {}
+
+  rows.forEach((values, i) => {
+    if (idOriginalKey >= 0) {
+      const originalId = (values[idOriginalKey] ?? '').trim()
+      if (originalId) {
+        originalToGenerated[originalId] = generateId(i)
+      }
+    }
+  })
+
+  return rows
+    .map((values, i) => {
       const rawDate = values[dateKey >= 0 ? dateKey : 0] ?? ''
       const rawDesc = values[descKey >= 0 ? descKey : 1] ?? ''
       const rawAmount = values[amountKey >= 0 ? amountKey : 2] ?? ''
@@ -146,13 +195,32 @@ function parseCSVBuffer(buffer: ArrayBuffer): ParsedTransaction[] {
         type = 'credit'
       }
 
-      return {
+      const tx: ParsedTransaction = {
         id: generateId(i),
         date: parseDate(rawDate.trim()),
         description: sanitizeDescription(rawDesc.trim()),
         amount,
         type,
       }
+
+      // Leer columnas de anomalías si existen
+      if (anomaliaKey >= 0) {
+        tx.tipoAnomalia = (values[anomaliaKey] ?? '').trim().toUpperCase()
+      }
+      if (referenciaKey >= 0) {
+        const rawRef = (values[referenciaKey] ?? '').trim()
+        // Resolver referencia: si el CSV usa IDs originales, traducir al ID generado
+        tx.idTransaccionReferencia = originalToGenerated[rawRef] ?? rawRef
+      }
+      if (reclamableKey >= 0) {
+        const raw = (values[reclamableKey] ?? '').trim().toUpperCase()
+        tx.reclamable = raw === 'SI' || raw === 'S' || raw === 'YES' || raw === 'TRUE'
+      }
+      if (motivoKey >= 0) {
+        tx.motivoReclamo = (values[motivoKey] ?? '').trim()
+      }
+
+      return tx
     })
     .filter(tx => tx.description && tx.amount !== 0)
 }

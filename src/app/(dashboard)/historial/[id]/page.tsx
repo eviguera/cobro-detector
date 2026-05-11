@@ -131,6 +131,8 @@ export default async function AnalysisDetailPage({ params }: Props) {
                       'Solicita recalculo de cuotas. Muestra el comprobante original de la venta en cuotas sin interés y las cuotas cobradas incorrectamente.'}
                     {anomaly.type === 'unknown_charge' &&
                       'Solicita detalle del cargo por escrito. Si no pueden justificarlo, exige reverso inmediato. Puedes escalar a la CMF si el banco no responde en 10 días.'}
+                    {anomaly.type === 'incorrect_charge' &&
+                      'Revisa el detalle del cobro y compáralo con tus registros. Si no corresponde, presenta este reporte en el banco solicitando el reverso del cargo.'}
                   </p>
                 </div>
               </div>
