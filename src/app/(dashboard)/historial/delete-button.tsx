@@ -55,7 +55,7 @@ export default function DeleteAnalysisButton({ id, fileName }: Props) {
         className={`p-1.5 rounded-lg transition-all duration-200 ${
           confirming
             ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
-            : 'text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
+            : 'text-gray-400 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
         }`}
         title={confirming ? `Confirmar eliminación de "${fileName}"` : 'Eliminar análisis'}
       >

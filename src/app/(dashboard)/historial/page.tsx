@@ -105,7 +105,7 @@ export default async function HistorialPage({ searchParams }: Props) {
               <p className={`font-display font-bold text-gray-900 dark:text-gray-100 tracking-tight tabular-nums ${m.large ? 'text-lg' : 'text-xl'} ${m.danger ? 'text-red-600 dark:text-red-400' : ''}`}>
                 {m.value}
               </p>
-              <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">{m.sub}</p>
+              <p className="text-[10px] text-gray-400 dark:text-gray-400 mt-0.5">{m.sub}</p>
             </div>
           ))}
         </div>
@@ -114,7 +114,7 @@ export default async function HistorialPage({ searchParams }: Props) {
       {!analyses || analyses.length === 0 ? (
         <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 text-center py-20 px-6 shadow-sm">
           <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 flex items-center justify-center shadow-inner">
-            <FileSearch className="w-7 h-7 text-gray-300 dark:text-gray-600" />
+            <FileSearch className="w-7 h-7 text-gray-400 dark:text-gray-400" />
           </div>
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
             {periodo !== 'todas' ? 'Sin análisis en este período' : 'No tienes análisis aún'}
@@ -176,11 +176,11 @@ export default async function HistorialPage({ searchParams }: Props) {
                       </p>
                       <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
                         <span className="truncate">{analysis.bank ?? 'Banco no detectado'}</span>
-                        <span className="text-gray-300 dark:text-gray-600">·</span>
+                        <span className="text-gray-400 dark:text-gray-400">·</span>
                         <span className="whitespace-nowrap">{formatDate(analysis.created_at)}</span>
                       </div>
                       {analysis.period_start && (
-                        <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5 sm:hidden flex items-center gap-1">
+                        <p className="text-[10px] text-gray-400 dark:text-gray-400 mt-0.5 sm:hidden flex items-center gap-1">
                           <CalendarDays className="w-3 h-3" />
                           {formatDate(analysis.period_start)} – {formatDate(analysis.period_end!)}
                         </p>

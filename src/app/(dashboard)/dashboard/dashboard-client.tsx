@@ -104,7 +104,7 @@ export function DashboardClient({ analyses, emptyState }: DashboardClientProps) 
         {filteredAnalyses.length === 0 ? (
           <div className="text-center py-16 px-6">
             <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center">
-              <Search className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+              <Search className="w-6 h-6 text-gray-400 dark:text-gray-400" />
             </div>
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
               Sin resultados
@@ -155,7 +155,7 @@ export function DashboardClient({ analyses, emptyState }: DashboardClientProps) 
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[11px] text-gray-400 dark:text-gray-500">{analysis.bank ?? 'Banco no detectado'}</span>
-                      <span className="text-[10px] text-gray-300 dark:text-gray-600">·</span>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-400">·</span>
                       <span className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {formatDate(analysis.created_at)}

@@ -220,7 +220,7 @@ export default function AnalisisPage() {
               <p className="text-sm text-gray-400 dark:text-gray-500 mb-2">
                 o haz clic para seleccionar un archivo
               </p>
-              <p className="text-xs text-gray-300 dark:text-gray-600 font-mono">
+              <p className="text-xs text-gray-400 dark:text-gray-400 font-mono">
                 PDF, Excel (.xlsx) o CSV · Máximo 10MB
               </p>
             </div>
@@ -310,7 +310,7 @@ export default function AnalisisPage() {
                 className={`flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm transition-all duration-300 ${
                   isCompleted ? 'text-emerald-600 dark:text-emerald-400' :
                   isActive ? 'text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 font-medium' :
-                  'text-gray-300 dark:text-gray-600'
+                  'text-gray-400 dark:text-gray-400'
                 }`}
               >
                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${

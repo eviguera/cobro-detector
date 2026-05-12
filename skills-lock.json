@@ -6,6 +6,12 @@
       "sourceType": "autoskills-registry",
       "computedHash": "bffe3d08cfe92ebad63699f74ce29e35c19850ebfbf474c1463183cfe34d6a09"
     },
+    "appinsights-instrumentation": {
+      "source": "microsoft/azure-skills",
+      "sourceType": "github",
+      "skillPath": "skills/appinsights-instrumentation/SKILL.md",
+      "computedHash": "a70f5b6abca44d75b1879bc68aa2926b0355c55cae654d79db97fdbb20c36337"
+    },
     "building-admin-dashboard-customizations": {
       "source": "medusajs/medusa-agent-skills",
       "sourceType": "github",

@@ -177,7 +177,7 @@ export default async function DashboardPage() {
                 <p className="text-[11px] text-gray-400 dark:text-gray-500">{stat.sub}</p>
               )}
             </div>
-            <p className="mt-0.5 text-[10px] text-gray-300 dark:text-gray-600">{stat.detail}</p>
+            <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-400">{stat.detail}</p>
           </div>
         ))}
       </div>
@@ -208,7 +208,7 @@ export default async function DashboardPage() {
           {totalAnalyses === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div className="w-12 h-12 rounded-xl bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center mb-3">
-                <BarChart3 className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+                <BarChart3 className="w-6 h-6 text-gray-400 dark:text-gray-400" />
               </div>
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Sin actividad aún</p>
               <p className="text-xs text-gray-400 dark:text-gray-500">Los análisis aparecerán aquí</p>
@@ -304,7 +304,7 @@ export default async function DashboardPage() {
         emptyState={
           <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 text-center py-16 px-6 shadow-sm">
             <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 flex items-center justify-center shadow-inner">
-              <FileSearch className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+              <FileSearch className="w-6 h-6 text-gray-400 dark:text-gray-400" />
             </div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
               Aún no tienes análisis
