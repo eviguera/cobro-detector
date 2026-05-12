@@ -15,7 +15,7 @@ export default function BuyButton({ plan, highlighted }: Props) {
 
   const handleBuy = async () => {
     if (plan.percentage) {
-      window.location.href = '/analisis'
+      window.location.href = '/analisis?plan=platino'
       return
     }
 

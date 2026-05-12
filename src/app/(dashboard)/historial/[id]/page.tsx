@@ -46,6 +46,57 @@ export default async function AnalysisDetailPage({ params }: Props) {
   const totalMedium = anomalies.filter(a => a.severity === 'medium').length
   const totalLow    = anomalies.filter(a => a.severity === 'low').length
 
+  if (analysis.status === 'awaiting_payment') {
+    const pct = Math.round((analysis.recoverable_amount ?? 0) * 0.2)
+    return (
+      <div className="animate-fade-in max-w-2xl">
+        <Link href="/historial" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Volver al historial
+        </Link>
+
+        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-8 shadow-sm text-center mb-6">
+          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+            <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Reporte bloqueado</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Plan Platino — Pagas solo el 20% de lo que recuperes</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            {analysis.file_name} · {analysis.bank ?? 'Banco no detectado'} · {formatDate(analysis.created_at)}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {[
+            { label: 'Anomalías', value: analysis.anomalies_count, color: 'text-red-600' },
+            { label: 'Monto recuperable', value: formatCLP(analysis.recoverable_amount), color: 'text-green-700', lg: true },
+            { label: '20% a pagar', value: formatCLP(pct), color: 'text-amber-600', lg: true },
+          ].map(m => (
+            <div key={m.label} className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-100 dark:border-gray-800/40 p-4">
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">{m.label}</p>
+              <p className={`font-bold ${m.lg ? 'text-lg' : 'text-xl'} ${m.color}`}>{m.value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-6 shadow-sm">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-6 text-center">
+            Para desbloquear el reporte completo, realizá el pago del 20% ({formatCLP(pct)}) a través de MercadoPago.
+          </p>
+          <button
+            className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
+          >
+            Pagar {formatCLP(pct)} con MercadoPago
+          </button>
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-3">
+            El reporte se libera automáticamente al acreditarse el pago
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="animate-fade-in max-w-4xl">
       {/* Header */}

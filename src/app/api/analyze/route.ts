@@ -66,8 +66,10 @@ export async function POST(request: NextRequest) {
     }
 
     const file = parsed.data.file
+    const planFromForm = formData.get('plan') as string | null
+    const isPlatino = planFromForm === 'platino'
 
-    console.log(`Usuario: ${user.id}, Archivo: ${file.name}`)
+    console.log(`Usuario: ${user.id}, Archivo: ${file.name}${isPlatino ? ', Plan: Platino' : ''}`)
 
     // Guardar archivo
     const fileBuffer = await file.arrayBuffer()
@@ -94,15 +96,38 @@ export async function POST(request: NextRequest) {
       .from('analysis-files')
       .getPublicUrl(fileName)
 
-    // Crear registro de análisis usando el servicio
-    const analysisId = await enqueueAnalysisService(
-      supabase,
-      user.id,
-      file.name,
-      file.type,
-      publicUrl,
-      null // companyId
-    )
+    // Crear registro de análisis
+    let analysisId: string | null = null
+
+    if (isPlatino) {
+      const { data: platinoAnalysis, error: platinoErr } = await supabase
+        .from('analyses')
+        .insert({
+          user_id: user.id,
+          file_name: file.name,
+          file_type: file.type,
+          file_url: publicUrl,
+          status: 'processing',
+        })
+        .select()
+        .single()
+
+      if (platinoErr || !platinoAnalysis) {
+        console.error('Error creating Platino analysis:', platinoErr)
+        return NextResponse.json({ error: 'Error al crear el análisis' }, { status: 500 })
+      }
+
+      analysisId = platinoAnalysis.id
+    } else {
+      analysisId = await enqueueAnalysisService(
+        supabase,
+        user.id,
+        file.name,
+        file.type,
+        publicUrl,
+        null
+      )
+    }
 
     if (!analysisId) {
       // Obtener créditos restantes
@@ -146,8 +171,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Guardar resultados en BD
+      const finalStatus = isPlatino ? 'awaiting_payment' : 'completed'
       await supabase.from('analyses').update({
-        status: 'completed',
+        status: finalStatus,
         anomalies_count: anomalyCount,
         total_transactions: txCount,
         recoverable_amount: result.totalRecoverable ?? 0,
@@ -191,6 +217,8 @@ export async function POST(request: NextRequest) {
         anomalies: result.anomalies ?? [],
         summary: result.aiSummary ?? undefined,
         bank: result.bank ?? undefined,
+        awaitingPayment: isPlatino,
+        paymentAmount: isPlatino ? Math.round((result.totalRecoverable ?? 0) * 0.2) : undefined,
       }
     } catch (syncError) {
       const errorMsg = syncError instanceof Error ? syncError.message : 'Error desconocido'

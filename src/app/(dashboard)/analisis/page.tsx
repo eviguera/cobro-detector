@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, Clock, RotateCcw } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { formatCLP } from '@/lib/utils'
 
@@ -24,6 +24,8 @@ interface AnalysisResult {
   recoverableAmount?: number
   anomalies?: AnomalyResult[]
   summary?: string
+  awaitingPayment?: boolean
+  paymentAmount?: number
 }
 
 const ANALYSIS_STEPS = [
@@ -57,6 +59,8 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function AnalisisPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const planFromUrl = searchParams?.get('plan') ?? null
   const [step, setStep] = useState<Step>('upload')
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -106,6 +110,7 @@ export default function AnalisisPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (planFromUrl) formData.append('plan', planFromUrl)
 
       const res = await fetch('/api/analyze', { method: 'POST', body: formData })
       const data = await res.json()
@@ -374,6 +379,48 @@ export default function AnalisisPage() {
             Intentar de nuevo
           </button>
         </div>
+      </div>
+    )
+  }
+
+  if (result.awaitingPayment) {
+    const recoverable = result.recoverableAmount ?? 0
+    const pct = Math.round(recoverable * 0.2)
+    return (
+      <div className="animate-fade-in-up max-w-lg mx-auto pt-8 sm:pt-16">
+        <div className="relative w-16 h-16 mx-auto mb-6">
+          <div className="absolute inset-0 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center">
+            <ShieldCheck className="w-8 h-8 text-amber-500" />
+          </div>
+        </div>
+        <h2 className="text-xl font-display font-bold text-gray-900 dark:text-gray-50 text-center mb-2">
+          Reporte bloqueado — Plan Platino
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-8 leading-relaxed">
+          Detectamos <strong>{result.anomaliesCount} anomalía{result.anomaliesCount !== 1 ? 's' : ''}</strong> con un monto recuperable de <strong>{formatCLP(result.recoverableAmount ?? 0)}</strong>.
+        </p>
+
+        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-6 shadow-sm mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">20% de lo recuperado</span>
+            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCLP(pct)}</span>
+          </div>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">
+            Pagá solo cuando recuperes. El reporte completo se libera al acreditar el pago.
+          </p>
+          <button
+            onClick={() => router.push(`/historial/${result.analysisId}`)}
+            className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
+          >
+            Ir al reporte y pagar
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        <button onClick={resetForm} className="w-full py-3 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex items-center justify-center gap-2">
+          <RotateCcw className="w-3.5 h-3.5" />
+          Nuevo análisis
+        </button>
       </div>
     )
   }
