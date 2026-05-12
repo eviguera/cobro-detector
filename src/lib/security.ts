@@ -157,7 +157,7 @@ export function verifyMercadoPagoWebhook(
 import { z } from 'zod'
 
 const envSchema = z.object({
-  GOOGLE_GEMINI_API_KEY: z.string().min(1).optional(),
+  GROQ_API_KEY: z.string().min(1).optional(),
   MERCADOPAGO_ACCESS_TOKEN: z.string().min(1).optional(),
   MERCADOPAGO_PUBLIC_KEY: z.string().min(1).optional(),
   MERCADOPAGO_WEBHOOK_SECRET: z.string().min(1).optional(),

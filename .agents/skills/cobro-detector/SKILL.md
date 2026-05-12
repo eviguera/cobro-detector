@@ -6,7 +6,7 @@ CobroDetector es una aplicación Next.js 14 que detecta cobros bancarios incorre
 ## Stack
 - **Frontend:** Next.js 14 App Router, Tailwind CSS
 - **Backend:** Next.js API Routes, Supabase (auth, DB, storage)
-- **AI:** Google Gemini 1.5 Flash
+- **AI:** Groq (Llama 3.1 70B) — reemplazó a Google Gemini (cuota gratuita agotada)
 - **Pagos:** Mercado Pago
 - **Rate Limiting:** Upstash Redis
 - **Documentos:** docx (Word), pdf-lib (PDF)
@@ -279,7 +279,7 @@ git add <files> && git commit -m "tipo: descripción" && git push
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-GOOGLE_GEMINI_API_KEY=
+GROQ_API_KEY=
 MERCADOPAGO_ACCESS_TOKEN=
 NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=
 MERCADOPAGO_WEBHOOK_SECRET=
