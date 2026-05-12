@@ -79,7 +79,7 @@ export default function LoginPage() {
 
           <div className="space-y-4">
             {[
-              '1 análisis gratis al registrarte',
+              'Análisis con inteligencia artificial',
               'Compatible con todos los bancos chilenos',
               'Reporte PDF listo para presentar al banco',
             ].map(item => (
@@ -117,7 +117,7 @@ export default function LoginPage() {
           <p className="text-muted-foreground text-sm mb-8">
             {mode === 'login'
               ? 'Ingresa a tu cuenta para ver tus análisis'
-              : 'Incluye 1 análisis gratis · Sin tarjeta de crédito'}
+              : 'Analiza tus estados de cuenta en minutos'}
           </p>
 
           <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="space-y-4">

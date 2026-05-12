@@ -47,7 +47,7 @@ export default function LandingPage() {
             Analizar gratis ahora
             <ChevronRight className="w-4 h-4" />
           </Link>
-          <span className="text-sm text-gray-400">Sin tarjeta de crédito · 1 análisis gratis</span>
+          <span className="text-sm text-gray-400">Analiza tu estado de cuenta en minutos</span>
         </div>
 
         {/* Prueba social */}
@@ -196,7 +196,7 @@ export default function LandingPage() {
         </div>
 
         <p className="text-center text-sm text-gray-400 mt-8">
-          Todos los planes incluyen 1 análisis gratis al registrarte. Los créditos no vencen.
+          Todos los planes incluyen análisis completos con IA. Los créditos no vencen.
         </p>
       </section>
 

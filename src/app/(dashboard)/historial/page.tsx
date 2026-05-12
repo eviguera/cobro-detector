@@ -137,7 +137,7 @@ export default async function HistorialPage({ searchParams }: Props) {
               className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30"
             >
               <Plus className="w-4 h-4" />
-              Primer análisis gratis
+              Nuevo análisis
             </Link>
           )}
         </div>

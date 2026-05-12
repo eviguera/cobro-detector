@@ -77,10 +77,6 @@ export default async function PreciosPage() {
                 q: '¿Cómo pago?',
                 a: 'Aceptamos tarjetas de débito y crédito a través de Mercado Pago. También puedes pagar por transferencia (contacta soporte).',
               },
-              {
-                q: '¿Garantía de devolución?',
-                a: 'Si no detectamos ninguna anomalía en tu estado de cuenta, te devolvemos el crédito usado.',
-              },
             ].map(item => (
               <div key={item.q}>
                 <p className="text-sm font-medium text-gray-900">{item.q}</p>
