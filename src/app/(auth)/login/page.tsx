@@ -112,7 +112,7 @@ export default function LoginPage() {
           </div>
 
           <h1 className="text-2xl font-bold text-foreground mb-2">
-            {mode === 'login' ? 'Bienvenido de vuelta' : 'Crea tu cuenta gratis'}
+            {mode === 'login' ? 'Bienvenido de vuelta' : 'Crea tu cuenta'}
           </h1>
           <p className="text-muted-foreground text-sm mb-8">
             {mode === 'login'
@@ -191,7 +191,7 @@ export default function LoginPage() {
               className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {mode === 'login' ? 'Ingresar' : 'Crear cuenta gratis'}
+              {mode === 'login' ? 'Ingresar' : 'Crear cuenta'}
             </button>
           </form>
 
@@ -201,7 +201,7 @@ export default function LoginPage() {
               className="text-sm text-blue-600 hover:underline"
             >
               {mode === 'login'
-                ? '¿No tienes cuenta? Regístrate gratis'
+                ? '¿No tienes cuenta? Regístrate'
                 : '¿Ya tienes cuenta? Inicia sesión'}
             </button>
           </div>

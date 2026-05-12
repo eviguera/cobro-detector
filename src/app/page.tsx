@@ -18,7 +18,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-4">
             <Link href="#precios" className="text-sm text-gray-600 hover:text-gray-900">Precios</Link>
             <Link href="/login" className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-              Comenzar gratis
+              Comenzar ahora
             </Link>
           </div>
         </div>
@@ -44,7 +44,7 @@ export default function LandingPage() {
 
         <div className="flex items-center justify-center gap-4">
           <Link href="/login" className="px-8 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center gap-2">
-            Analizar gratis ahora
+            Analizar ahora
             <ChevronRight className="w-4 h-4" />
           </Link>
           <span className="text-sm text-gray-400">Analiza tu estado de cuenta en minutos</span>
