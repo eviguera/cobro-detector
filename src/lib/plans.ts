@@ -36,6 +36,7 @@ export const PLANS: Plan[] = [
     pricePerAnalysis: 10000,
     features: [
       '10 análisis de estados de cuenta',
+      'O el 20% de lo que recuperes',
       'Todo lo del plan Plus',
       'Multi-empresa (gestiona varios clientes)',
       'Historial completo de análisis',

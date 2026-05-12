@@ -56,7 +56,9 @@ export default async function PreciosPage() {
                 <p className="text-xs text-gray-400 dark:text-gray-500">
                   {isPlatino
                     ? 'De lo recuperado · Sin costo fijo'
-                    : `${plan.credits} crédito${plan.credits !== 1 ? 's' : ''} · ${formatCLP(plan.pricePerAnalysis)} c/u`}
+                    : plan.key === 'contador'
+                      ? '10 créditos · o 20% de lo recuperado'
+                      : `${plan.credits} crédito${plan.credits !== 1 ? 's' : ''} · ${formatCLP(plan.pricePerAnalysis)} c/u`}
                 </p>
               </div>
 
@@ -69,7 +71,20 @@ export default async function PreciosPage() {
                 ))}
               </ul>
 
-              <BuyButton plan={plan} highlighted={plan.highlighted} />
+              {plan.key === 'contador' ? (
+                <div className="space-y-2">
+                  <a
+                    href="/analisis?plan=platino"
+                    className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Percent className="w-4 h-4" />
+                    20% de lo recuperado
+                  </a>
+                  <BuyButton plan={plan} highlighted={plan.highlighted} />
+                </div>
+              ) : (
+                <BuyButton plan={plan} highlighted={plan.highlighted} />
+              )}
             </div>
           )
         })}
