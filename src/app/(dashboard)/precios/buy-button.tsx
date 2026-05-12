@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, ShoppingCart, CreditCard } from 'lucide-react'
+import { Loader2, ShoppingCart, ArrowRight } from 'lucide-react'
 import type { Plan } from '@/types/database.types'
 import { toast } from 'sonner'
 
@@ -14,9 +14,8 @@ export default function BuyButton({ plan, highlighted }: Props) {
   const [loading, setLoading] = useState(false)
 
   const handleBuy = async () => {
-    // Plan de éxito (10% de lo recuperado) requiere tarjeta
-    if (plan.key === 'success_fee') {
-      toast.info('Para este plan necesitas vincular tu tarjeta de crédito/débito. Contacta a soporte para configurarlo.')
+    if (plan.percentage) {
+      window.location.href = '/analisis'
       return
     }
 
@@ -35,18 +34,14 @@ export default function BuyButton({ plan, highlighted }: Props) {
         return
       }
 
-      // En desarrollo usamos sandboxInitPoint, en producción initPoint
-      const isDev = process.env.NODE_ENV === 'development'
-      const payUrl = isDev ? data.sandboxInitPoint : data.initPoint
+      const payUrl = data.sandboxInitPoint || data.initPoint
 
       if (!payUrl) {
         toast.error('No se pudo obtener el link de pago')
         return
       }
 
-      // Redirigir a Mercado Pago
       window.location.href = payUrl
-
     } catch {
       toast.error('Error de conexión. Intenta nuevamente.')
     } finally {
@@ -54,13 +49,15 @@ export default function BuyButton({ plan, highlighted }: Props) {
     }
   }
 
+  const isPlatino = !!plan.percentage
+
   return (
     <button
       onClick={handleBuy}
       disabled={loading}
       className={`w-full py-3 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${
-        plan.key === 'success_fee'
-          ? 'bg-green-600 text-white hover:bg-green-700'
+        isPlatino
+          ? 'bg-amber-500 text-white hover:bg-amber-600'
           : highlighted
             ? 'bg-blue-600 text-white hover:bg-blue-700'
             : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
@@ -68,8 +65,8 @@ export default function BuyButton({ plan, highlighted }: Props) {
     >
       {loading ? (
         <><Loader2 className="w-4 h-4 animate-spin" /> Preparando pago...</>
-      ) : plan.key === 'success_fee' ? (
-        <><CreditCard className="w-4 h-4" /> Vincular tarjeta</>
+      ) : isPlatino ? (
+        <><ArrowRight className="w-4 h-4" /> Comenzar ahora</>
       ) : (
         <><ShoppingCart className="w-4 h-4" /> Comprar {plan.name}</>
       )}

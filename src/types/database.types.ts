@@ -486,4 +486,5 @@ export interface Plan {
   pricePerAnalysis: number
   highlighted?: boolean
   features: string[]
+  percentage?: number // % de lo recuperado (ej: 20 = 20%, solo planes Platino)
 }
