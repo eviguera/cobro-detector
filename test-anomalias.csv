@@ -1,0 +1,16 @@
+id_transaccion,fecha,descripcion,categoria,monto,tipo_anomalia,id_transaccion_referencia,reclamable,motivo_reclamo
+T001,01/03/2024,RIPLEY VESTUARIO,Vestuario,-45000,COBRO_DOBLE,T002,SI,Cobro duplicado de RIPLEY VESTUARIO
+T002,01/03/2024,RIPLEY VESTUARIO,Vestuario,-45000,COBRO_DOBLE,T001,SI,Cobro duplicado de RIPLEY VESTUARIO
+T003,05/03/2024,PARIS ELECTRO,Hogar,-120000,COBRO_DOBLE,T004,SI,Compra Paris cargada dos veces
+T004,05/03/2024,PARIS ELECTRO,Hogar,-120000,COBRO_DOBLE,T003,SI,Compra Paris cargada dos veces
+T005,10/03/2024,MERCEDES BENZ SERVICIO,Automotriz,-350000,COBRO_ALTO_DUPLICADO,T006,SI,Cobro alto duplicado servicio Mercedes Benz
+T006,10/03/2024,MERCEDES BENZ SERVICIO,Automotriz,-350000,COBRO_ALTO_DUPLICADO,T005,SI,Cobro alto duplicado servicio Mercedes Benz
+T007,10/03/2024,MERCEDES BENZ REPUESTOS,Automotriz,-280000,COBRO_ALTO_DUPLICADO,T008,SI,Repuestos Mercedes cobrados dos veces
+T008,10/03/2024,MERCEDES BENZ REPUESTOS,Automotriz,-280000,COBRO_ALTO_DUPLICADO,T007,SI,Repuestos Mercedes cobrados dos veces
+T009,15/03/2024,COMISION MENSUAL TARJETA,Comisiones,-15000,COBRO_INCORRECTO,,SI,Comisión mensual no corresponde según contrato
+T010,15/03/2024,INTERES POR MORATORIA,Intereses,-25000,COBRO_INCORRECTO,,SI,No hubo mora en este período
+T011,20/03/2024,SERVICIO DE SEGUROS,Seguros,-55000,,,NO,
+T012,20/03/2024,SERVICIO DE SEGUROS,Seguros,-55000,,,NO,
+T013,25/03/2024,ABONO SUELDO,Ingresos,1500000,,,NO,
+T014,25/03/2024,PAGO SERVICIO LUZ,Servicios,-45000,,,NO,
+T015,25/03/2024,PAGO SERVICIO AGUA,Servicios,-32000,,,NO,
