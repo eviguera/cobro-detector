@@ -6,6 +6,7 @@ import { formatCLP, formatDate, getAnomalyTypeLabel, getSeverityLabel, getStatus
 import type { DetectedAnomaly, ParsedTransaction, Analysis } from '@/types/database.types'
 import AnomalyStatusButton from './anomaly-status-button'
 import DownloadReportButton from './download-report-button'
+import PaywallButton from './paywall-button'
 
 interface Props {
   params: { id: string }
@@ -84,11 +85,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-6 text-center">
             Para desbloquear el reporte completo, realizá el pago del 20% ({formatCLP(pct)}) a través de MercadoPago.
           </p>
-          <button
-            className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
-          >
-            Pagar {formatCLP(pct)} con MercadoPago
-          </button>
+          <PaywallButton analysisId={params.id} amount={pct} />
           <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-3">
             El reporte se libera automáticamente al acreditarse el pago
           </p>

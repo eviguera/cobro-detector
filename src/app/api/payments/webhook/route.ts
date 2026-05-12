@@ -66,9 +66,12 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
 
+    const isUnlock = externalRef.startsWith('unlock_')
     const isSuccessCharge = externalRef.length > 30
 
-    if (isSuccessCharge) {
+    if (isUnlock) {
+      await handleUnlockReport(supabase, externalRef, paymentId, status)
+    } else if (isSuccessCharge) {
       await handleSuccessCharge(supabase, externalRef, paymentId, status, statusDetail)
     } else {
       await handleOrderPayment(supabase, externalRef, paymentId, status, statusDetail)
@@ -175,6 +178,29 @@ async function handleOrderPayment(
     }
 
     console.log(`Pago aprobado: orden ${externalRef}, +${order.credits_purchased} créditos para usuario ${order.user_id}`)
+  }
+}
+
+async function handleUnlockReport(
+  supabase: Supabase,
+  externalRef: string,
+  paymentId: string,
+  status: string | undefined
+) {
+  const analysisId = externalRef.replace('unlock_', '')
+
+  if (status === 'approved') {
+    const { error } = await supabase
+      .from('analyses')
+      .update({ status: 'completed' })
+      .eq('id', analysisId)
+      .eq('status', 'awaiting_payment')
+
+    if (error) {
+      console.error('Error desbloqueando reporte:', error)
+    } else {
+      console.log(`Reporte desbloqueado: ${analysisId} (pago ${paymentId})`)
+    }
   }
 }
 
