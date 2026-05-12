@@ -59,7 +59,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
             {analysis.bank ?? 'Banco no detectado'} · Analizado el {formatDate(analysis.created_at)}
           </p>
         </div>
-        <DownloadReportButton analysis={analysis} anomalies={anomalies} />
+        <DownloadReportButton analysis={analysis} anomalies={anomalies} transactions={transactions} />
       </div>
 
       {/* Summary metrics */}
