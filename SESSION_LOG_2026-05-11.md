@@ -87,3 +87,4 @@
 - `searchParams` — comentada ruta de migración a Next.js 15
 - Groq client lazy: se instancia solo cuando se usa (evita crash en tests sin API key)
 - Tests: 7/7 pasan
+- Migraciones aplicadas en Supabase: `verify_api_key` (SHA-256) y `consume_credit` (FOR UPDATE)
