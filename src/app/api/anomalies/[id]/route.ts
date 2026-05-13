@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { tables } from '@/lib/supabase/db'
 import { chargeSuccessFee } from '@/lib/mercadopago'
+import { handleApiError } from '@/lib/api-error'
 import type { SuccessChargeStatus, Anomaly, Order, PaymentMethod, SuccessCharge } from '@/types/database.types'
 
 export async function PATCH(
@@ -9,6 +11,7 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
+    const db = tables(supabase)
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -24,9 +27,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Estado inválido' }, { status: 400 })
     }
 
+    // @supabase/ssr type inference limitation — all table queries return `never` types.
+    // Cast required to unblock .from().select() chaining.
     // Obtener la anomalía actual
-    const { data: anomaly, error: fetchError } = await (supabase as any)
-      .from('anomalies')
+    const { data: anomaly, error: fetchError } = await db.anomalies
       .select('*, analyses!inner(user_id, recoverable_amount)')
       .eq('id', anomalyId)
       .eq('user_id', user.id)
@@ -42,8 +46,7 @@ export async function PATCH(
     // Si se marca como recuperada y el usuario tiene plan de éxito activo
     if (status === 'recovered' && anomalyData.status !== 'recovered') {
       // Verificar si el usuario tiene plan de éxito activo
-      const { data: activeOrder } = await (supabase as any)
-        .from('orders')
+      const { data: activeOrder } = await db.orders
         .select('*')
         .eq('user_id', user.id)
         .eq('plan', 'success_fee')
@@ -54,8 +57,7 @@ export async function PATCH(
       if (activeOrder) {
           const orderData = activeOrder as Order
           // Obtener método de pago del usuario
-          const { data: paymentMethod } = await (supabase as any)
-            .from('payment_methods')
+          const { data: paymentMethod } = await db.paymentMethods
             .select('*')
             .eq('user_id', user.id)
             .eq('is_default', true)
@@ -67,8 +69,7 @@ export async function PATCH(
             const feeAmount = Math.round(amountToCharge * (orderData.fee_percentage || 10) / 100)
 
             // Crear registro de cargo pendiente
-            const { data: successCharge, error: chargeError } = await (supabase as any)
-              .from('success_charges')
+            const { data: successCharge, error: chargeError } = await db.successCharges
               .insert({
                 user_id: user.id,
                 anomaly_id: anomalyId,
@@ -92,12 +93,13 @@ export async function PATCH(
               pmData.mp_card_token,
               feeAmount,
               `CobroDetector - 10% de recuperación (${anomalyData.title})`,
-              (successCharge as SuccessCharge).id
+              (successCharge as SuccessCharge).id,
+              user.email!,
+              pmData.card_brand?.toLowerCase()
             )
 
             // Actualizar estado del cargo
-            await (supabase as any)
-              .from('success_charges')
+            await db.successCharges
               .update({
                 status: payment.status === 'approved' ? 'charged' as SuccessChargeStatus : 'failed' as SuccessChargeStatus,
                 mp_payment_id: String(payment.id),
@@ -118,8 +120,7 @@ export async function PATCH(
           } catch (chargeErr) {
             console.error('Error en cobro MP:', chargeErr)
             // Actualizar estado a fallido
-            await (supabase as any)
-              .from('success_charges')
+            await db.successCharges
               .update({
                 status: 'failed' as SuccessChargeStatus,
                 mp_detail: String(chargeErr),
@@ -133,8 +134,7 @@ export async function PATCH(
     }
 
     // Actualizar anomalía
-    const { data: updatedAnomaly, error: updateError } = await (supabase as any)
-      .from('anomalies')
+    const { data: updatedAnomaly, error: updateError } = await db.anomalies
       .update({ status })
       .eq('id', anomalyId)
       .select()
@@ -147,7 +147,6 @@ export async function PATCH(
     return NextResponse.json({ anomaly: updatedAnomaly })
 
   } catch (err) {
-    console.error('Error actualizando anomalía:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'PATCH /api/anomalies/[id]')
   }
 }

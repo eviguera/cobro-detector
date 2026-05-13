@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getMPClient, Preference } from '@/lib/mercadopago'
+import { createPaymentPreference } from '@/lib/mercadopago'
 import { PLANS } from '@/lib/plans'
 import { z } from 'zod'
 import { authError, handleApiError, successResponse } from '@/lib/api-error'
@@ -78,48 +78,39 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
     // 5. Crear preferencia en Mercado Pago
-    const mpClient = getMPClient()
-    const preference = new Preference(mpClient)
-
-    const preferenceData = await preference.create({
-      body: {
-        items: [
-          {
-            id: planKey,
-            title: `CobroDetector · Plan ${plan.name}`,
-            description: `${plan.credits} créditos de análisis de estado de cuenta`,
-            quantity: 1,
-            unit_price: plan.price,
-            currency_id: 'CLP',
-          },
-        ],
-        payer: {
-          email: profile?.email ?? user.email ?? '',
-          name: profile?.full_name ?? '',
+    const { initPoint, sandboxInitPoint, preferenceId } = await createPaymentPreference({
+      items: [
+        {
+          id: planKey,
+          title: `CobroDetector · Plan ${plan.name}`,
+          description: `${plan.credits} créditos de análisis de estado de cuenta`,
+          quantity: 1,
+          unit_price: plan.price,
         },
-        back_urls: {
-          success: `${appUrl}/pago/exitoso?order=${order.id}`,
-          failure: `${appUrl}/pago/fallido?order=${order.id}`,
-          pending: `${appUrl}/pago/exitoso?order=${order.id}&pending=true`,
-        },
-        auto_return: 'approved',
-        external_reference: order.id,
-        notification_url: `${appUrl}/api/payments/webhook`,
-        statement_descriptor: 'COBRO DETECTOR',
-        expires: false,
-        metadata: {
-          order_id: order.id,
-          user_id: user.id,
-          plan_key: planKey,
-          credits: plan.credits,
-        },
-      }
+      ],
+      payer: {
+        email: profile?.email ?? user.email ?? '',
+        name: profile?.full_name ?? '',
+      },
+      backUrls: {
+        success: `${appUrl}/pago/exitoso?order=${order.id}`,
+        failure: `${appUrl}/pago/fallido?order=${order.id}`,
+        pending: `${appUrl}/pago/exitoso?order=${order.id}&pending=true`,
+      },
+      externalReference: order.id,
+      metadata: {
+        order_id: order.id,
+        user_id: user.id,
+        plan_key: planKey,
+        credits: plan.credits,
+      },
+      appUrl,
     })
 
     // 6. Guardar preference_id en la orden
     const { error: updateError } = await supabase
       .from('orders')
-      .update({ mp_preference_id: preferenceData.id })
+      .update({ mp_preference_id: preferenceId })
       .eq('id', order.id)
 
     if (updateError) {
@@ -128,9 +119,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({
       orderId: order.id,
-      preferenceId: preferenceData.id,
-      initPoint: preferenceData.init_point,
-      sandboxInitPoint: preferenceData.sandbox_init_point,
+      preferenceId,
+      initPoint,
+      sandboxInitPoint,
     })
 
   } catch (err) {

@@ -203,5 +203,5 @@ export function validateFullEnv(): Env & { MERCADOPAGO_WEBHOOK_SECRET?: string }
       .join('\n  ')
     throw new Error(`❌ Variables de entorno inválidas:\n  ${missing}`)
   }
-  return parsed.data as any
+  return parsed.data
 }

@@ -49,10 +49,11 @@ async function getAnalysesData(userId: string, desde?: string, hasta?: string) {
 }
 
 interface Props {
-  searchParams: { periodo?: string }
+  searchParams: { periodo?: string } // En Next.js 15: searchParams: Promise<{ periodo?: string }>
 }
 
 export default async function HistorialPage({ searchParams }: Props) {
+  // Next.js 15: const periodo = (await searchParams).periodo ?? 'todas'
   const periodo = searchParams.periodo ?? 'todas'
   const dateRange = getPeriodoDates(periodo)
 

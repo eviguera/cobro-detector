@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getMPClient, Preference } from '@/lib/mercadopago'
+import { createPaymentPreference } from '@/lib/mercadopago'
 import { z } from 'zod'
-import { authError } from '@/lib/api-error'
+import { authError, handleApiError, successResponse } from '@/lib/api-error'
+import type { Analysis } from '@/types/database.types'
 
 const bodySchema = z.object({
   analysisId: z.string().min(1),
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Análisis no encontrado' }, { status: 404 })
     }
 
-    const analysisData = analysis as any
+    const analysisData = analysis as Analysis
     if (analysisData.status !== 'awaiting_payment') {
       return NextResponse.json({ error: 'Este análisis ya fue pagado o no requiere pago' }, { status: 400 })
     }
@@ -51,52 +52,40 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
     const externalRef = `unlock_${analysisId}`
 
-    const mpClient = getMPClient()
-    const preference = new Preference(mpClient)
-
-    const preferenceData = await preference.create({
-      body: {
-        items: [
-          {
-            id: 'unlock-report',
-            title: 'CobroDetector · Desbloquear Reporte (Plan Platino)',
-            description: `20% de $${recoverable.toLocaleString('es-CL')} recuperado — ${analysisData.file_name}`,
-            quantity: 1,
-            unit_price: amount,
-            currency_id: 'CLP',
-          },
-        ],
-        payer: {
-          email: profile?.email ?? user.email ?? '',
-          name: profile?.full_name ?? '',
+    const { initPoint, sandboxInitPoint } = await createPaymentPreference({
+      items: [
+        {
+          id: 'unlock-report',
+          title: 'CobroDetector · Desbloquear Reporte (Plan Platino)',
+          description: `20% de $${recoverable.toLocaleString('es-CL')} recuperado — ${analysisData.file_name}`,
+          quantity: 1,
+          unit_price: amount,
         },
-        back_urls: {
-          success: `${appUrl}/historial/${analysisId}`,
-          failure: `${appUrl}/historial/${analysisId}`,
-          pending: `${appUrl}/historial/${analysisId}`,
-        },
-        auto_return: 'approved',
-        external_reference: externalRef,
-        notification_url: `${appUrl}/api/payments/webhook`,
-        statement_descriptor: 'COBRO DETECTOR',
-        metadata: {
-          analysis_id: analysisId,
-          user_id: user.id,
-          type: 'unlock_report',
-        },
+      ],
+      payer: {
+        email: profile?.email ?? user.email ?? '',
+        name: profile?.full_name ?? '',
       },
+      backUrls: {
+        success: `${appUrl}/historial/${analysisId}`,
+        failure: `${appUrl}/historial/${analysisId}`,
+        pending: `${appUrl}/historial/${analysisId}`,
+      },
+      externalReference: externalRef,
+      metadata: {
+        analysis_id: analysisId,
+        user_id: user.id,
+        type: 'unlock_report',
+      },
+      appUrl,
     })
 
     return NextResponse.json({
-      initPoint: preferenceData.init_point,
-      sandboxInitPoint: preferenceData.sandbox_init_point,
+      initPoint,
+      sandboxInitPoint,
       amount,
     })
   } catch (err) {
-    console.error('Error en unlock-report:', err)
-    if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    return handleApiError(err, 'POST /api/payments/unlock-report')
   }
 }

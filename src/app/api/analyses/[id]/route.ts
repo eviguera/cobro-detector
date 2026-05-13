@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { authError } from '@/lib/api-error'
+import { authError, handleApiError } from '@/lib/api-error'
 
 export async function DELETE(
   request: NextRequest,
@@ -54,7 +54,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('Error en DELETE /api/analyses/[id]:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'DELETE /api/analyses/[id]')
   }
 }

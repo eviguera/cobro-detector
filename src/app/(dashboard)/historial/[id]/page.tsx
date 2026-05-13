@@ -2,26 +2,15 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, AlertTriangle, CheckCircle2, FileDown, RotateCcw } from 'lucide-react'
-import { formatCLP, formatDate, getAnomalyTypeLabel, getSeverityLabel, getStatusLabel } from '@/lib/utils'
+import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
 import type { DetectedAnomaly, ParsedTransaction, Analysis } from '@/types/database.types'
-import AnomalyStatusButton from './anomaly-status-button'
+import { AnomalyCard } from '@/components/anomaly-card'
+
 import DownloadReportButton from './download-report-button'
 import PaywallButton from './paywall-button'
 
 interface Props {
   params: { id: string }
-}
-
-const SEVERITY_STYLE: Record<string, string> = {
-  high:   'border-l-red-500 bg-red-50',
-  medium: 'border-l-amber-500 bg-amber-50',
-  low:    'border-l-blue-500 bg-blue-50',
-}
-
-const SEVERITY_BADGE: Record<string, string> = {
-  high:   'bg-red-100 text-red-700',
-  medium: 'bg-amber-100 text-amber-700',
-  low:    'bg-blue-100 text-blue-700',
 }
 
 export default async function AnalysisDetailPage({ params }: Props) {
@@ -144,46 +133,16 @@ export default async function AnalysisDetailPage({ params }: Props) {
 
           <div className="space-y-3">
             {anomalies.map((anomaly, i) => (
-              <div key={i} className={`border-l-4 rounded-xl border border-gray-200 p-5 ${SEVERITY_STYLE[anomaly.severity] ?? 'bg-gray-50'}`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${SEVERITY_BADGE[anomaly.severity]}`}>
-                        {getSeverityLabel(anomaly.severity)}
-                      </span>
-                      <span className="text-xs text-muted-foreground bg-white/80 px-2 py-0.5 rounded-full border border-border">
-                        {getAnomalyTypeLabel(anomaly.type)}
-                      </span>
-                    </div>
-                    <p className="font-semibold text-foreground text-sm mb-1">{anomaly.title}</p>
-                    <p className="text-sm text-gray-600 mb-1">{anomaly.description}</p>
-                    {anomaly.detail && (
-                      <p className="text-xs text-gray-400 font-mono bg-white/60 rounded px-2 py-1 inline-block mt-1">
-                        {anomaly.detail}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xs text-muted-foreground mb-1">Monto recuperable</p>
-                    <p className="text-xl font-bold text-foreground">{formatCLP(anomaly.recoverableAmount)}</p>
-                  </div>
-                </div>
-
-                {/* How to claim */}
-                <div className="mt-4 pt-4 border-t border-white/60">
-                  <p className="text-xs font-medium text-gray-600 mb-1">¿Cómo reclamar?</p>
-                  <p className="text-xs text-muted-foreground">
-                    {anomaly.type === 'duplicate_commission' &&
-                      'Presenta este reporte en sucursal o por ejecutivo de cuenta. Solicita reverso de comisiones duplicadas citando los montos y fechas. El banco tiene 10 días hábiles para responder.'}
-                    {anomaly.type === 'installment_error' &&
-                      'Solicita recalculo de cuotas. Muestra el comprobante original de la venta en cuotas sin interés y las cuotas cobradas incorrectamente.'}
-                    {anomaly.type === 'unknown_charge' &&
-                      'Solicita detalle del cargo por escrito. Si no pueden justificarlo, exige reverso inmediato. Puedes escalar a la CMF si el banco no responde en 10 días.'}
-                    {anomaly.type === 'incorrect_charge' &&
-                      'Revisa el detalle del cobro y compáralo con tus registros. Si no corresponde, presenta este reporte en el banco solicitando el reverso del cargo.'}
-                  </p>
-                </div>
-              </div>
+              <AnomalyCard
+                key={i}
+                type={anomaly.type}
+                severity={anomaly.severity}
+                title={anomaly.title}
+                description={anomaly.description}
+                detail={anomaly.detail}
+                recoverableAmount={anomaly.recoverableAmount}
+                mode="full"
+              />
             ))}
           </div>
         </div>

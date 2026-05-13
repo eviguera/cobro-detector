@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { SEVERITY, ANOMALY_TYPES, ANALYSIS_STATUS } from './constants'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -22,33 +23,13 @@ export function formatDate(date: string | Date): string {
 }
 
 export function getSeverityLabel(severity: string): string {
-  const map: Record<string, string> = {
-    high: 'Alta prioridad',
-    medium: 'Media prioridad',
-    low: 'Baja prioridad',
-  }
-  return map[severity] ?? severity
+  return SEVERITY[severity]?.label ?? severity
 }
 
 export function getAnomalyTypeLabel(type: string): string {
-  const map: Record<string, string> = {
-    duplicate_commission: 'Comisión duplicada',
-    installment_error: 'Error en cuotas',
-    unknown_charge: 'Cargo no reconocido',
-    incorrect_charge: 'Cobro incorrecto',
-  }
-  return map[type] ?? type
+  return ANOMALY_TYPES[type] ?? type
 }
 
 export function getStatusLabel(status: string): string {
-  const map: Record<string, string> = {
-    pending: 'Pendiente',
-    claimed: 'Reclamado',
-    recovered: 'Recuperado',
-    dismissed: 'Descartado',
-    processing: 'Procesando',
-    completed: 'Completado',
-    failed: 'Error',
-  }
-  return map[status] ?? status
+  return ANALYSIS_STATUS[status] ?? status
 }

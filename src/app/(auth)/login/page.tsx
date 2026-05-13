@@ -20,9 +20,28 @@ export default function LoginPage() {
 
   const supabase = createClient()
 
+  const checkRateLimit = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/check-rate-limit', { method: 'POST' })
+      if (res.status === 429) {
+        const data = await res.json()
+        toast.error(data.error || 'Demasiados intentos. Espera un minuto.')
+        return false
+      }
+      return true
+    } catch {
+      return true // Si falla el rate limiter, permitir (fail-open)
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    if (!(await checkRateLimit())) {
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.auth.signInWithPassword({
       email: form.email,
@@ -40,6 +59,11 @@ export default function LoginPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    if (!(await checkRateLimit())) {
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.auth.signUp({
       email: form.email,

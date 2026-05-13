@@ -1,5 +1,6 @@
 import type { ParsedTransaction } from '@/types/database.types'
 import { sanitizeDescription } from '@/lib/security'
+import { BANKS } from './constants'
 
 // Genera IDs únicos para transacciones
 function generateId(index: number): string {
@@ -292,14 +293,8 @@ export function parsePDFText(text: string): ParsedTransaction[] {
 // Detectar banco por nombre de archivo o contenido
 export function detectBank(filename: string, content?: string): string | undefined {
   const lower = (filename + (content ?? '')).toLowerCase()
-  if (lower.includes('santander')) return 'Banco Santander'
-  if (lower.includes('bci')) return 'BCI'
-  if (lower.includes('chile')) return 'Banco de Chile'
-  if (lower.includes('estado')) return 'BancoEstado'
-  if (lower.includes('itau') || lower.includes('itaú')) return 'Itaú'
-  if (lower.includes('scotiabank') || lower.includes('scotia')) return 'Scotiabank'
-  if (lower.includes('security')) return 'Banco Security'
-  if (lower.includes('falabella')) return 'Banco Falabella'
-  if (lower.includes('ripley')) return 'Banco Ripley'
+  for (const [keyword, name] of Object.entries(BANKS)) {
+    if (lower.includes(keyword)) return name
+  }
   return undefined
 }

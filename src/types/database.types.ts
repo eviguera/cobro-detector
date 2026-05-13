@@ -100,7 +100,7 @@ export interface Database {
           plan: string
           credits_purchased: number
           amount_clp: number
-          status: string
+          status?: string
           payment_provider?: string | null
           payment_reference?: string | null
           recovered_amount?: number
@@ -194,56 +194,133 @@ export interface Database {
           created_at?: string
         }
       }
+      anomalies: {
+        Row: {
+          id: string
+          analysis_id: string
+          user_id: string
+          type: string
+          severity: string
+          title: string
+          description: string | null
+          detail: string | null
+          recoverable_amount: number
+          transaction_refs: string[]
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          analysis_id: string
+          user_id: string
+          type: string
+          severity: string
+          title: string
+          description?: string | null
+          detail?: string | null
+          recoverable_amount: number
+          transaction_refs?: string[]
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          analysis_id?: string
+          user_id?: string
+          type?: string
+          severity?: string
+          title?: string
+          description?: string | null
+          detail?: string | null
+          recoverable_amount?: number
+          transaction_refs?: string[]
+          status?: string
+          created_at?: string
+        }
+      }
       api_keys: {
         Row: {
           id: string
           user_id: string
           name: string
           key_hash: string
-          company_id: string | null
+          key_prefix: string
+          permissions: string[]
+          is_active: boolean
           last_used_at: string | null
+          expires_at: string | null
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
           name: string
           key_hash: string
-          company_id?: string | null
+          key_prefix: string
+          permissions?: string[]
+          is_active?: boolean
           last_used_at?: string | null
+          expires_at?: string | null
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           name?: string
           key_hash?: string
-          company_id?: string | null
+          key_prefix?: string
+          permissions?: string[]
+          is_active?: boolean
           last_used_at?: string | null
+          expires_at?: string | null
           created_at?: string
+          updated_at?: string
         }
       }
       companies: {
         Row: {
           id: string
-          name: string
+          accountant_id: string
+          company_name: string
+          business_name: string | null
           rut: string | null
-          owner_id: string
+          email: string | null
+          phone: string | null
+          address: string | null
+          industry: string | null
+          is_active: boolean
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
-          name: string
+          accountant_id: string
+          company_name: string
+          business_name?: string | null
           rut?: string | null
-          owner_id: string
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          industry?: string | null
+          is_active?: boolean
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
-          name?: string
+          accountant_id?: string
+          company_name?: string
+          business_name?: string | null
           rut?: string | null
-          owner_id?: string
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          industry?: string | null
+          is_active?: boolean
           created_at?: string
+          updated_at?: string
         }
       }
       company_members: {
@@ -301,56 +378,12 @@ export interface Database {
           created_at?: string
         }
       }
-      anomalies: {
-        Row: {
-          id: string
-          analysis_id: string
-          user_id: string
-          type: string
-          severity: string
-          title: string
-          description: string
-          detail: string | null
-          recoverable_amount: number
-          transaction_refs: string[]
-          status: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          analysis_id: string
-          user_id: string
-          type: string
-          severity: string
-          title: string
-          description: string
-          detail?: string | null
-          recoverable_amount: number
-          transaction_refs: string[]
-          status: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          analysis_id?: string
-          user_id?: string
-          type?: string
-          severity?: string
-          title?: string
-          description?: string
-          detail?: string | null
-          recoverable_amount?: number
-          transaction_refs?: string[]
-          status?: string
-          created_at?: string
-        }
-      }
       success_charges: {
         Row: {
           id: string
           user_id: string
-          anomaly_id: string
-          analysis_id: string
+          anomaly_id: string | null
+          analysis_id: string | null
           recovered_amount: number
           fee_percentage: number
           charge_amount: number
@@ -364,12 +397,12 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          anomaly_id: string
-          analysis_id: string
+          anomaly_id?: string | null
+          analysis_id?: string | null
           recovered_amount: number
           fee_percentage: number
           charge_amount: number
-          status: string
+          status?: string
           mp_payment_id?: string | null
           mp_status?: string | null
           mp_detail?: string | null
@@ -379,8 +412,8 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
-          anomaly_id?: string
-          analysis_id?: string
+          anomaly_id?: string | null
+          analysis_id?: string | null
           recovered_amount?: number
           fee_percentage?: number
           charge_amount?: number
@@ -397,41 +430,152 @@ export interface Database {
           id: string
           user_id: string
           mp_card_token: string
-          last_four: string | null
+          mp_customer_id: string | null
+          last_four_digits: string | null
           card_brand: string | null
+          expires_month: number | null
+          expires_year: number | null
           is_default: boolean
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
           mp_card_token: string
-          last_four?: string | null
+          mp_customer_id?: string | null
+          last_four_digits?: string | null
           card_brand?: string | null
+          expires_month?: number | null
+          expires_year?: number | null
           is_default?: boolean
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           mp_card_token?: string
-          last_four?: string | null
+          mp_customer_id?: string | null
+          last_four_digits?: string | null
           card_brand?: string | null
+          expires_month?: number | null
+          expires_year?: number | null
           is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      api_logs: {
+        Row: {
+          id: string
+          api_key_id: string | null
+          user_id: string | null
+          endpoint: string
+          method: string
+          status_code: number
+          ip_address: string | null
+          user_agent: string | null
+          request_body: Json | null
+          response_time_ms: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          api_key_id?: string | null
+          user_id?: string | null
+          endpoint: string
+          method: string
+          status_code: number
+          ip_address?: string | null
+          user_agent?: string | null
+          request_body?: Json | null
+          response_time_ms?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          api_key_id?: string | null
+          user_id?: string | null
+          endpoint?: string
+          method?: string
+          status_code?: number
+          ip_address?: string | null
+          user_agent?: string | null
+          request_body?: Json | null
+          response_time_ms?: number | null
           created_at?: string
         }
       }
     }
-    Views: {}
+    Views: {
+      orders_with_credits: {
+        Row: {
+          id: string
+          user_id: string
+          plan: string
+          credits_purchased: number
+          amount_clp: number
+          status: string
+          payment_provider: string | null
+          payment_reference: string | null
+          recovered_amount: number
+          fee_percentage: number
+          mp_preference_id: string | null
+          mp_payment_id: string | null
+          mp_status: string | null
+          mp_detail: string | null
+          metadata: Json | null
+          company_id: string | null
+          success_plan_active: boolean | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          business_name: string | null
+          credits_total: number
+          credits_used: number
+          credits_available: number
+        }
+      }
+      analyses_with_company: {
+        Row: {
+          id: string
+          user_id: string
+          file_name: string
+          file_type: string
+          file_url: string | null
+          bank: string | null
+          period_start: string | null
+          period_end: string | null
+          total_transactions: number
+          anomalies_count: number
+          recoverable_amount: number
+          status: string
+          raw_data: Json | null
+          anomalies: Json | null
+          ai_summary: string | null
+          company_id: string | null
+          created_at: string
+          company_name: string | null
+          company_business_name: string | null
+          company_rut: string | null
+        }
+      }
+    }
     Functions: {
       verify_api_key: {
         Args: { key_text: string }
         Returns: {
-          id: string
-          user_id: string
-          name: string
-          company_id: string | null
-        } | null
+          valid: boolean
+          key_id: string | null
+          user_id: string | null
+          permissions: string[] | null
+          rate_limit: number
+        }
+      }
+      can_access_company: {
+        Args: { company_uuid: string }
+        Returns: boolean
       }
     }
     Enums: {}
@@ -486,5 +630,5 @@ export interface Plan {
   pricePerAnalysis: number
   highlighted?: boolean
   features: string[]
-  percentage?: number // % de lo recuperado (ej: 20 = 20%, solo planes Platino)
+  percentage?: number
 }

@@ -1,4 +1,5 @@
 import { createClient } from './supabase/server'
+import { tables } from './supabase/db'
 import { NextRequest } from 'next/server'
 
 export interface ApiAuthResult {
@@ -28,10 +29,10 @@ export async function authenticateApiRequest(
 
     try {
     const supabase = await createClient()
+    const db = tables(supabase)
     
     // Verificar API key usando la función de base de datos
-    const { data, error } = await (supabase as any)
-      .rpc('verify_api_key', { key_text: apiKey })
+    const { data, error } = await db.rpc('verify_api_key', { key_text: apiKey })
       .single()
 
     if (error || !data || !data.valid) {

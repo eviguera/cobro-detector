@@ -1,4 +1,4 @@
-import { Ratelimit } from '@upstash/ratelimit'
+import { Ratelimit, type Duration } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
 // Inicializar Redis solo si las variables están configuradas
@@ -79,6 +79,30 @@ export async function checkStrictRateLimit(ip: string): Promise<RateLimitResult>
   }
 }
 
+// Rate limiting para intentos de auth (login/register)
+// 5 intentos por minuto por IP — previene fuerza bruta
+export async function checkAuthRateLimit(ip: string): Promise<RateLimitResult> {
+  const rl = getRateLimit()
+
+  if (!rl) {
+    return { success: true }
+  }
+
+  const authRl = new Ratelimit({
+    redis: redis!,
+    limiter: Ratelimit.slidingWindow(5, '60 s'),
+  })
+
+  const result = await authRl.limit(`auth:${ip}`)
+
+  return {
+    success: result.success,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: result.reset,
+  }
+}
+
 // Rate limiting para API keys (por key ID)
 export async function checkApiKeyRateLimit(keyId: string, limit = 100, window = '60 s'): Promise<RateLimitResult> {
   const rl = getRateLimit()
@@ -89,7 +113,7 @@ export async function checkApiKeyRateLimit(keyId: string, limit = 100, window = 
   
   const perKeyRl = new Ratelimit({
     redis: redis!,
-    limiter: Ratelimit.slidingWindow(limit, window as any),
+    limiter: Ratelimit.slidingWindow(limit, window as Duration),
   })
   
   const result = await perKeyRl.limit(`api-key:${keyId}`)

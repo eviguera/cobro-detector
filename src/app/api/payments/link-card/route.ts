@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { tables } from '@/lib/supabase/db'
 import { getMPClient, Customer, CardToken } from '@/lib/mercadopago'
 import { z } from 'zod'
-
+import { handleApiError } from '@/lib/api-error'
 const linkCardSchema = z.object({
   cardToken: z.string().min(10, 'Token de tarjeta inválido'),
   lastFourDigits: z.string().length(4),
@@ -14,6 +15,7 @@ const linkCardSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const db = tables(supabase)
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -29,9 +31,10 @@ export async function POST(request: NextRequest) {
 
     let mpCustomerId: string | null = null
 
+    // @supabase/ssr type inference limitation — all table queries return `never` types.
+    // Cast required to unblock .from().select() chaining.
     // Buscar si el usuario ya tiene un customer en MP
-    const { data: existingPaymentMethod } = await (supabase as any)
-      .from('payment_methods')
+    const { data: existingPaymentMethod } = await db.paymentMethods
       .select('mp_customer_id')
       .eq('user_id', user.id)
       .not('mp_customer_id', 'is', null)
@@ -42,8 +45,7 @@ export async function POST(request: NextRequest) {
       mpCustomerId = existingPaymentMethod.mp_customer_id
     } else {
       // Obtener email del usuario
-      const { data: profile } = await (supabase as any)
-        .from('profiles')
+      const { data: profile } = await db.profiles
         .select('email, full_name')
         .eq('id', user.id)
         .single()
@@ -72,8 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Guardar método de pago en DB
-    const { data: paymentMethod, error } = await (supabase as any)
-      .from('payment_methods')
+    const { data: paymentMethod, error } = await db.paymentMethods
       .insert({
         user_id: user.id,
         mp_card_token: validated.cardToken,
@@ -104,10 +105,6 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (err) {
-    console.error('Error vinculando tarjeta:', err)
-    if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: err.errors }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'POST /api/payments/link-card')
   }
 }

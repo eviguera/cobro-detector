@@ -13,6 +13,44 @@ export function getMPClient() {
 
 export { Preference, Payment, CardToken, Customer }
 
+export async function createPaymentPreference(params: {
+  items: Array<{ id: string; title: string; description: string; quantity: number; unit_price: number }>
+  payer: { email: string; name?: string }
+  externalReference: string
+  metadata: Record<string, unknown>
+  backUrls: { success: string; failure: string; pending: string }
+  appUrl: string
+  statementDescriptor?: string
+}) {
+  const mpClient = getMPClient()
+  const preference = new Preference(mpClient)
+
+  const preferenceData = await preference.create({
+    body: {
+      items: params.items.map(item => ({
+        ...item,
+        currency_id: 'CLP',
+      })),
+      payer: {
+        email: params.payer.email,
+        name: params.payer.name ?? '',
+      },
+      back_urls: params.backUrls,
+      auto_return: 'approved',
+      external_reference: params.externalReference,
+      notification_url: `${params.appUrl}/api/payments/webhook`,
+      statement_descriptor: params.statementDescriptor ?? 'COBRO DETECTOR',
+      metadata: params.metadata,
+    },
+  })
+
+  return {
+    initPoint: preferenceData.init_point,
+    sandboxInitPoint: preferenceData.sandbox_init_point,
+    preferenceId: preferenceData.id,
+  }
+}
+
 // Función para cobrar con tarjeta tokenizada (plan de éxito)
 export async function chargeSuccessFee(
   cardToken: string,

@@ -1,9 +1,16 @@
 import Groq from 'groq-sdk'
 import type { ParsedTransaction, DetectedAnomaly } from '@/types/database.types'
 import { sanitizeDescription, sanitizeTransactions } from '@/lib/security'
-import { parseExcelFile, parsePDFFile, detectBank as detectBankFromParser } from './parser'
+import { parseExcelFile, parsePDFFile, detectBank } from './parser'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+let groqInstance: Groq | null = null
+
+function getGroq(): Groq {
+  if (!groqInstance) {
+    groqInstance = new Groq({ apiKey: process.env.GROQ_API_KEY })
+  }
+  return groqInstance
+}
 
 export interface AnalysisResult {
   anomalies: DetectedAnomaly[]
@@ -59,7 +66,7 @@ Responde SOLO JSON con esta estructura exacta:
 }`
 
   try {
-    const chatCompletion = await groq.chat.completions.create({
+    const chatCompletion = await getGroq().chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -370,7 +377,7 @@ export async function analyzeFile(
     }
 
     // Detectar banco
-    const bank = detectBankFromParser('', transactions.map(tx => tx.description).join(' '))
+    const bank = detectBank('', transactions.map(tx => tx.description).join(' '))
 
     // Ejecutar detección por reglas
     const ruleAnomalies = detectAnomaliesRules(transactions)
@@ -417,19 +424,4 @@ export async function analyzeFile(
   }
 }
 
-function detectBank(transactions: ParsedTransaction[]): string | undefined {
-  const descriptions = transactions.map(tx => tx.description.toLowerCase()).join(' ')
-  
-  if (descriptions.includes('santander')) return 'Santander'
-  if (descriptions.includes('banco de chile') || descriptions.includes('bco chile')) return 'Banco de Chile'
-  if (descriptions.includes('estado') || descriptions.includes('bancoestado')) return 'BancoEstado'
-  if (descriptions.includes('bci')) return 'BCI'
-  if (descriptions.includes('scotiabank')) return 'Scotiabank'
-  if (descriptions.includes('itau')) return 'Itaú'
-  if (descriptions.includes('falabella')) return 'Banco Falabella'
-  if (descriptions.includes('ripley')) return 'Banco Ripley'
-  if (descriptions.includes('security')) return 'Banco Security'
-  if (descriptions.includes('corpbanca')) return 'CorpBanca'
-  
-  return undefined
-}
+

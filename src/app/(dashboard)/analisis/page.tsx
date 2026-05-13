@@ -5,6 +5,7 @@ import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, Fi
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { formatCLP } from '@/lib/utils'
+import { AnomalyCard } from '@/components/anomaly-card'
 
 type Step = 'upload' | 'analyzing' | 'done'
 
@@ -37,25 +38,6 @@ const ANALYSIS_STEPS = [
   { label: 'Consultando IA para cargos desconocidos', icon: Sparkles },
   { label: 'Generando reporte final', icon: CheckCircle2 },
 ]
-
-const SEVERITY_COLORS: Record<string, string> = {
-  high: 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400',
-  medium: 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400',
-  low: 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-blue-400',
-}
-
-const SEVERITY_LABELS: Record<string, string> = {
-  high: 'Alta prioridad',
-  medium: 'Media',
-  low: 'Baja',
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  duplicate_commission: 'Comisión duplicada',
-  installment_error: 'Error en cuotas',
-  unknown_charge: 'Cargo no reconocido',
-  incorrect_charge: 'Cobro incorrecto',
-}
 
 export default function AnalisisPage() {
   const router = useRouter()
@@ -531,28 +513,17 @@ export default function AnalisisPage() {
           {anomalies.length > 0 && (
             <div className="space-y-3">
               {anomalies.map((anomaly, i) => (
-                <div
+                <AnomalyCard
                   key={i}
-                  className={`rounded-2xl border p-5 transition-all duration-300 hover:shadow-md ${SEVERITY_COLORS[anomaly.severity] ?? 'bg-white dark:bg-gray-900/60 border-gray-100 dark:border-gray-800/40'}`}
-                  style={{ animationDelay: `${i * 60}ms` }}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-white/60 dark:bg-gray-800/60">
-                        {TYPE_LABELS[anomaly.type] ?? anomaly.type}
-                      </span>
-                      <span className="text-xs opacity-70">{SEVERITY_LABELS[anomaly.severity]}</span>
-                    </div>
-                    <span className="font-display font-bold text-lg tabular-nums">
-                      {formatCLP(anomaly.recoverableAmount)}
-                    </span>
-                  </div>
-                  <p className="font-semibold text-sm mb-1">{anomaly.title}</p>
-                  <p className="text-xs opacity-80 leading-relaxed">{anomaly.description}</p>
-                  {anomaly.detail && (
-                    <p className="text-xs opacity-60 mt-2 font-mono">{anomaly.detail}</p>
-                  )}
-                </div>
+                  type={anomaly.type}
+                  severity={anomaly.severity as 'high' | 'medium' | 'low'}
+                  title={anomaly.title}
+                  description={anomaly.description}
+                  detail={anomaly.detail}
+                  recoverableAmount={anomaly.recoverableAmount}
+                  index={i}
+                  mode="compact"
+                />
               ))}
             </div>
           )}

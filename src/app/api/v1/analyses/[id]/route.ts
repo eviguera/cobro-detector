@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { authenticateApiRequest, hasPermission } from '@/lib/api-auth'
 import type { Analysis, Anomaly } from '@/types/database.types'
-
+import { handleApiError } from '@/lib/api-error'
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -34,11 +34,10 @@ export async function GET(
 
     return NextResponse.json({
       analysis: analysis as Analysis,
-      anomalies: (analysis as any).anomalias as Anomaly[],
+      anomalies: (analysis as Analysis & { anomalias: Anomaly[] }).anomalias,
     })
 
   } catch (err) {
-    console.error('Error en GET /api/v1/analyses/[id]:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'GET /api/v1/analyses/[id]')
   }
 }

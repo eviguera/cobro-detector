@@ -55,30 +55,32 @@ export async function consumeCreditAtomic(
     return data ?? false
   }
 
-  // Si la función RPC no existe (PGRST202), hacer update directo
+  // Si la función RPC no existe (PGRST202), usar update con CAS (compare-and-swap)
   if (error.code === 'PGRST202' || error.message?.includes('function not found')) {
-    console.warn('consume_credit RPC not found, using fallback update')
+    console.warn('consume_credit RPC not found, using CAS fallback')
 
-    const { data: credits, error: fetchError } = await supabase
+    const { data: credits } = await supabase
       .from('credits')
       .select('total, used')
       .eq('user_id', userId)
       .is('company_id', companyId ?? null)
       .single()
 
-    if (fetchError || !credits) return false
+    if (!credits) return false
 
     const left = (credits.total ?? 0) - (credits.used ?? 0)
     if (left <= 0) return false
 
+    // CAS: solo actualiza si used no cambió desde que lo leímos
     const { error: updateError } = await supabase
       .from('credits')
       .update({ used: (credits.used ?? 0) + 1 })
       .eq('user_id', userId)
+      .eq('used', credits.used ?? 0)
       .is('company_id', companyId ?? null)
 
     if (updateError) {
-      console.error('Error updating credit fallback:', updateError)
+      console.error('Error in credit CAS fallback:', updateError)
       return false
     }
 

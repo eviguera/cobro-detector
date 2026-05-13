@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { tables } from '@/lib/supabase/db'
 import { generatePDFDocument } from '@/lib/document-generator'
 import type { Analysis, Anomaly } from '@/types/database.types'
-
+import { handleApiError } from '@/lib/api-error'
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const db = tables(supabase)
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -19,9 +21,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'analysisId es requerido' }, { status: 400 })
     }
 
+    // @supabase/ssr type inference limitation — all table queries return `never` types.
+    // Cast required to unblock .from().select() chaining.
     // Obtener el análisis
-    const { data: analysis, error: analysisError } = await (supabase as any)
-      .from('analyses')
+    const { data: analysis, error: analysisError } = await db.analyses
       .select('*')
       .eq('id', analysisId)
       .eq('user_id', user.id)
@@ -32,8 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener anomalías del análisis
-    const { data: anomalies, error: anomaliesError } = await (supabase as any)
-      .from('anomalies')
+    const { data: anomalies, error: anomaliesError } = await db.anomalies
       .select('*')
       .eq('analysis_id', analysisId)
       .eq('user_id', user.id)
@@ -43,8 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener perfil del usuario
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
+    const { data: profile } = await db.profiles
       .select('*')
       .eq('id', user.id)
       .single()
@@ -71,7 +72,6 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (err) {
-    console.error('Error generando carta de reclamo PDF:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'POST /api/documents/complaint-letter/pdf')
   }
 }

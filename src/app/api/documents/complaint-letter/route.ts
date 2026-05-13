@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { generateWordDocument } from '@/lib/document-generator'
 import type { Analysis, Anomaly } from '@/types/database.types'
 import { z } from 'zod'
-
+import { handleApiError } from '@/lib/api-error'
 const bodySchema = z.object({
   analysisId: z.string().uuid('analysisId debe ser un UUID válido'),
 })
@@ -75,7 +75,6 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (err) {
-    console.error('Error generando carta de reclamo:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return handleApiError(err, 'POST /api/documents/complaint-letter')
   }
 }

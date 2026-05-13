@@ -3,24 +3,13 @@
 import { FileDown, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { formatCLP, formatDate, getAnomalyTypeLabel, getSeverityLabel } from '@/lib/utils'
+import { SEVERITY } from '@/lib/constants'
 import type { Analysis, DetectedAnomaly, ParsedTransaction } from '@/types/database.types'
 
 interface Props {
   analysis: Analysis
   anomalies: DetectedAnomaly[]
   transactions: ParsedTransaction[]
-}
-
-const SEVERITY_BADGE_STYLE: Record<string, string> = {
-  high:   'background:#fef2f2;color:#dc2626;',
-  medium: 'background:#fffbeb;color:#d97706;',
-  low:    'background:#f9fafb;color:#6b7280;',
-}
-
-const SEVERITY_BORDER: Record<string, string> = {
-  high:   'border-left-color:#dc2626;',
-  medium: 'border-left-color:#d97706;',
-  low:    'border-left-color:#6b7280;',
 }
 
 function buildTransactionTable(anomaly: DetectedAnomaly, txMap: Map<string, ParsedTransaction>): string {
@@ -103,12 +92,12 @@ export default function DownloadReportButton({ analysis, anomalies, transactions
 
     const cobroCards = anomalies.map((a, i) => {
       const count = a.transactionRefs?.length || 1
-      return `<div class="cobro" style="border:1px solid #e5e7eb;border-left:5px solid;${SEVERITY_BORDER[a.severity] ?? 'border-left-color:#6b7280;'}border-radius:10px;padding:20px 22px;margin-bottom:16px;">
+      return `<div class="cobro" style="border:1px solid #e5e7eb;border-left:5px solid;${SEVERITY[a.severity]?.borderStyle ?? 'border-left-color:#6b7280;'}border-radius:10px;padding:20px 22px;margin-bottom:16px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
           <div>
             <div style="font-size:13px;font-weight:700;color:#111827;">Cobro Nº ${i + 1} — ${getAnomalyTypeLabel(a.type)}</div>
             <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-              <span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:99px;${SEVERITY_BADGE_STYLE[a.severity] ?? ''}">${getSeverityLabel(a.severity)}</span>
+              <span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:99px;${SEVERITY[a.severity]?.badgeStyle ?? ''}">${getSeverityLabel(a.severity)}</span>
               <span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:99px;background:#f3f4f6;color:#374151;">${getAnomalyTypeLabel(a.type)}</span>
               ${count > 1 ? `<span style="font-size:10px;color:#6b7280;">${count} transacciones involucradas</span>` : ''}
             </div>
