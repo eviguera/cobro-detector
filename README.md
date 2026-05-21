@@ -28,22 +28,18 @@
 | Contador | 10 | $100.000 CLP | $10.000 |
 | **Platino** | Ilimitado | **20% de lo recuperado** | Sin costo fijo |
 
-- Los créditos no vencen
+- Los créditos no vencen.
 - Plan Platino: subís tu archivo, detectamos los cobros, y solo pagás el 20% de lo que recuperes. El reporte se libera una vez acreditado el pago.
-- Plan Contador: también podés elegir 20% de lo recuperado en vez de $100.000
+- Plan Contador: también podés elegir 20% de lo recuperado en vez de $100.000.
 
 ---
 
 ## Qué detecta
 
 1. **Comisión de crédito duplicada** — La comisión de apertura se cobra UNA SOLA VEZ, no en cada cuota. Caso típico: venta en 6 cuotas sin interés, comisión duplicada en todas las cuotas.
-
 2. **Errores en cuotas sin interés** — Ventas "sin interés" con montos de cuota inconsistentes.
-
 3. **Cargos no reconocidos** — Cargos genéricos sin relación clara a una operación real.
-
 4. **Cobros duplicados** — Misma operación cobrada dos veces en ventana de 7 días.
-
 5. **Cobros incorrectos** — Detectados desde CSV con columna `tipo_anomalia`.
 
 ### Pipeline de detección
@@ -71,10 +67,18 @@ npm install
 ### 2. Configurar Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com)
-2. Ejecutá las migraciones en SQL Editor:
+2. Ejecutá las migraciones en SQL Editor en este orden:
    - `supabase/schema.sql`
    - `supabase/migration_payments.sql`
+   - `supabase/migration_success_fee.sql`
+   - `supabase/migration_multi_company.sql`
+   - `supabase/migration_api_integration.sql`
+   - `supabase/migration_consume_credit_atomic.sql`
+   - `supabase/migration_fix_verify_api_key.sql`
+   - `supabase/migration_add_file_url.sql`
    - `supabase/migration_rls_and_indexes_FIXED.sql`
+   - `supabase/migrations/20260502_add_performance_indexes.sql`
+   - `supabase/migrations/20260520_db_improvements.sql`
 3. Copiá las credenciales en `.env.local`
 
 ### 3. Configurar Groq (IA gratuita)
@@ -102,7 +106,7 @@ MERCADOPAGO_ACCESS_TOKEN=APP_USR-xxxx
 NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=APP_USR-xxxx
 MERCADOPAGO_WEBHOOK_SECRET=tu-secret
 
-# Rate Limiting
+# Rate Limiting (opcional — graceful fallback si no configurado)
 UPSTASH_REDIS_URL=https://tu-redis.upstash.io
 UPSTASH_REDIS_TOKEN=tu-token
 ```
@@ -112,6 +116,7 @@ UPSTASH_REDIS_TOKEN=tu-token
 ```bash
 npm run dev      # Desarrollo
 npm test         # Tests unitarios
+npm run test:e2e # Tests E2E (set E2E_URL)
 npm run build    # Build producción
 ```
 
@@ -140,17 +145,25 @@ src/
 │   │   │   └── unlock-report/     # Pago 20% para desbloquear reporte
 │   │   └── v1/analyses/[id]/      # API pública (API key auth)
 │   └── page.tsx                   # Landing page
+├── components/
+│   └── anomaly-card.tsx           # Tarjeta de anomalía
 ├── lib/
 │   ├── analyzer.ts                # Motor de detección (reglas + IA)
 │   ├── parser.ts                  # Parser CSV/Excel/PDF
 │   ├── plans.ts                   # Configuración de planes
 │   ├── mercadopago.ts             # Cliente Mercado Pago
+│   ├── api-auth.ts                # Auth API keys (SHA-256 vía RPC)
+│   ├── api-error.ts               # Manejo de errores HTTP
+│   ├── security.ts                # Sanitización + verificación webhook
+│   ├── rate-limit.ts              # Rate limiting (Upstash Redis)
+│   ├── analysis-queue.ts          # Procesamiento asíncrono de análisis
+│   ├── document-generator.ts      # Generación Word/PDF
 │   ├── services/
 │   │   ├── credit.service.ts      # Gestión de créditos
 │   │   └── company.service.ts     # Gestión multi-empresa
-│   └── supabase/                  # Clientes Supabase (server/client)
+│   └── supabase/                  # Clientes Supabase (server/client/middleware)
 └── types/
-    └── database.types.ts          # Tipos TypeScript
+    └── database.types.ts          # Tipos TypeScript (manuales)
 ```
 
 ---
@@ -158,12 +171,14 @@ src/
 ## Flujo de pago
 
 ### Planes fijos (Inicial, Plus, Contador)
+
 ```
 /precios → BuyButton → POST /api/payments/create → MercadoPago checkout
 → webhook → acredita créditos → /analisis → subir archivo → reporte inmediato
 ```
 
 ### Plan Platino / Contador 20%
+
 ```
 /precios → "Comenzar ahora" → /analisis?plan=platino → subir archivo
 → análisis corre sin consumir crédito → status: awaiting_payment
@@ -174,17 +189,34 @@ src/
 
 ---
 
-## Configuración Mercado Pago
+## API v1
 
-1. Obtené credenciales en [mercadopago.cl/developers](https://www.mercadopago.cl/developers/panel/credentials)
-2. Variables: `MERCADOPAGO_ACCESS_TOKEN`, `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY`, `MERCADOPAGO_WEBHOOK_SECRET`
-3. Webhook URL: `https://tu-dominio.vercel.app/api/payments/webhook`
+API REST para integración con sistemas contables. Autenticación por API key.
 
----
+**Header:** `Authorization: Bearer cd_xxx...`
 
-## Bancos compatibles
+### Endpoints
 
-Santander · BCI · Banco de Chile · BancoEstado · Itaú · Scotiabank · Banco Security · Banco Falabella · Banco Ripley
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/v1/analyses/:id` | Obtener resultado de análisis |
+| GET | `/api/companies` | Listar empresas |
+| POST | `/api/companies` | Crear empresa |
+| GET | `/api/companies/:id` | Ver empresa |
+| PATCH | `/api/companies/:id` | Actualizar empresa |
+| DELETE | `/api/companies/:id` | Desactivar empresa |
+| POST | `/api/analyze` | Subir estado de cuenta (multipart: `file`, `company_id`) |
+| POST | `/api/documents/complaint-letter` | Carta reclamo Word (`{ analysisId }`) |
+| POST | `/api/documents/complaint-letter/pdf` | Carta reclamo PDF (`{ analysisId }`) |
+
+### Ejemplo
+
+```bash
+curl -X POST https://cobrodetector.cl/api/analyze \
+  -H "Authorization: Bearer cd_xxx..." \
+  -F "file=@estado_cuenta.pdf" \
+  -F "company_id=uuid-de-empresa"
+```
 
 ---
 
@@ -202,6 +234,20 @@ Columnas reconocidas por el parser:
 | `id_transaccion_referencia` | ID del par duplicado |
 | `reclamable` | SI/NO |
 | `motivo_reclamo` | Descripción del error |
+
+---
+
+## Configuración Mercado Pago
+
+1. Obtené credenciales en [mercadopago.cl/developers](https://www.mercadopago.cl/developers/panel/credentials)
+2. Variables: `MERCADOPAGO_ACCESS_TOKEN`, `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY`, `MERCADOPAGO_WEBHOOK_SECRET`
+3. Webhook URL: `https://tu-dominio.vercel.app/api/payments/webhook`
+
+---
+
+## Bancos compatibles
+
+Santander · BCI · Banco de Chile · BancoEstado · Itaú · Scotiabank · Banco Security · Banco Falabella · Banco Ripley
 
 ---
 

@@ -103,7 +103,7 @@ async function main() {
 
   // 6. Verificar documentación
   console.log('\n6. Verificando documentación...')
-  check(fs.existsSync('API.md'), 'API.md existe')
+  check(fs.existsSync('README.md'), 'README.md existe')
 
   // Resumen
   console.log('\n' + '='.repeat(50))
