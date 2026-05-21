@@ -7,6 +7,13 @@
     "vercel": {
       "type": "remote",
       "url": "https://mcp.vercel.com/mcp"
+    },
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+      "environment": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_TOKEN}"
+      }
     }
   }
 }
