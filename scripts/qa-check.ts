@@ -34,10 +34,6 @@ async function main() {
   console.log('1. Verificando migraciones SQL...')
   const migrationFiles = [
     'supabase/schema.sql',
-    'supabase/migration_payments.sql',
-    'supabase/migration_success_fee.sql',
-    'supabase/migration_multi_company.sql',
-    'supabase/migration_api_integration.sql',
   ]
 
   for (const file of migrationFiles) {

@@ -67,18 +67,8 @@ npm install
 ### 2. Configurar Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com)
-2. Ejecutá las migraciones en SQL Editor en este orden:
-   - `supabase/schema.sql`
-   - `supabase/migration_payments.sql`
-   - `supabase/migration_success_fee.sql`
-   - `supabase/migration_multi_company.sql`
-   - `supabase/migration_api_integration.sql`
-   - `supabase/migration_consume_credit_atomic.sql`
-   - `supabase/migration_fix_verify_api_key.sql`
-   - `supabase/migration_add_file_url.sql`
-   - `supabase/migration_rls_and_indexes_FIXED.sql`
-   - `supabase/migrations/20260502_add_performance_indexes.sql`
-   - `supabase/migrations/20260520_db_improvements.sql`
+2. Ejecutá la migración consolidada en SQL Editor:
+   - `supabase/schema.sql` (incluye todas las tablas, índices, RLS, funciones y vistas)
 3. Copiá las credenciales en `.env.local`
 
 ### 3. Configurar Groq (IA gratuita)

@@ -31,37 +31,23 @@ npm run build      # Production build
 
 ## Supabase Database
 
-### Migration Order (apply in this sequence)
+### Schema
 
-1. `supabase/schema.sql` — core tables + RLS + triggers + indexes
-2. `supabase/migration_payments.sql` — MercadoPago columns + `orders_with_credits` view
-3. `supabase/migration_success_fee.sql` — `payment_methods`, `success_charges` tables
-4. `supabase/migration_multi_company.sql` — `companies` table + `company_id` FKs
-5. `supabase/migration_api_integration.sql` — `api_keys`, `api_logs` + `verify_api_key` RPC
-6. `supabase/migration_consume_credit_atomic.sql` — replaces `consume_credit` RPC with `company_id` support
-7. `supabase/migration_fix_verify_api_key.sql` — fixes hash from bcrypt → SHA-256
-8. `supabase/migration_add_file_url.sql` — adds `file_url` column to `analyses`
-9. `supabase/migration_rls_and_indexes_FIXED.sql` — redundant RLS+indexes (may produce "already exists" errors safely)
-10. `supabase/migrations/20260502_add_performance_indexes.sql` — additional indexes
-11. `supabase/migrations/20260520_db_improvements.sql` — **NUEVA**: `company_members`, `success_plans`, UNIQUE+CHECK constraints, índices compuestos, vistas con `security_invoker`
-
-- `scripts/run-migration.js` is **broken** — it tries to POST SQL via REST API which doesn't work. Apply migrations manually in Supabase SQL Editor or use MCP `execute_sql`.
+- **Single consolidated schema**: `supabase/schema.sql` — contiene todas las tablas (12), índices (30+), RLS (11 tablas), políticas (38), funciones SECURITY DEFINER (4), triggers (5), CHECK/UNIQUE constraints (3) y vistas con `security_invoker` (2).
+- The 10 legacy migration files were consolidated and deleted on 2026-05-21.
+- Apply `supabase/schema.sql` in Supabase SQL Editor for fresh installs. For existing databases, it's safe (uses `IF NOT EXISTS` / `CREATE OR REPLACE` / `DO` blocks).
 - **Never use `apply_migration`** for iterative changes. Use `execute_sql` (MCP) or `supabase db query` (CLI). Then run advisors and generate a clean migration with `supabase db pull --local`.
 
 ### RLS & Security
 
 - All tables have RLS enabled with policies restricting to `auth.uid() = user_id`.
-- **Views (`orders_with_credits`, `analyses_with_company`) bypass RLS by default.** They do NOT have `security_invoker = true` set. Protect them or move to private schema.
-- RPC functions `consume_credit` and `verify_api_key` use `SECURITY DEFINER` and live in `public` schema — this is insecure per Supabase best practices. Move to a private schema.
-- `verify_api_key` uses SHA-256 hashing (not bcrypt). The app's `api-auth.ts` calls this via RPC.
+- **Vistas**: `orders_with_credits` y `analyses_with_company` usan `security_invoker = true`.
+- RPC functions `consume_credit` y `verify_api_key` usan `SECURITY DEFINER` y están en `public` schema — mover a schema privado (requiere coordinar con los clientes que las llaman).
+- `verify_api_key` uses SHA-256 hashing. The app's `api-auth.ts` calls this via RPC.
 
 ### Known Schema Issues
 
-- ~~`company_members` table: now created by `20260520_db_improvements.sql`~~
-- ~~`success_plans` table: now created by `20260520_db_improvements.sql`~~
-- ~~`credits.upsert` UNIQUE constraint: now added by `20260520_db_improvements.sql`~~
-- ~~`consumeCreditAtomic` RPC call: now passes `p_company_id`~~
-- RPC functions `consume_credit` y `verify_api_key` siguen en schema `public` con `SECURITY DEFINER` — mover a schema privado (requiere coordinar con los clientes que las llaman).
+- RPC functions `consume_credit` y `verify_api_key` siguen en schema `public` con `SECURITY DEFINER` — mover a schema privado.
 
 ### API Key Auth Flow
 
@@ -76,22 +62,15 @@ npm run build      # Production build
 - Webhook endpoint: `POST /api/payments/webhook` — handles both regular payments and `unlock_{analysisId}` events.
 - MercadoPago credentials: `MERCADOPAGO_ACCESS_TOKEN`, `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY`, `MERCADOPAGO_WEBHOOK_SECRET`.
 
-## Plan de Mejora de Base de Datos (basado en skills .agents)
+## Plan de Mejora de Base de Datos
 
-### Crítico
-1. ~~**Crear tabla `company_members`**~~ ✅ — implementada en `20260520_db_improvements.sql`
-2. ~~**Crear tabla `success_plans`**~~ ✅ — implementada en `20260520_db_improvements.sql`
-3. ~~**Agregar restricción UNIQUE en `credits(user_id, company_id)`**~~ ✅ — implementada en `20260520_db_improvements.sql`
-4. **Mover funciones `SECURITY DEFINER` a schema privado** — `consume_credit` y `verify_api_key` están en `public`, expuestas a la API de datos. Requiere coordinar con los clientes que las llaman.
-5. ~~**Agregar `security_invoker = true` a las vistas**~~ ✅ — implementada en `20260520_db_improvements.sql`
+### Pendiente
+1. **Mover funciones `SECURITY DEFINER` a schema privado** — `consume_credit` y `verify_api_key` están en `public`, expuestas a la API de datos. Requiere coordinar con los clientes que las llaman.
 
-### Alto
-6. ~~**Agregar índice `idx_credits_user_company`**~~ ✅ — implementado en `20260520_db_improvements.sql`
-7. ~~**Agregar índice `idx_anomalies_type_status`**~~ ✅ — implementado en `20260520_db_improvements.sql`
-8. ~~**Corregir fallback CAS en `consumeCreditAtomic`**~~ ✅ — ahora pasa `p_company_id`
-9. **Consolidar migraciones** — hay 11 archivos SQL con solapamiento (índices duplicados en schema.sql, migration_rls_and_indexes_FIXED.sql, y 20260502_add_performance_indexes.sql).
-
-### Medio
-10. ~~**Agregar CHECK en `success_charges.fee_percentage`**~~ ✅ — implementado en `20260520_db_improvements.sql`
-11. ~~**Agregar CHECK en `credits.used <= total`**~~ ✅ — implementado en `20260520_db_improvements.sql`
-12. **Considerar `supabase db advisors` para detectar más issues de performance.**
+### Completado (2026-05-20/21)
+- ✅ Tablas `company_members`, `success_plans`
+- ✅ UNIQUE `credits(user_id, company_id)`, CHECK `used <= total`, CHECK `fee_percentage`
+- ✅ `security_invoker = true` en vistas
+- ✅ Índices compuestos (`idx_credits_user_company`, `idx_anomalies_type_status`, etc.)
+- ✅ Fallback CAS con `p_company_id`
+- ✅ **Migraciones consolidadas** — 11 archivos → 1 (`supabase/schema.sql`)
