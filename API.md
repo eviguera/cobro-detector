@@ -9,14 +9,7 @@ Todas las requests deben incluir el header:
 Authorization: Bearer cd_xxx...
 ```
 
-Las API keys se generan en: `POST /api/integrations/api-keys`
-
 ## Endpoints
-
-### API Keys
-- `GET /api/integrations/api-keys` - Listar keys
-- `POST /api/integrations/api-keys` - Crear nueva key
-- `DELETE /api/integrations/api-keys/:id` - Revocar key
 
 ### Empresas
 - `GET /api/companies` - Listar empresas
@@ -40,11 +33,6 @@ Las API keys se generan en: `POST /api/integrations/api-keys`
 ## Ejemplo de uso
 
 ```bash
-# Crear API key
-curl -X POST https://cobrodetector.cl/api/integrations/api-keys \
-  -H "Content-Type: application/json" \
-  -d '{"name": "ContaPlus", "permissions": ["read", "write"]}'
-
 # Subir estado de cuenta
 curl -X POST https://cobrodetector.cl/api/analyze \
   -H "Authorization: Bearer cd_xxx..." \

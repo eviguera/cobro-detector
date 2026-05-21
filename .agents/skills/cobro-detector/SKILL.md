@@ -232,11 +232,10 @@ T009,15/03/2024,COMISION MENSUAL,Comisiones,-15000,COBRO_INCORRECTO,,SI,No corre
 | Ruta | Propósito |
 |------|-----------|
 | `/api/analyze` | Upload + análisis síncrono + guardar resultados |
-| `/api/anomalies/[id]` | Actualizar estado de anomalía |
 | `/api/documents/complaint-letter` | Carta reclamo DOCX |
 | `/api/documents/complaint-letter/pdf` | Carta reclamo PDF |
 | `/api/companies` | Multi-empresa (CRUD) |
-| `/api/payments/*` | Mercado Pago (create, webhook, link-card) |
+| `/api/payments/*` | Mercado Pago (create, webhook, unlock-report) |
 | `/api/v1/analyses/[id]` | Public API (API key auth) |
 
 ### Frontend

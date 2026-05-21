@@ -132,14 +132,12 @@ src/
 │   ├── api/
 │   │   ├── analyze/               # POST: upload + análisis síncrono
 │   │   ├── analyses/[id]/         # DELETE: eliminar análisis
-│   │   ├── anomalies/[id]/        # PATCH: estado de anomalía
 │   │   ├── companies/             # CRUD multi-empresa
 │   │   ├── documents/             # Cartas reclamo (DOCX/PDF)
 │   │   ├── payments/
 │   │   │   ├── create/            # Crear preferencia MP
 │   │   │   ├── webhook/           # Recibir notificaciones MP
-│   │   │   ├── unlock-report/     # Pago 20% para desbloquear reporte
-│   │   │   └── link-card/         # Vincular tarjeta
+│   │   │   └── unlock-report/     # Pago 20% para desbloquear reporte
 │   │   └── v1/analyses/[id]/      # API pública (API key auth)
 │   └── page.tsx                   # Landing page
 ├── lib/

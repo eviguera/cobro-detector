@@ -53,16 +53,13 @@ async function main() {
   console.log('\n2. Verificando endpoints API...')
   const apiEndpoints = [
     'src/app/api/analyze/route.ts',
-    'src/app/api/anomalies/[id]/route.ts',
     'src/app/api/payments/create/route.ts',
-    'src/app/api/payments/link-card/route.ts',
     'src/app/api/payments/webhook/route.ts',
+    'src/app/api/payments/unlock-report/route.ts',
     'src/app/api/documents/complaint-letter/route.ts',
     'src/app/api/documents/complaint-letter/pdf/route.ts',
     'src/app/api/companies/route.ts',
     'src/app/api/companies/[id]/route.ts',
-    'src/app/api/integrations/api-keys/route.ts',
-    'src/app/api/integrations/api-keys/[id]/route.ts',
     'src/app/api/v1/analyses/[id]/route.ts',
   ]
 
