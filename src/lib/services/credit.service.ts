@@ -49,7 +49,7 @@ export async function consumeCreditAtomic(
 ): Promise<boolean> {
   // Intentar RPC consume_credit (función PostgreSQL)
   const { data, error } = await supabase
-    .rpc('consume_credit', { p_user_id: userId })
+    .rpc('consume_credit', { p_user_id: userId, p_company_id: companyId ?? null })
   
   if (!error) {
     return data ?? false
