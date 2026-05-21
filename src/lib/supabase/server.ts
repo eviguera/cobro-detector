@@ -1,12 +1,9 @@
+import { cache } from 'react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { Database } from '@/types/database.types'
 
-/**
- * Cliente tipado para el servidor
- * Retorna un cliente con el tipo Database propagado correctamente
- */
-export async function createClient() {
+export const createClient = cache(async () => {
   const cookieStore = await cookies()
   
   return createServerClient<Database>(
@@ -25,6 +22,6 @@ export async function createClient() {
       },
     }
   )
-}
+})
 
 

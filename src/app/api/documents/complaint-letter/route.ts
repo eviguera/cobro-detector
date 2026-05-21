@@ -25,32 +25,23 @@ export async function POST(request: NextRequest) {
 
     const { analysisId } = parsed.data
 
-    const { data: analysis, error: analysisError } = await supabase
-      .from('analyses')
-      .select('*')
-      .eq('id', analysisId)
-      .eq('user_id', user.id)
-      .single()
+    const [analysisResult, anomaliesResult, profileResult] = await Promise.all([
+      supabase.from('analyses').select('*').eq('id', analysisId).eq('user_id', user.id).single(),
+      supabase.from('anomalies').select('*').eq('analysis_id', analysisId).eq('user_id', user.id),
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+    ])
+
+    const { data: analysis, error: analysisError } = analysisResult
+    const { data: anomalies, error: anomaliesError } = anomaliesResult
+    const { data: profile } = profileResult
 
     if (analysisError || !analysis) {
       return NextResponse.json({ error: 'Análisis no encontrado' }, { status: 404 })
     }
 
-    const { data: anomalies, error: anomaliesError } = await supabase
-      .from('anomalies')
-      .select('*')
-      .eq('analysis_id', analysisId)
-      .eq('user_id', user.id)
-
     if (anomaliesError) {
       return NextResponse.json({ error: 'Error obteniendo anomalías' }, { status: 500 })
     }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
 
     const letterData = {
       analysis: analysis as unknown as Analysis,

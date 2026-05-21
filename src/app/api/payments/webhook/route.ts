@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getMPClient, Payment } from '@/lib/mercadopago'
 import { createClient } from '@/lib/supabase/server'
 import { verifyMercadoPagoWebhook } from '@/lib/security'
+import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database.types'
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
@@ -178,6 +179,8 @@ async function handleOrderPayment(
     }
 
     console.log(`Pago aprobado: orden ${externalRef}, +${order.credits_purchased} créditos para usuario ${order.user_id}`)
+    revalidateTag(`dashboard-${order.user_id}`)
+    revalidateTag(`analyses-${order.user_id}`)
   }
 }
 
@@ -200,6 +203,17 @@ async function handleUnlockReport(
       console.error('Error desbloqueando reporte:', error)
     } else {
       console.log(`Reporte desbloqueado: ${analysisId} (pago ${paymentId})`)
+
+      const { data: analysis } = await supabase
+        .from('analyses')
+        .select('user_id')
+        .eq('id', analysisId)
+        .single()
+
+      if (analysis?.user_id) {
+        revalidateTag(`dashboard-${analysis.user_id}`)
+        revalidateTag(`analyses-${analysis.user_id}`)
+      }
     }
   }
 }

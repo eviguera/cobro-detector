@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { authError, handleApiError } from '@/lib/api-error'
+import { revalidateTag } from 'next/cache'
 
 export async function DELETE(
   request: NextRequest,
@@ -52,6 +53,8 @@ export async function DELETE(
       }
     }
 
+    revalidateTag(`analyses-${user.id}`)
+    revalidateTag(`dashboard-${user.id}`)
     return NextResponse.json({ success: true })
   } catch (err) {
     return handleApiError(err, 'DELETE /api/analyses/[id]')
