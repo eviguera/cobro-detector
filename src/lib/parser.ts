@@ -260,8 +260,7 @@ export async function parsePDFFile(buffer: Buffer): Promise<ParsedTransaction[]>
   return parsePDFText(data.text)
 }
 
-// Parser simplificado para PDF (texto extraído)
-export function parsePDFText(text: string): ParsedTransaction[] {
+function parsePDFText(text: string): ParsedTransaction[] {
   const lines = text.split('\n').filter(l => l.trim())
   const transactions: ParsedTransaction[] = []
   let index = 0

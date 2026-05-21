@@ -4,7 +4,7 @@ import type { Company } from '@/types/database.types'
 
 type SupabaseClientType = SupabaseClient<Database>
 
-export interface CreateCompanyData {
+interface CreateCompanyData {
   company_name: string
   business_name?: string
   rut?: string
@@ -14,7 +14,7 @@ export interface CreateCompanyData {
   industry?: string
 }
 
-export interface UpdateCompanyData {
+interface UpdateCompanyData {
   company_name?: string
   business_name?: string
   rut?: string

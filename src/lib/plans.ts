@@ -60,4 +60,3 @@ export const PLANS: Plan[] = [
   },
 ]
 
-export const FREE_CREDITS = 0

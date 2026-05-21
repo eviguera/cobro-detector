@@ -81,18 +81,4 @@ export function authError(): NextResponse {
   )
 }
 
-// Helper para errores de autorización
-export function forbiddenError(): NextResponse {
-  return NextResponse.json(
-    { error: 'No autorizado' },
-    { status: 403 }
-  )
-}
 
-// Helper para recursos no encontrados
-export function notFoundError(resource = 'Recurso'): NextResponse {
-  return NextResponse.json(
-    { error: `${resource} no encontrado` },
-    { status: 404 }
-  )
-}

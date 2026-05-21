@@ -1,4 +1,6 @@
-// Dynamic imports for heavy libraries
+import type { Analysis, Anomaly } from '@/types/database.types'
+import { formatCLP } from '@/lib/utils'
+
 let docxModule: any = null
 const getDocx = async () => {
   if (!docxModule) {
@@ -14,7 +16,6 @@ const getPdfLib = async () => {
   }
   return pdfLibModule
 }
-import type { Analysis, Anomaly } from '@/types/database.types'
 
 interface LetterData {
   analysis: Analysis
@@ -26,14 +27,10 @@ interface LetterData {
   date: string
 }
 
-export async function generateComplaintLetter(data: LetterData): Promise<Document> {
+async function generateComplaintLetter(data: LetterData): Promise<Document> {
   const docx = await getDocx()
   const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle } = docx
   const { analysis, anomalies, bankName, businessName, userName, rut, date } = data
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount)
-  }
 
   const totalRecoverable = anomalies.reduce((sum, a) => sum + a.recoverable_amount, 0)
 
@@ -147,7 +144,7 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
                       children: [new Paragraph(anomaly.title), new Paragraph({ children: [new TextRun({ text: anomaly.description || '', size: 8 })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun(formatCurrency(anomaly.recoverable_amount))] })],
+                      children: [new Paragraph({ children: [new TextRun(formatCLP(anomaly.recoverable_amount))] })],
                     }),
                   ],
                 })
@@ -159,7 +156,7 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
                     columnSpan: 2,
                   }),
                   new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(totalRecoverable), bold: true })] })],
+                    children: [new Paragraph({ children: [new TextRun({ text: formatCLP(totalRecoverable), bold: true })] })],
                   }),
                 ],
               }),
@@ -174,7 +171,7 @@ export async function generateComplaintLetter(data: LetterData): Promise<Documen
             spacing: { before: 200, after: 200 },
           }),
           new Paragraph({
-            text: `En virtud de lo expuesto, solicito formalmente la devolución de la suma de ${formatCurrency(totalRecoverable)}, correspondiente a cargos indebidos, comisiones duplicadas y/o errores en el cobro de cuotas detectados en el análisis de mi estado de cuenta.`,
+            text: `En virtud de lo expuesto, solicito formalmente la devolución de la suma de ${formatCLP(totalRecoverable)}, correspondiente a cargos indebidos, comisiones duplicadas y/o errores en el cobro de cuotas detectados en el análisis de mi estado de cuenta.`,
             spacing: { after: 200 },
           }),
           new Paragraph({
@@ -231,10 +228,6 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
   const fontSize = 12
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount)
-  }
 
   const totalRecoverable = data.anomalies.reduce((sum, a) => sum + a.recoverable_amount, 0)
 
@@ -314,14 +307,14 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
     })
     yPosition -= 12
 
-    currentPage.drawText(`  Monto: ${formatCurrency(anomaly.recoverable_amount)}`, {
+    currentPage.drawText(`  Monto: ${formatCLP(anomaly.recoverable_amount)}`, {
       x: 50, y: yPosition, size: 10, font,
     })
     yPosition -= 20
   }
 
   yPosition -= 20
-  currentPage.drawText(`TOTAL A RECUPERAR: ${formatCurrency(totalRecoverable)}`, {
+  currentPage.drawText(`TOTAL A RECUPERAR: ${formatCLP(totalRecoverable)}`, {
     x: 50, y: yPosition, size: 14, font: boldFont, color: rgb(0.2, 0.4, 0.8),
   })
   yPosition -= 50
@@ -331,7 +324,7 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
   })
   yPosition -= 20
 
-  const solicitud = `En virtud de lo expuesto, solicito formalmente la devolución de la suma de ${formatCurrency(totalRecoverable)}, correspondiente a cargos indebidos, comisiones duplicadas y/o errores en el cobro de cuotas detectados en el análisis de mi estado de cuenta.`
+  const solicitud = `En virtud de lo expuesto, solicito formalmente la devolución de la suma de ${formatCLP(totalRecoverable)}, correspondiente a cargos indebidos, comisiones duplicadas y/o errores en el cobro de cuotas detectados en el análisis de mi estado de cuenta.`
   drawOrNewPage((p) => { p.drawText(solicitud, { x: 50, y: yPosition, size: fontSize, font, maxWidth: 495 }); return yPosition - 40 })
   yPosition -= 40
 

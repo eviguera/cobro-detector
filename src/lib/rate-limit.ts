@@ -1,4 +1,4 @@
-import { Ratelimit, type Duration } from '@upstash/ratelimit'
+import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
 // Inicializar Redis solo si las variables están configuradas
@@ -36,26 +36,7 @@ export interface RateLimitResult {
   reset?: number
 }
 
-// Rate limiting para API routes generales
-export async function checkRateLimit(ip: string): Promise<RateLimitResult> {
-  const rl = getRateLimit()
-  
-  if (!rl) {
-    // Si no está configurado, permitir (modo desarrollo)
-    return { success: true }
-  }
-  
-  const result = await rl.limit(ip)
-  
-  return {
-    success: result.success,
-    limit: result.limit,
-    remaining: result.remaining,
-    reset: result.reset,
-  }
-}
-
-// Rate limiting más estricto para endpoints críticos (análisis, pagos)
+// Rate limiting estricto para endpoints críticos (análisis, pagos)
 export async function checkStrictRateLimit(ip: string): Promise<RateLimitResult> {
   const rl = getRateLimit()
   
@@ -103,25 +84,4 @@ export async function checkAuthRateLimit(ip: string): Promise<RateLimitResult> {
   }
 }
 
-// Rate limiting para API keys (por key ID)
-export async function checkApiKeyRateLimit(keyId: string, limit = 100, window = '60 s'): Promise<RateLimitResult> {
-  const rl = getRateLimit()
-  
-  if (!rl) {
-    return { success: true }
-  }
-  
-  const perKeyRl = new Ratelimit({
-    redis: redis!,
-    limiter: Ratelimit.slidingWindow(limit, window as Duration),
-  })
-  
-  const result = await perKeyRl.limit(`api-key:${keyId}`)
-  
-  return {
-    success: result.success,
-    limit: result.limit,
-    remaining: result.remaining,
-    reset: result.reset,
-  }
-}
+

@@ -1,22 +1,10 @@
 import { formatCLP } from '@/lib/utils'
-
-const SEVERITY_COLORS: Record<string, string> = {
-  high: 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400',
-  medium: 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400',
-  low: 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-blue-400',
-}
+import { SEVERITY, ANOMALY_TYPES } from '@/lib/constants'
 
 const SEVERITY_LABELS: Record<string, string> = {
   high: 'Alta prioridad',
   medium: 'Media',
   low: 'Baja',
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  duplicate_commission: 'Comisión duplicada',
-  installment_error: 'Error en cuotas',
-  unknown_charge: 'Cargo no reconocido',
-  incorrect_charge: 'Cobro incorrecto',
 }
 
 interface AnomalyCardProps {
@@ -40,7 +28,7 @@ export function AnomalyCard({
   mode = 'compact',
   index = 0,
 }: AnomalyCardProps) {
-  const colorClasses = SEVERITY_COLORS[severity] ?? 'bg-white dark:bg-gray-900/60 border-gray-100 dark:border-gray-800/40'
+  const colorClasses = SEVERITY[severity]?.color ?? 'bg-white dark:bg-gray-900/60 border-gray-100 dark:border-gray-800/40'
 
   return (
     <div
@@ -50,7 +38,7 @@ export function AnomalyCard({
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-white/60 dark:bg-gray-800/60">
-            {TYPE_LABELS[type] ?? type}
+            {ANOMALY_TYPES[type] ?? type}
           </span>
           <span className="text-xs opacity-70">{SEVERITY_LABELS[severity]}</span>
         </div>

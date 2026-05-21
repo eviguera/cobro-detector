@@ -27,12 +27,4 @@ export async function createClient() {
   )
 }
 
-/**
- * Helper para operaciones de base de datos
- * Evita el uso de `as any` manteniendo tipos
- */
-export function db(supabase: Awaited<ReturnType<typeof createClient>>) {
-  return supabase
-}
 
-export type SupabaseClient = Awaited<ReturnType<typeof createClient>>

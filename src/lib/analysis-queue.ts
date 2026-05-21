@@ -2,8 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { analyzeFile } from '@/lib/analyzer'
 import type { AnalysisResult } from '@/lib/analyzer'
 
-// Procesar análisis de forma asíncrona (sin cola externa)
-export async function processAnalysis(data: {
+async function processAnalysis(data: {
   userId: string
   fileName: string
   filePath: string

@@ -1,5 +1,3 @@
-import { FileText, FileSpreadsheet, ShieldCheck, AlertCircle, FileBadge, Sparkles, CheckCircle2 } from 'lucide-react'
-
 // Banks — keyword → display name
 export const BANKS: Record<string, string> = {
   santander: 'Banco Santander',
@@ -57,13 +55,4 @@ export const ANALYSIS_STATUS: Record<string, string> = {
   failed: 'Error',
 }
 
-// Analysis steps (UI progress)
-export const ANALYSIS_STEPS = [
-  { label: 'Leyendo el archivo', icon: FileText },
-  { label: 'Extrayendo transacciones', icon: FileSpreadsheet },
-  { label: 'Identificando comisiones de crédito', icon: ShieldCheck },
-  { label: 'Detectando cobros duplicados', icon: AlertCircle },
-  { label: 'Analizando cuotas y errores', icon: FileBadge },
-  { label: 'Consultando IA para cargos desconocidos', icon: Sparkles },
-  { label: 'Generando reporte final', icon: CheckCircle2 },
-]
+

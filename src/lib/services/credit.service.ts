@@ -1,16 +1,15 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database.types'
-import { handleApiError } from '@/lib/api-error'
 
 type SupabaseClientType = SupabaseClient<Database>
 
-export interface CreditInfo {
+interface CreditInfo {
   total: number
   used: number
   left: number
 }
 
-export async function getCreditInfo(
+async function getCreditInfo(
   supabase: SupabaseClientType,
   userId: string,
   companyId?: string | null
@@ -92,7 +91,7 @@ export async function consumeCreditAtomic(
 }
 
 // Función para encolar análisis (crea registro y descuenta crédito)
-export async function enqueueAnalysis(
+export async function createAnalysisRecord(
   supabase: SupabaseClientType,
   userId: string,
   fileName: string,
@@ -143,44 +142,4 @@ export async function enqueueAnalysis(
   return analysis.id
 }
 
-export async function addCredits(
-  supabase: SupabaseClientType,
-  userId: string,
-  amount: number,
-  companyId?: string | null
-): Promise<void> {
-  const { error } = await supabase
-    .from('credits')
-    .upsert({
-      user_id: userId,
-      company_id: companyId ?? null,
-      total: amount,
-      used: 0,
-    }, {
-      onConflict: 'user_id, company_id',
-      ignoreDuplicates: false
-    })
-  
-  if (error) {
-    throw error
-  }
-}
 
-export async function incrementCredits(
-  supabase: SupabaseClientType,
-  userId: string,
-  amount: number,
-  companyId?: string | null
-): Promise<void> {
-  const creditInfo = await getCreditInfo(supabase, userId, companyId)
-  
-  const { error } = await supabase
-    .from('credits')
-    .update({ total: (creditInfo?.total ?? 0) + amount })
-    .eq('user_id', userId)
-    .is('company_id', companyId ?? null)
-  
-  if (error) {
-    throw error
-  }
-}

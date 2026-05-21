@@ -254,8 +254,7 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
   return anomalies
 }
 
-// Detecta anomalías pre-etiquetadas en el CSV (tipo_anomalia, id_transaccion_referencia, etc.)
-export function detectLabeledAnomalies(transactions: ParsedTransaction[]): DetectedAnomaly[] {
+function detectLabeledAnomalies(transactions: ParsedTransaction[]): DetectedAnomaly[] {
   const anomalies: DetectedAnomaly[] = []
   const processed = new Set<string>()
 

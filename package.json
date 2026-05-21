@@ -16,7 +16,6 @@
     "@supabase/supabase-js": "^2.105.4",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
-    "clsx": "^2.1.1",
     "docx": "^9.6.1",
     "groq-sdk": "^1.2.0",
     "lucide-react": "^0.454.0",
@@ -28,7 +27,6 @@
     "react": "^18",
     "react-dom": "^18",
     "sonner": "^1.7.4",
-    "tailwind-merge": "^2.6.0",
     "xlsx": "^0.18.5",
     "zod": "^3.23.0"
   },

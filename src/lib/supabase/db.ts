@@ -27,4 +27,4 @@ export function tables(client: ServerClient) {
   } as const
 }
 
-export type { ServerClient }
+

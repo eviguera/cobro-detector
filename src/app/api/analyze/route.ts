@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { authError, handleApiError, successResponse } from '@/lib/api-error'
 import { checkStrictRateLimit } from '@/lib/rate-limit'
-import { consumeCreditAtomic, enqueueAnalysis as enqueueAnalysisService } from '@/lib/services/credit.service'
+import { createAnalysisRecord } from '@/lib/services/credit.service'
 import { analyzeFile } from '@/lib/analyzer'
 import { enqueueAnalysis } from '@/lib/analysis-queue'
 import { revalidateTag } from 'next/cache'
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
 
       analysisId = platinoAnalysis.id
     } else {
-      analysisId = await enqueueAnalysisService(
+      analysisId = await createAnalysisRecord(
         supabase,
         user.id,
         file.name,

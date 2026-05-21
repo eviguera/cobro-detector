@@ -11,7 +11,7 @@ export function getMPClient() {
   })
 }
 
-export { Preference, Payment, CardToken, Customer }
+export { Payment, CardToken, Customer }
 
 export async function createPaymentPreference(params: {
   items: Array<{ id: string; title: string; description: string; quantity: number; unit_price: number }>
