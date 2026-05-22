@@ -3,7 +3,7 @@ import { formatCLP } from '@/lib/utils'
 import { CheckCircle2, Zap, Percent } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import type { Credits } from '@/types/database.types'
-import BuyButton from './buy-button'
+import { BuyButton } from './buy-button'
 
 export default async function PreciosPage() {
   const supabase = await createClient()
@@ -80,10 +80,18 @@ export default async function PreciosPage() {
                     <Percent className="w-4 h-4" />
                     20% de lo recuperado
                   </a>
-                  <BuyButton plan={plan} highlighted={plan.highlighted} />
+                  {plan.highlighted ? (
+                    <BuyButton.Highlighted plan={plan} />
+                  ) : (
+                    <BuyButton.Default plan={plan} />
+                  )}
                 </div>
               ) : (
-                <BuyButton plan={plan} highlighted={plan.highlighted} />
+                plan.highlighted ? (
+                  <BuyButton.Highlighted plan={plan} />
+                ) : (
+                  <BuyButton.Default plan={plan} />
+                )
               )}
             </div>
           )

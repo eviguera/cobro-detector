@@ -46,9 +46,9 @@ export async function consumeCreditAtomic(
   userId: string,
   companyId?: string | null
 ): Promise<boolean> {
-  // Intentar RPC consume_credit (función PostgreSQL)
+  // Intentar RPC consume_credit (función PostgreSQL, user_id deriva de auth.uid())
   const { data, error } = await supabase
-    .rpc('consume_credit', { p_user_id: userId, p_company_id: companyId ?? null })
+    .rpc('consume_credit', { p_company_id: companyId ?? null })
   
   if (!error) {
     return data ?? false

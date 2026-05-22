@@ -339,3 +339,49 @@
   background: hsla(var(--primary), 0.2);
   color: hsl(var(--foreground));
 }
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Skip Link */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 9999;
+  padding: 12px 24px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 3px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Minimum target size for interactive elements (WCAG 2.2) */
+button,
+[role="button"],
+a[href],
+input[type="checkbox"] + label,
+input[type="radio"] + label,
+select,
+input[type="submit"],
+input[type="reset"] {
+  min-width: 24px;
+  min-height: 24px;
+}

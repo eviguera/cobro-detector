@@ -133,7 +133,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
 
           <div className="space-y-3">
             {anomalies.map((anomaly, i) => (
-              <AnomalyCard
+              <AnomalyCard.Full
                 key={i}
                 type={anomaly.type}
                 severity={anomaly.severity}
@@ -141,7 +141,6 @@ export default async function AnalysisDetailPage({ params }: Props) {
                 description={anomaly.description}
                 detail={anomaly.detail}
                 recoverableAmount={anomaly.recoverableAmount}
-                mode="full"
               />
             ))}
           </div>

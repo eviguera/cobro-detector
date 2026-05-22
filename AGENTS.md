@@ -34,6 +34,7 @@ npm run build      # Production build
 ### Schema
 
 - **Single consolidated schema**: `supabase/schema.sql` — contiene todas las tablas (12), índices (30+), RLS (11 tablas), políticas (38), funciones SECURITY DEFINER (4), triggers (5), CHECK/UNIQUE constraints (3) y vistas con `security_invoker` (2).
+- **Schema `internal`**: schema privado (no expuesto a REST API) para funciones SECURITY DEFINER. Contiene `verify_api_key`, `consume_credit` y `can_access_company`. Wrappers públicos en schema `public` con privilegios mínimos (SECURITY INVOKER o SECURITY DEFINER según necesidad).
 - The 10 legacy migration files were consolidated and deleted on 2026-05-21.
 - Apply `supabase/schema.sql` in Supabase SQL Editor for fresh installs. For existing databases, it's safe (uses `IF NOT EXISTS` / `CREATE OR REPLACE` / `DO` blocks).
 - **Never use `apply_migration`** for iterative changes. Use `execute_sql` (MCP) or `supabase db query` (CLI). Then run advisors and generate a clean migration with `supabase db pull --local`.
@@ -42,12 +43,13 @@ npm run build      # Production build
 
 - All tables have RLS enabled with policies restricting to `auth.uid() = user_id`.
 - **Vistas**: `orders_with_credits` y `analyses_with_company` usan `security_invoker = true`.
-- RPC functions `consume_credit` y `verify_api_key` usan `SECURITY DEFINER` y están en `public` schema — mover a schema privado (requiere coordinar con los clientes que las llaman).
+- **Schema `internal`**: schema privado no expuesto a REST API. Contiene las funciones SECURITY DEFINER (`verify_api_key`, `consume_credit`, `can_access_company`). Wrappers públicos en schema `public` con privilegios mínimos.
 - `verify_api_key` uses SHA-256 hashing. The app's `api-auth.ts` calls this via RPC.
 
 ### Known Schema Issues
 
-- RPC functions `consume_credit` y `verify_api_key` siguen en schema `public` con `SECURITY DEFINER` — mover a schema privado.
+- `handle_new_user` (trigger function) sigue en `public` con SECURITY DEFINER — mover a schema privado.
+- `api_logs` table no tiene RLS habilitada — evaluar si es necesaria.
 
 ### API Key Auth Flow
 
@@ -65,7 +67,7 @@ npm run build      # Production build
 ## Plan de Mejora de Base de Datos
 
 ### Pendiente
-1. **Mover funciones `SECURITY DEFINER` a schema privado** — `consume_credit` y `verify_api_key` están en `public`, expuestas a la API de datos. Requiere coordinar con los clientes que las llaman.
+(ninguno por ahora)
 
 ### Completado (2026-05-20/21)
 - ✅ Tablas `company_members`, `success_plans`
@@ -74,3 +76,4 @@ npm run build      # Production build
 - ✅ Índices compuestos (`idx_credits_user_company`, `idx_anomalies_type_status`, etc.)
 - ✅ Fallback CAS con `p_company_id`
 - ✅ **Migraciones consolidadas** — 11 archivos → 1 (`supabase/schema.sql`)
+- ✅ **Funciones SECURITY DEFINER movidas a schema `internal`** — `consume_credit`, `verify_api_key`, `can_access_company` movidas a schema privado no expuesto a REST API. Wrappers públicos: `consume_credit` y `can_access_company` ahora son `SECURITY INVOKER` (usan `auth.uid()`), `verify_api_key` mantiene `SECURITY DEFINER` (necesario para auth sin sesión).

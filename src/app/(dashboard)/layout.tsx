@@ -1,15 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Shield, LayoutDashboard, FileSearch, History, CreditCard, LogOut, ChevronRight, Sparkles } from 'lucide-react'
+import { Shield, LogOut, ChevronRight, Sparkles } from 'lucide-react'
 import type { Credits, Profile } from '@/types/database.types'
-
-const navItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Panel' },
-  { href: '/analisis', icon: FileSearch, label: 'Nuevo análisis' },
-  { href: '/historial', icon: History, label: 'Historial' },
-  { href: '/precios', icon: CreditCard, label: 'Créditos' },
-]
+import { SidebarNav } from '@/components/sidebar-nav'
+import { MobileSidebar } from '@/components/mobile-sidebar'
 
 async function getDashboardData(userId: string) {
   const supabase = await createClient()
@@ -33,7 +28,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0f] flex">
-      <aside className="w-64 bg-white/80 dark:bg-[#0d0d14]/90 backdrop-blur-xl border-r border-gray-100 dark:border-gray-800/40 flex flex-col fixed h-full z-30">
+      <MobileSidebar
+        creditsLeft={creditsLeft}
+        creditsTotal={credits?.total ?? 0}
+        userName={profile?.full_name ?? 'Usuario'}
+        userEmail={user.email ?? ''}
+        userInitial={(profile?.full_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
+      />
+
+      <aside className="hidden lg:flex w-64 bg-white/80 dark:bg-[#0d0d14]/90 backdrop-blur-xl border-r border-gray-100 dark:border-gray-800/40 flex-col fixed h-full z-30">
         <div className="p-5 border-b border-gray-100 dark:border-gray-800/30">
           <Link href="/dashboard" className="group flex items-center gap-2.5">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/30 group-hover:scale-105 transition-all duration-300">
@@ -62,21 +65,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           )}
         </div>
 
-        <nav className="flex-1 px-3 mt-4">
-          <ul className="space-y-0.5">
-            {navItems.map(item => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-all duration-200"
-                >
-                  <item.icon className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <SidebarNav />
 
         <div className="p-4 border-t border-gray-100 dark:border-gray-800/30">
           <div className="flex items-center gap-3 mb-3 px-1">
@@ -99,8 +88,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </aside>
 
-      <main className="flex-1 ml-64 min-h-screen">
-        <div className="max-w-6xl mx-auto p-6 lg:p-8 xl:p-10">
+      <main id="main-content" className="flex-1 lg:ml-64 min-h-screen">
+        <div className="max-w-6xl mx-auto p-4 lg:p-8 xl:p-10 pt-16 lg:pt-8">
           {children}
         </div>
       </main>

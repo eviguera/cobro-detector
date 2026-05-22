@@ -21,7 +21,6 @@ describe('consumeCreditAtomic', () => {
 
     expect(result).toBe(true)
     expect(supabase.rpc).toHaveBeenCalledWith('consume_credit', {
-      p_user_id: 'user-1',
       p_company_id: null,
     })
   })

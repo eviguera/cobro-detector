@@ -573,6 +573,10 @@ export interface Database {
           rate_limit: number
         }
       }
+      consume_credit: {
+        Args: { p_company_id?: string | null }
+        Returns: boolean
+      }
       can_access_company: {
         Args: { company_uuid: string }
         Returns: boolean

@@ -150,7 +150,10 @@ export default function AnalisisPage() {
         </div>
 
         <div
+          role="button"
+          tabIndex={0}
           onClick={() => fileInputRef.current?.click()}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click() } }}
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
@@ -513,7 +516,7 @@ export default function AnalisisPage() {
           {anomalies.length > 0 && (
             <div className="space-y-3">
               {anomalies.map((anomaly, i) => (
-                <AnomalyCard
+                <AnomalyCard.Compact
                   key={i}
                   type={anomaly.type}
                   severity={anomaly.severity as 'high' | 'medium' | 'low'}
@@ -522,7 +525,6 @@ export default function AnalisisPage() {
                   detail={anomaly.detail}
                   recoverableAmount={anomaly.recoverableAmount}
                   index={i}
-                  mode="compact"
                 />
               ))}
             </div>

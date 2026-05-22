@@ -443,10 +443,14 @@ CREATE TRIGGER api_keys_updated_at BEFORE UPDATE ON api_keys
 
 
 -- =============================================
--- SECTION 8: SECURITY DEFINER FUNCTIONS
+-- SECTION 8: INTERNAL SCHEMA & SECURITY DEFINER FUNCTIONS
 -- =============================================
 
-CREATE OR REPLACE FUNCTION verify_api_key(key_text TEXT)
+-- Schema privado: no expuesto a la REST API (solo public lo está)
+CREATE SCHEMA IF NOT EXISTS internal;
+
+-- verify_api_key (core: SECURITY DEFINER en schema privado)
+CREATE OR REPLACE FUNCTION internal.verify_api_key(key_text TEXT)
 RETURNS TABLE (
   valid BOOLEAN,
   key_id UUID,
@@ -476,7 +480,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION consume_credit(p_user_id UUID, p_company_id UUID DEFAULT NULL)
+-- verify_api_key (wrapper público: SECURITY DEFINER, necesario para auth sin sesión)
+CREATE OR REPLACE FUNCTION public.verify_api_key(key_text TEXT)
+RETURNS TABLE (
+  valid BOOLEAN,
+  key_id UUID,
+  user_id UUID,
+  permissions TEXT[],
+  rate_limit INTEGER
+) AS $$
+BEGIN
+  RETURN QUERY SELECT * FROM internal.verify_api_key(key_text);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- consume_credit (core: SECURITY DEFINER en schema privado)
+CREATE OR REPLACE FUNCTION internal.consume_credit(p_user_id UUID, p_company_id UUID DEFAULT NULL)
 RETURNS BOOLEAN AS $$
 DECLARE
   credit_row credits%ROWTYPE;
@@ -505,7 +524,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION can_access_company(company_uuid UUID)
+-- consume_credit (wrapper público: SECURITY INVOKER, user_id deriva de auth.uid())
+CREATE OR REPLACE FUNCTION public.consume_credit(p_company_id UUID DEFAULT NULL)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN internal.consume_credit(auth.uid(), p_company_id);
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
+
+-- can_access_company (core: SECURITY DEFINER en schema privado)
+CREATE OR REPLACE FUNCTION internal.can_access_company(company_uuid UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
   company_accountant UUID;
@@ -514,6 +542,14 @@ BEGIN
   RETURN company_accountant = auth.uid();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- can_access_company (wrapper público: SECURITY INVOKER)
+CREATE OR REPLACE FUNCTION public.can_access_company(company_uuid UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN internal.can_access_company(company_uuid);
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
 
 CREATE OR REPLACE FUNCTION cleanup_old_api_logs()
 RETURNS void AS $$
@@ -527,9 +563,19 @@ $$ LANGUAGE plpgsql;
 -- SECTION 9: GRANTS
 -- =============================================
 
-GRANT EXECUTE ON FUNCTION consume_credit(UUID, UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION verify_api_key(TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION can_access_company(UUID) TO authenticated;
+-- Schema internal: revocar acceso público, solo authenticated
+REVOKE ALL ON SCHEMA internal FROM PUBLIC;
+GRANT USAGE ON SCHEMA internal TO authenticated;
+
+-- Wrappers públicos
+GRANT EXECUTE ON FUNCTION public.verify_api_key(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.consume_credit(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_access_company(UUID) TO authenticated;
+
+-- Funciones internas (accesibles desde wrappers públicos)
+GRANT EXECUTE ON FUNCTION internal.consume_credit(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION internal.verify_api_key(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION internal.can_access_company(UUID) TO authenticated;
 
 
 -- =============================================
