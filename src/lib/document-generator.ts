@@ -1,5 +1,6 @@
 import type { Analysis, Anomaly } from '@/types/database.types'
 import { formatCLP } from '@/lib/utils'
+import { escapeXml } from '@/lib/security'
 
 let docxModule: any = null
 const getDocx = async () => {
@@ -49,7 +50,7 @@ async function generateComplaintLetter(data: LetterData): Promise<Document> {
           new Paragraph({
             children: [
               new TextRun({
-                text: `Fecha: ${date}`,
+                text: `Fecha: ${escapeXml(date)}`,
                 bold: true,
               }),
             ],
@@ -64,19 +65,19 @@ async function generateComplaintLetter(data: LetterData): Promise<Document> {
           new Paragraph({
             children: [
               new TextRun({ text: 'Nombre: ', bold: true }),
-              new TextRun(userName || 'No especificado'),
+              new TextRun(escapeXml(userName || 'No especificado')),
             ],
           }),
           new Paragraph({
             children: [
               new TextRun({ text: 'RUT: ', bold: true }),
-              new TextRun(rut || 'No especificado'),
+              new TextRun(escapeXml(rut || 'No especificado')),
             ],
           }),
           new Paragraph({
             children: [
               new TextRun({ text: 'Empresa: ', bold: true }),
-              new TextRun(businessName || 'No especificado'),
+              new TextRun(escapeXml(businessName || 'No especificado')),
             ],
             spacing: { after: 200 },
           }),
@@ -89,7 +90,7 @@ async function generateComplaintLetter(data: LetterData): Promise<Document> {
           new Paragraph({
             children: [
               new TextRun({ text: 'Banco: ', bold: true }),
-              new TextRun(bankName || analysis.bank || 'No especificado'),
+              new TextRun(escapeXml(bankName || analysis.bank || 'No especificado')),
             ],
           }),
           new Paragraph({
@@ -138,10 +139,10 @@ async function generateComplaintLetter(data: LetterData): Promise<Document> {
                 new TableRow({
                   children: [
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun(anomaly.type.replace('_', ' ').toUpperCase())] })],
+                      children: [new Paragraph({ children: [new TextRun(escapeXml(anomaly.type.replace('_', ' ').toUpperCase()))] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph(anomaly.title), new Paragraph({ children: [new TextRun({ text: anomaly.description || '', size: 8 })] })],
+                      children: [new Paragraph(escapeXml(anomaly.title || '')), new Paragraph({ children: [new TextRun({ text: escapeXml(anomaly.description || ''), size: 8 })] })],
                     }),
                     new TableCell({
                       children: [new Paragraph({ children: [new TextRun(formatCLP(anomaly.recoverable_amount))] })],
@@ -247,7 +248,7 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
   })
   yPosition -= 30
 
-  currentPage.drawText(`Fecha: ${data.date}`, {
+  currentPage.drawText(`Fecha: ${escapeXml(data.date)}`, {
     x: 50, y: yPosition, size: fontSize, font: boldFont,
   })
   yPosition -= 25
@@ -257,18 +258,18 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
   })
   yPosition -= 20
 
-  drawOrNewPage((p) => { p.drawText(`Nombre: ${data.userName}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
+  drawOrNewPage((p) => { p.drawText(`Nombre: ${escapeXml(data.userName)}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
   yPosition -= 18
-  drawOrNewPage((p) => { p.drawText(`RUT: ${data.rut || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
+  drawOrNewPage((p) => { p.drawText(`RUT: ${escapeXml(data.rut || 'No especificado')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
   yPosition -= 18
-  drawOrNewPage((p) => { p.drawText(`Empresa: ${data.businessName || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 25 })
+  drawOrNewPage((p) => { p.drawText(`Empresa: ${escapeXml(data.businessName || 'No especificado')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 25 })
   yPosition -= 25
 
   currentPage.drawText('DATOS DEL BANCO', {
     x: 50, y: yPosition, size: 14, font: boldFont,
   })
   yPosition -= 20
-  drawOrNewPage((p) => { p.drawText(`Banco: ${data.bankName}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
+  drawOrNewPage((p) => { p.drawText(`Banco: ${escapeXml(data.bankName)}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
   yPosition -= 18
   drawOrNewPage((p) => { p.drawText(`Período: ${data.analysis.period_start || 'N/A'} al ${data.analysis.period_end || 'N/A'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 25 })
   yPosition -= 25
@@ -297,12 +298,12 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
       yPosition -= 25
     }
 
-    currentPage.drawText(`• ${anomaly.type.replace('_', ' ').toUpperCase()}: ${anomaly.title}`, {
+    currentPage.drawText(`• ${escapeXml(anomaly.type.replace('_', ' ').toUpperCase())}: ${escapeXml(anomaly.title)}`, {
       x: 50, y: yPosition, size: 10, font: boldFont,
     })
     yPosition -= 15
 
-    currentPage.drawText(`  ${anomaly.description || ''}`, {
+    currentPage.drawText(`  ${escapeXml(anomaly.description || '')}`, {
       x: 50, y: yPosition, size: 9, font, maxWidth: 495,
     })
     yPosition -= 12
@@ -331,11 +332,11 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
   drawOrNewPage((p) => { p.drawText('Sin otro particular, saluda atentamente,', { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 30 })
   yPosition -= 30
 
-  drawOrNewPage((p) => { p.drawText(data.userName || 'Firma', { x: 50, y: yPosition, size: fontSize, font: boldFont }); return yPosition - 18 })
+  drawOrNewPage((p) => { p.drawText(escapeXml(data.userName || 'Firma'), { x: 50, y: yPosition, size: fontSize, font: boldFont }); return yPosition - 18 })
   yPosition -= 18
-  drawOrNewPage((p) => { p.drawText(`RUT: ${data.rut || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
+  drawOrNewPage((p) => { p.drawText(`RUT: ${escapeXml(data.rut || 'No especificado')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
   yPosition -= 18
-  drawOrNewPage((p) => { p.drawText(`Empresa: ${data.businessName || 'No especificado'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 30 })
+  drawOrNewPage((p) => { p.drawText(`Empresa: ${escapeXml(data.businessName || 'No especificado')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 30 })
   yPosition -= 30
 
   currentPage.drawText('Este documento fue generado automáticamente por CobroDetector.cl', {

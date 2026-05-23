@@ -2,12 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { authError, handleApiError } from '@/lib/api-error'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+
+const paramsSchema = z.object({
+  id: z.string().uuid('ID de análisis inválido'),
+})
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const parsed = paramsSchema.safeParse(params)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
@@ -16,7 +26,7 @@ export async function DELETE(
     const { data: analysis, error: fetchErr } = await supabase
       .from('analyses')
       .select('file_url, user_id')
-      .eq('id', params.id)
+      .eq('id', parsed.data.id)
       .eq('user_id', user.id)
       .single()
 
@@ -27,7 +37,7 @@ export async function DELETE(
     const { error: deleteAnomaliesErr } = await supabase
       .from('anomalies')
       .delete()
-      .eq('analysis_id', params.id)
+      .eq('analysis_id', parsed.data.id)
 
     if (deleteAnomaliesErr) {
       console.error('Error deleting anomalies:', deleteAnomaliesErr)
@@ -36,7 +46,7 @@ export async function DELETE(
     const { error: deleteAnalysisErr } = await supabase
       .from('analyses')
       .delete()
-      .eq('id', params.id)
+      .eq('id', parsed.data.id)
       .eq('user_id', user.id)
 
     if (deleteAnalysisErr) {

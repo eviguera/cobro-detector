@@ -4,6 +4,18 @@ import crypto from 'crypto'
 // Sanitización de Datos (Anti Prompt Injection)
 // ==========================================
 
+/**
+ * Escapa caracteres especiales XML para prevenir inyección
+ */
+export function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
 // Patrones maliciosos comunes en intentos de prompt injection
 const INJECTION_PATTERNS = [
   /ignore.*previous.*instructions?/gi,
@@ -12,6 +24,18 @@ const INJECTION_PATTERNS = [
   /system:|usuario:|assistant:/gi,
   /```/g,
 ]
+
+/**
+ * Sanitiza un nombre de banco para prevenir prompt injection en LLM
+ */
+export function sanitizeBankName(name: string | null | undefined): string {
+  if (!name) return ''
+  return name
+    .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑü\s.-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 50)
+}
 
 /**
  * Sanitiza una descripción para prevenir prompt injection

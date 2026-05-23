@@ -331,6 +331,7 @@ ALTER TABLE payment_methods  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE success_charges  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_members  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE success_plans    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_logs        ENABLE ROW LEVEL SECURITY;
 
 
 -- =============================================
@@ -396,6 +397,10 @@ CREATE POLICY "company_members_delete_own" ON company_members FOR DELETE USING (
 CREATE POLICY "success_plans_select_own" ON success_plans FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "success_plans_insert_own" ON success_plans FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "success_plans_update_own" ON success_plans FOR UPDATE USING (auth.uid() = user_id);
+
+-- api_logs
+CREATE POLICY "api_logs_insert_own"   ON api_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "api_logs_select_own"   ON api_logs FOR SELECT USING (auth.uid() = user_id);
 
 
 -- =============================================

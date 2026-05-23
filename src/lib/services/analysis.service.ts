@@ -149,17 +149,17 @@ export async function executeAndStoreAnalysis(
     .eq('user_id', userId)
 
   if (result.anomalies && result.anomalies.length > 0) {
-    const anomaliesToInsert = result.anomalies.map((anomaly: any) => ({
+    const anomaliesToInsert = result.anomalies.map((anomaly: Record<string, unknown>) => ({
       analysis_id: analysisId,
       user_id: userId,
-      type: anomaly.type,
-      severity: anomaly.severity,
-      title: anomaly.title,
-      description: anomaly.description,
-      detail: anomaly.detail ?? null,
-      recoverable_amount: anomaly.recoverableAmount,
-      transaction_refs: anomaly.transactionRefs,
-      status: 'pending',
+      type: anomaly.type as string,
+      severity: anomaly.severity as string,
+      title: anomaly.title as string,
+      description: anomaly.description as string,
+      detail: (anomaly.detail as string) ?? null,
+      recoverable_amount: anomaly.recoverableAmount as number,
+      transaction_refs: anomaly.transactionRefs as string[],
+      status: 'pending' as string,
     }))
 
     await supabase

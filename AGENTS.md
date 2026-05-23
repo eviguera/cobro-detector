@@ -1,79 +1,88 @@
 # AGENTS.md
 
-## Dev Commands
+## Comandos de desarrollo
 
 ```bash
-npm run dev        # Next.js dev server (localhost:3000)
-npm test           # Jest unit tests (src/lib/**/*.test.ts, *.spec.ts)
-npm run test:e2e   # Playwright E2E (set E2E_URL env var for local)
-npm run lint       # ESLint (next/core-web-vitals + next/typescript)
-npm run build      # Production build
+npm run dev           # Servidor de desarrollo Next.js (localhost:3000)
+npm test              # Tests unitarios Jest (src/lib/**/*.test.ts, *.spec.ts)
+npm run test:e2e      # Tests E2E Playwright (setear E2E_URL para local)
+npm run test:e2e:ui   # Playwright UI mode
+npm run lint          # ESLint via next lint (eslint.config.mjs flat config)
+npm run build         # Build de producción
 ```
 
-- Unit tests match `**/src/**/*.test.ts` and `**/src/**/*.spec.ts` (node env, ts-jest).
-- E2E tests need `E2E_URL` env or default to `https://project-qtyiz.vercel.app`.
-- QA script: `npx ts-node scripts/qa-check.ts` — verifies migrations, endpoints, types.
+- Los tests unitarios matchean `**/src/**/*.test.ts` y `**/src/**/*.spec.ts` (node env, ts-jest).
+- `jest.setup.ts` mockea `react.cache()` para que la factory de cliente Supabase server funcione en tests.
+- Los tests E2E necesitan la variable `E2E_URL` o usan `https://project-qtyiz.vercel.app` por defecto.
+- Script de QA: `npx ts-node scripts/qa-check.ts` — verifica migraciones, endpoints, tipos.
+- ESLint forbids `any` (`@typescript-eslint/no-explicit-any: error`) except in `src/types/**`. Also warns on `console.log` (only `warn`/`error` allowed).
+- `.env.example` es la referencia de variables de entorno. Incluye `LOG_LEVEL` (default: `info`).
 
-## Architecture
+## Arquitectura
 
-- **Next.js 14 App Router** (pages: `src/app/`). Path alias `@/` → `src/`.
-- **Supabase** (PostgreSQL + Auth + RLS + Storage). Client factories in `src/lib/supabase/`.
-- **No `opencode.json`** — works with `.mcp.json` (Supabase and Vercel MCP servers).
+- **Next.js 14 App Router** (páginas: `src/app/`). Alias `@/` → `src/`.
+- **Supabase** (PostgreSQL + Auth + RLS + Storage). Factories de cliente en `src/lib/supabase/`:
+  - `server.ts` — cliente server cacheado (usa `react.cache()` + `@supabase/ssr`)
+  - `client.ts` — cliente browser (`'use client'`)
+  - No hay un cliente separado para middleware; `src/middleware.ts` usa `createServerClient` de `@supabase/ssr` directamente.
+- **Middleware** (`src/middleware.ts`): protege `/dashboard`, `/analisis`, `/historial`, `/precios` → redirige a `/login` si no hay sesión. Redirige `/login` y `/` → `/dashboard` si está autenticado.
+- **Configuración**: `.mcp.json` (servidores MCP de Supabase, Vercel y GitHub). No existe `opencode.json`.
 - **Deploy**: Vercel (`vercel.json`). Framework: nextjs.
-- **Tailwind CSS** with `darkMode: ['class']`, CSS variables for theming.
-- **Rate limiting**: Upstash Redis (graceful fallback if not configured).
+- **Tailwind CSS** con `darkMode: ['class']`, variables CSS para temas. Fuentes personalizadas: Archivo, Bricolage Grotesque, JetBrains Mono.
+- **Rate limiting**: Upstash Redis (fallback graceful si no está configurado).
+- **IA**: Groq SDK (`groq-sdk`) con Llama 3.1 8B para detección de anomalías.
+- **Parseo de archivos**: CSV, Excel (`xlsx`), y PDF (`pdf-parse`) de estados de cuenta.
+- **Límite de subida**: `10mb` vía `next.config.js` `serverActions.bodySizeLimit`.
+- **Pipeline de análisis**: Reglas → CSV pre-etiquetado → IA → resultado combinado. Procesamiento asíncrono via `src/lib/analysis-queue.ts`.
 
-## TypeScript Quirks
+## Quirks de TypeScript
 
-- `next.config.js` has `ignoreBuildErrors: true` because `@supabase/ssr` v0.10.3 has a type inference bug that makes table queries return `never`. Do NOT remove this until upgrading supabase-ssr.
-- Workaround: `src/lib/supabase/db.ts` exports a `tables(client)` helper that casts via `as any` to bypass the bug. Always use this helper for server-side DB access instead of raw `supabase.from()`.
-- Database types in `src/types/database.types.ts` are **manually maintained**, not auto-generated. If you add/modify tables or columns in SQL, update the types file.
+- `next.config.js` tiene `ignoreBuildErrors: true` porque `@supabase/ssr` v0.10.3 tiene un bug de inferencia de tipos que hace que las queries de tabla retornen `never`. NO quitar esto hasta actualizar supabase-ssr.
+- Workaround: `src/lib/supabase/db.ts` exporta un helper `tables(client)` que castea via `as any` para evitar el bug. Siempre usar este helper para acceso a DB del lado servidor en vez de `supabase.from()` directamente.
+- Los tipos de base de datos en `src/types/database.types.ts` se **mantienen manualmente**, no son auto-generados. Si se agregan o modifican tablas/columnas en SQL, actualizar el archivo de tipos.
+- ESLint usa `eslint-config-next` (extiende `next/core-web-vitals` + `next/typescript`). Config en `eslint.config.mjs` (flat config).
 
-## Supabase Database
+## Base de Datos Supabase
 
 ### Schema
 
-- **Single consolidated schema**: `supabase/schema.sql` — contiene todas las tablas (12), índices (30+), RLS (11 tablas), políticas (38), funciones SECURITY DEFINER (4), triggers (5), CHECK/UNIQUE constraints (3) y vistas con `security_invoker` (2).
-- **Schema `internal`**: schema privado (no expuesto a REST API) para funciones SECURITY DEFINER. Contiene `verify_api_key`, `consume_credit` y `can_access_company`. Wrappers públicos en schema `public` con privilegios mínimos (SECURITY INVOKER o SECURITY DEFINER según necesidad).
-- The 10 legacy migration files were consolidated and deleted on 2026-05-21.
-- Apply `supabase/schema.sql` in Supabase SQL Editor for fresh installs. For existing databases, it's safe (uses `IF NOT EXISTS` / `CREATE OR REPLACE` / `DO` blocks).
-- **Never use `apply_migration`** for iterative changes. Use `execute_sql` (MCP) or `supabase db query` (CLI). Then run advisors and generate a clean migration with `supabase db pull --local`.
+- **Schema único consolidado**: `supabase/schema.sql` — 12 tablas, 30+ índices, RLS (11 tablas), 38 políticas, 4 funciones SECURITY DEFINER, 5 triggers, 3 constraints CHECK/UNIQUE, 2 vistas con `security_invoker`.
+- **Schema `internal`**: schema privado (no expuesto a REST API) para funciones SECURITY DEFINER (`verify_api_key`, `consume_credit`, `can_access_company`). Wrappers públicos en `public` con privilegios mínimos.
+- Aplicar `supabase/schema.sql` en SQL Editor de Supabase para instalaciones nuevas. Para bases existentes es seguro (usa `IF NOT EXISTS` / `CREATE OR REPLACE` / bloques `DO`).
+- **Nunca usar `apply_migration`** para cambios iterativos. Usar `execute_sql` (MCP) o `supabase db query` (CLI). Luego correr advisors y generar una migración limpia con `supabase db pull --local`.
 
-### RLS & Security
+### RLS y Seguridad
 
-- All tables have RLS enabled with policies restricting to `auth.uid() = user_id`.
-- **Vistas**: `orders_with_credits` y `analyses_with_company` usan `security_invoker = true`.
-- **Schema `internal`**: schema privado no expuesto a REST API. Contiene las funciones SECURITY DEFINER (`verify_api_key`, `consume_credit`, `can_access_company`). Wrappers públicos en schema `public` con privilegios mínimos.
-- `verify_api_key` uses SHA-256 hashing. The app's `api-auth.ts` calls this via RPC.
+- Todas las tablas tienen RLS habilitado con políticas que restringen a `auth.uid() = user_id`.
+- Vistas: `orders_with_credits` y `analyses_with_company` usan `security_invoker = true`.
+- `verify_api_key` usa hashing SHA-256. `api-auth.ts` de la app llama a esto via RPC.
 
-### Known Schema Issues
+### Problemas Conocidos del Schema
 
 - `handle_new_user` (trigger function) sigue en `public` con SECURITY DEFINER — mover a schema privado.
-- `api_logs` table no tiene RLS habilitada — evaluar si es necesaria.
+- La tabla `api_logs` no tiene RLS habilitado — evaluar si es necesario.
 
-### API Key Auth Flow
+### Flujo de Auth con API Keys
 
-- SHA-256 hash stored in `api_keys.key_hash`, verified via `verify_api_key` RPC.
-- `authenticateApiRequest()` in `src/lib/api-auth.ts` calls the RPC, checks expiration.
-- API keys have permissions `['read'] | ['read','write'] | ['admin']`.
+- Hash SHA-256 almacenado en `api_keys.key_hash`, verificado via RPC `verify_api_key`.
+- `authenticateApiRequest()` en `src/lib/api-auth.ts` llama al RPC y verifica expiración.
+- Las API keys tienen permisos `['read'] | ['read','write'] | ['admin']`.
 
-## Payment Flow
+## Flujo de Pagos
 
-- **Fixed plans**: `/precios` → `POST /api/payments/create` → MercadoPago → webhook credits credits → `/analisis`
-- **Platino (20% success fee)**: `/analisis?plan=platino` → upload → analysis runs without credit → status `awaiting_payment` → user pays 20% → webhook unlocks report
-- Webhook endpoint: `POST /api/payments/webhook` — handles both regular payments and `unlock_{analysisId}` events.
-- MercadoPago credentials: `MERCADOPAGO_ACCESS_TOKEN`, `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY`, `MERCADOPAGO_WEBHOOK_SECRET`.
+- **Planes fijos**: `/precios` → `POST /api/payments/create` → MercadoPago → webhook acredita créditos → `/analisis`
+- **Platino (20% de lo recuperado)**: `/analisis?plan=platino` → subida → análisis corre sin crédito → status `awaiting_payment` → usuario paga 20% → webhook libera reporte
+- Webhook endpoint: `POST /api/payments/webhook` — maneja tanto pagos regulares como eventos `unlock_{analysisId}`.
+- Credenciales MercadoPago: `MERCADOPAGO_ACCESS_TOKEN`, `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY`, `MERCADOPAGO_WEBHOOK_SECRET`.
 
-## Plan de Mejora de Base de Datos
+## Seguridad
 
-### Pendiente
-(ninguno por ahora)
-
-### Completado (2026-05-20/21)
-- ✅ Tablas `company_members`, `success_plans`
-- ✅ UNIQUE `credits(user_id, company_id)`, CHECK `used <= total`, CHECK `fee_percentage`
-- ✅ `security_invoker = true` en vistas
-- ✅ Índices compuestos (`idx_credits_user_company`, `idx_anomalies_type_status`, etc.)
-- ✅ Fallback CAS con `p_company_id`
-- ✅ **Migraciones consolidadas** — 11 archivos → 1 (`supabase/schema.sql`)
-- ✅ **Funciones SECURITY DEFINER movidas a schema `internal`** — `consume_credit`, `verify_api_key`, `can_access_company` movidas a schema privado no expuesto a REST API. Wrappers públicos: `consume_credit` y `can_access_company` ahora son `SECURITY INVOKER` (usan `auth.uid()`), `verify_api_key` mantiene `SECURITY DEFINER` (necesario para auth sin sesión).
+- **Autenticación en rutas API**: cada handler es responsable de su propia auth. El middleware solo protege rutas de página.
+  - `/api/v1/**` usa API keys (Bearer token + RPC `verify_api_key` SHA-256).
+  - Resto de `/api/**` usa sesión Supabase (`supabase.auth.getUser()`).
+  - Webhook MercadoPago usa HMAC-SHA256 (`x-signature` header).
+- **Rate limiting**: `checkStrictRateLimit(ip)` (3 req/60s) para `/api/analyze` y `/api/health`. `checkAuthRateLimit(ip)` (5 req/60s) para auth. Las IPs son sanitizadas via `sanitizeIp()` antes de usarse como key de Redis.
+- **Validación de archivos**: el parser (`parser.ts`) rechaza buffers >10MB. `analyzeFile()` solo acepta URLs que estén dentro del bucket `analysis-files` de Supabase Storage (no acepta paths locales ni URLs arbitrarias).
+- **Sanitización**: `security.ts` exporta `sanitizeDescription()` (anti prompt-injection para LLM), `sanitizeBankName()` (alfanumérico + español, 50 chars), y `escapeXml()` (para documentos DOCX/PDF).
+- **Zod errors**: `api-error.ts` expone solo el primer issue como string genérico, no el array completo de errores Zod.
+- **Logging**: `console.error` solo loguea `.message` del Error, no el objeto completo (evita leak de stack traces).

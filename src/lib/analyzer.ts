@@ -1,6 +1,6 @@
 import Groq from 'groq-sdk'
 import type { ParsedTransaction, DetectedAnomaly } from '@/types/database.types'
-import { sanitizeDescription, sanitizeTransactions } from '@/lib/security'
+import { sanitizeTransactions, sanitizeBankName } from '@/lib/security'
 import { parseExcelFile, parsePDFFile, detectBank } from './parser'
 
 let groqInstance: Groq | null = null
@@ -32,7 +32,7 @@ export async function analyzeTransactionsWithAI(
 
   const systemPrompt = `Eres un experto en detección de cobros bancarios incorrectos para negocios chilenos. Siempre respondes SOLO en JSON válido.`
 
-  const userPrompt = `Analiza estas transacciones de un estado de cuenta bancario${bankName ? ` del ${bankName}` : ''} y detecta:
+  const userPrompt = `Analiza estas transacciones de un estado de cuenta bancario${bankName ? ` del ${sanitizeBankName(bankName)}` : ''} y detecta:
 
 1. **COMISIONES DE CRÉDITO DUPLICADAS EN CUOTAS SIN INTERÉS**: 
    - Las ventas en cuotas sin interés NO deben tener comisión de crédito en cada cuota.
@@ -341,25 +341,37 @@ function detectLabeledAnomalies(transactions: ParsedTransaction[]): DetectedAnom
   return anomalies
 }
 
+function isAllowedStorageUrl(url: string): boolean {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!supabaseUrl) return false
+  if (!url.startsWith(supabaseUrl + '/storage/v1/object/public/analysis-files/')) return false
+  if (url.includes('..')) return false
+  if (url.length > 2048) return false
+  return true
+}
+
 export async function analyzeFile(
   filePath: string,
   fileType: string,
   options?: { userId?: string; companyId?: string; fileName?: string }
 ): Promise<AnalysisResult> {
   try {
-    // Leer el archivo (puede ser una URL de Supabase o un path local)
     let buffer: Buffer
     
     if (filePath.startsWith('http')) {
-      // Es una URL (Supabase Storage) - descargar
+      if (!isAllowedStorageUrl(filePath)) {
+        throw new Error('URL de archivo no permitida')
+      }
       const response = await fetch(filePath)
       if (!response.ok) throw new Error(`Error descargando archivo: ${response.statusText}`)
+      const contentLength = Number(response.headers.get('content-length'))
+      if (contentLength > 10 * 1024 * 1024) {
+        throw new Error('Archivo excede el tamaño máximo de 10MB')
+      }
       const arrayBuffer = await response.arrayBuffer()
       buffer = Buffer.from(arrayBuffer)
     } else {
-      // Es un path local
-      const fs = await import('fs/promises')
-      buffer = await fs.readFile(filePath)
+      throw new Error('Solo se soportan URLs de Supabase Storage')
     }
 
     // Parsear según el tipo

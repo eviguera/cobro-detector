@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createPaymentPreference } from '@/lib/mercadopago'
 import { z } from 'zod'
-import { authError, handleApiError, successResponse } from '@/lib/api-error'
+import { authError, handleApiError } from '@/lib/api-error'
 import type { Analysis } from '@/types/database.types'
 
 const bodySchema = z.object({
-  analysisId: z.string().min(1),
+  analysisId: z.string().uuid('analysisId debe ser un UUID válido'),
 })
 
 export async function POST(request: NextRequest) {

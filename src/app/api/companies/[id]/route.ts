@@ -16,11 +16,20 @@ const updateCompanySchema = z.object({
   is_active: z.boolean().optional(),
 })
 
+const paramsSchema = z.object({
+  id: z.string().uuid('ID de empresa inválido'),
+})
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const parsed = paramsSchema.safeParse(params)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
@@ -28,7 +37,7 @@ export async function GET(
       return authError()
     }
 
-    const company = await getCompanyById(supabase, params.id, user.id)
+    const company = await getCompanyById(supabase, parsed.data.id, user.id)
 
     if (!company) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 })
@@ -50,6 +59,11 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const parsed = paramsSchema.safeParse(params)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
@@ -60,7 +74,7 @@ export async function PATCH(
     const body = await request.json()
     const validated = updateCompanySchema.parse(body)
 
-    const company = await updateCompany(supabase, params.id, user.id, validated)
+    const company = await updateCompany(supabase, parsed.data.id, user.id, validated)
 
     return successResponse({ company })
 
@@ -74,6 +88,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const parsed = paramsSchema.safeParse(params)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
@@ -81,7 +100,7 @@ export async function DELETE(
       return authError()
     }
 
-    await deleteCompany(supabase, params.id, user.id)
+    await deleteCompany(supabase, parsed.data.id, user.id)
 
     return successResponse({ success: true })
 

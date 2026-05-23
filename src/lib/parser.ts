@@ -61,6 +61,11 @@ function excelSerialToDate(serial: number, XLSX: any): string {
 
 // Parser para archivos Excel/CSV usando xlsx
 export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransaction[]> {
+  const MAX_BUFFER_SIZE = 10 * 1024 * 1024
+  if (buffer.byteLength > MAX_BUFFER_SIZE) {
+    throw new Error(`Archivo demasiado grande. Máximo ${MAX_BUFFER_SIZE / 1024 / 1024}MB.`)
+  }
+
   const XLSX = await import('xlsx')
 
   // Detectar si es CSV puro (no ZIP/OLE2) para evitar auto-conversión de fechas de xlsx
@@ -255,6 +260,10 @@ function parseCSVLine(line: string): string[] {
 
 // Parser para archivos PDF usando pdf-parse
 export async function parsePDFFile(buffer: Buffer): Promise<ParsedTransaction[]> {
+  const MAX_BUFFER_SIZE = 10 * 1024 * 1024
+  if (buffer.byteLength > MAX_BUFFER_SIZE) {
+    throw new Error(`Archivo demasiado grande. Máximo ${MAX_BUFFER_SIZE / 1024 / 1024}MB.`)
+  }
   const pdfParse = (await import('pdf-parse')).default
   const data = await pdfParse(buffer)
   return parsePDFText(data.text)

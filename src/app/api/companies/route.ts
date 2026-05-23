@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import type { Company } from '@/types/database.types'
 import { z } from 'zod'
 import { authError, handleApiError, successResponse } from '@/lib/api-error'
 import { getCompanies, createCompany } from '@/lib/services/company.service'
@@ -15,7 +14,7 @@ const createCompanySchema = z.object({
   industry: z.string().optional(),
 })
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()

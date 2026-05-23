@@ -13,7 +13,11 @@ export class ApiError extends Error {
 }
 
 export function handleApiError(error: unknown, context: string): NextResponse {
-  console.error(`API Error [${context}]:`, error)
+  if (error instanceof Error) {
+    console.error(`API Error [${context}]:`, error.message)
+  } else {
+    console.error(`API Error [${context}]:`, String(error))
+  }
 
   // Error personalizado de la API
   if (error instanceof ApiError) {
@@ -25,8 +29,10 @@ export function handleApiError(error: unknown, context: string): NextResponse {
 
   // Error de validación Zod
   if (isZodError(error)) {
+    const zodErr = error as ZodError
+    const genericMsg = zodErr.issues[0] ? `${zodErr.issues[0].path.join('.')}: ${zodErr.issues[0].message}` : 'Datos inválidos'
     return NextResponse.json(
-      { error: 'Datos inválidos', details: (error as ZodError).errors },
+      { error: genericMsg },
       { status: 400 }
     )
   }

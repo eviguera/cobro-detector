@@ -18,10 +18,25 @@ export default async function PagoExitosoPage({ searchParams }: Props) {
 
   if (orderId) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return (
+        <div className="min-h-screen bg-muted/50 flex items-center justify-center p-6">
+          <div className="bg-card rounded-2xl border border-border p-10 max-w-md w-full text-center shadow-sm">
+            <h1 className="text-2xl font-bold text-foreground mb-3">Inicia sesión</h1>
+            <p className="text-muted-foreground mb-6">Debes iniciar sesión para ver esta página.</p>
+            <Link href="/login" className="text-blue-600 hover:underline">Ir al login</Link>
+          </div>
+        </div>
+      )
+    }
+
     const { data: orderData } = await supabase
       .from('orders')
       .select('*')
       .eq('id', orderId)
+      .eq('user_id', user.id)
       .single()
 
     const order = orderData as Order | null

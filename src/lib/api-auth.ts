@@ -57,7 +57,7 @@ export async function authenticateApiRequest(
     }
 
   } catch (err) {
-    console.error('Error autenticando API key:', err)
+    console.error('Error autenticando API key:', err instanceof Error ? err.message : 'Unknown error')
     return { authenticated: false }
   }
 }

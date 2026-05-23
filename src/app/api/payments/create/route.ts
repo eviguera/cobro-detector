@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { authError, handleApiError, successResponse } from '@/lib/api-error'
 
 const bodySchema = z.object({
-  planKey: z.enum(['starter', 'professional', 'enterprise', 'success_fee']),
+  planKey: z.enum(['inicial', 'plus', 'contador', 'platino']),
 })
 
 export async function POST(request: NextRequest) {
@@ -49,12 +49,12 @@ export async function POST(request: NextRequest) {
       payment_provider: 'mercadopago',
     }
 
-    // Plan de éxito: cobro por 10% de lo recuperado
-    if (planKey === 'success_fee') {
-      orderData.credits_purchased = 999999 // Ilimitado
+    // Plan Platino: ilimitado, se cobra el 20% de lo recuperado
+    if (planKey === 'platino') {
+      orderData.credits_purchased = 999999
       orderData.amount_clp = 0
       orderData.payment_provider = 'success_fee'
-      Object.assign(orderData, { fee_percentage: 10 })
+      Object.assign(orderData, { fee_percentage: plan.percentage ?? 20 })
     }
 
     const { data: order, error: orderError } = await supabase
@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
       return handleApiError(orderError, 'POST /api/payments/create - create order')
     }
 
-    // Plan de éxito: no necesita preferencia de Mercado Pago
-    if (planKey === 'success_fee') {
+    // Plan Platino: no necesita preferencia de Mercado Pago
+    if (planKey === 'platino') {
       return successResponse({
         orderId: order.id,
         message: 'Plan de éxito activado. Se cobrará el 10% de lo recuperado.',

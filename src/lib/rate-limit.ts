@@ -29,6 +29,15 @@ function getRateLimit() {
   return ratelimit
 }
 
+function sanitizeIp(ip: string): string {
+  const cleaned = ip.trim()
+  if (cleaned.length > 45) return '127.0.0.1'
+  const ipv4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/
+  const ipv6 = /^[0-9a-fA-F:]+$/
+  if (ipv4.test(cleaned) || ipv6.test(cleaned)) return cleaned
+  return '127.0.0.1'
+}
+
 export interface RateLimitResult {
   success: boolean
   limit?: number
@@ -44,13 +53,15 @@ export async function checkStrictRateLimit(ip: string): Promise<RateLimitResult>
     return { success: true }
   }
   
+  const safeIp = sanitizeIp(ip)
+  
   // 3 requests por minuto para endpoints críticos
   const strictRl = new Ratelimit({
     redis: redis!,
     limiter: Ratelimit.slidingWindow(3, '60 s'),
   })
   
-  const result = await strictRl.limit(`strict:${ip}`)
+  const result = await strictRl.limit(`strict:${safeIp}`)
   
   return {
     success: result.success,
@@ -69,12 +80,14 @@ export async function checkAuthRateLimit(ip: string): Promise<RateLimitResult> {
     return { success: true }
   }
 
+  const safeIp = sanitizeIp(ip)
+
   const authRl = new Ratelimit({
     redis: redis!,
     limiter: Ratelimit.slidingWindow(5, '60 s'),
   })
 
-  const result = await authRl.limit(`auth:${ip}`)
+  const result = await authRl.limit(`auth:${safeIp}`)
 
   return {
     success: result.success,

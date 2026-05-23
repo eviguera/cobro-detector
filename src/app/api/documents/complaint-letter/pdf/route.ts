@@ -3,7 +3,13 @@ import { createClient } from '@/lib/supabase/server'
 import { tables } from '@/lib/supabase/db'
 import { generatePDFDocument } from '@/lib/document-generator'
 import type { Analysis, Anomaly } from '@/types/database.types'
+import { z } from 'zod'
 import { handleApiError } from '@/lib/api-error'
+
+const bodySchema = z.object({
+  analysisId: z.string().uuid('analysisId debe ser un UUID válido'),
+})
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -15,11 +21,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { analysisId } = body
-
-    if (!analysisId) {
-      return NextResponse.json({ error: 'analysisId es requerido' }, { status: 400 })
+    const parsed = bodySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
     }
+
+    const { analysisId } = parsed.data
 
     // @supabase/ssr type inference limitation — all table queries return `never` types.
     // Cast required to unblock .from().select() chaining.

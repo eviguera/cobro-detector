@@ -3,7 +3,6 @@ import { getMPClient, Payment } from '@/lib/mercadopago'
 import { createClient } from '@/lib/supabase/server'
 import { verifyMercadoPagoWebhook } from '@/lib/security'
 import { revalidateTag } from 'next/cache'
-import type { Database } from '@/types/database.types'
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
@@ -14,30 +13,18 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get('x-signature')
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
 
-    if (process.env.NODE_ENV === 'production') {
-      if (!webhookSecret) {
-        console.error('MERCADOPAGO_WEBHOOK_SECRET no configurado en producción')
-        return NextResponse.json({ received: false, error: 'Webhook secret not configured' }, { status: 500 })
-      }
+    if (!webhookSecret) {
+      console.error('MERCADOPAGO_WEBHOOK_SECRET no configurado')
+      return NextResponse.json({ received: false, error: 'Webhook secret not configured' }, { status: 500 })
+    }
 
-      if (!signature) {
-        return NextResponse.json({ received: false, error: 'Falta firma' }, { status: 401 })
-      }
+    if (!signature) {
+      return NextResponse.json({ received: false, error: 'Falta firma' }, { status: 401 })
+    }
 
-      const isValid = verifyMercadoPagoWebhook(rawBody, signature, webhookSecret)
-      if (!isValid) {
-        return NextResponse.json({ received: false, error: 'Firma inválida' }, { status: 401 })
-      }
-    } else {
-      if (webhookSecret && signature) {
-        const isValid = verifyMercadoPagoWebhook(rawBody, signature, webhookSecret)
-        if (!isValid) {
-          console.warn('Webhook MP: firma inválida (desarrollo)')
-          return NextResponse.json({ received: false, error: 'Firma inválida' }, { status: 401 })
-        }
-      } else if (!webhookSecret) {
-        console.warn('Webhook MP: verificación desactivada (sin MERCADOPAGO_WEBHOOK_SECRET)')
-      }
+    const isValid = verifyMercadoPagoWebhook(rawBody, signature, webhookSecret)
+    if (!isValid) {
+      return NextResponse.json({ received: false, error: 'Firma inválida' }, { status: 401 })
     }
 
     const body = JSON.parse(rawBody)
@@ -93,6 +80,12 @@ async function handleSuccessCharge(
   status: string | undefined,
   statusDetail: string | undefined
 ) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!uuidRegex.test(externalRef)) {
+    console.error('Webhook: externalRef inválido en success_charge', externalRef)
+    return
+  }
+
   const { data: successCharge } = await supabase
     .from('success_charges')
     .select('*')
@@ -129,6 +122,12 @@ async function handleOrderPayment(
   status: string | undefined,
   statusDetail: string | undefined
 ) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!uuidRegex.test(externalRef)) {
+    console.error('Webhook: externalRef inválido en orden', externalRef)
+    return
+  }
+
   const { data: order } = await supabase
     .from('orders')
     .select('*')
@@ -171,7 +170,7 @@ async function handleOrderPayment(
         .insert({ user_id: order.user_id, total: order.credits_purchased, used: 0 })
     }
 
-    if (order.plan === 'success_fee') {
+    if (order.plan === 'platino') {
       await supabase
         .from('orders')
         .update({ success_plan_active: true })
@@ -191,6 +190,11 @@ async function handleUnlockReport(
   status: string | undefined
 ) {
   const analysisId = externalRef.replace('unlock_', '')
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!uuidRegex.test(analysisId)) {
+    console.error('Webhook: analysisId inválido en unlock', externalRef)
+    return
+  }
 
   if (status === 'approved') {
     const { error } = await supabase

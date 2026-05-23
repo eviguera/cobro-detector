@@ -62,16 +62,16 @@ async function processAnalysis(data: {
 
     // Insertar anomalías detectadas
     if (result.anomalies && result.anomalies.length > 0) {
-      const anomaliesToInsert = result.anomalies.map((anomaly: any) => ({
+      const anomaliesToInsert = result.anomalies.map((anomaly: Record<string, unknown>) => ({
         analysis_id: analysisId,
         user_id: userId,
-        type: anomaly.type,
-        title: anomaly.title,
-        description: anomaly.description,
-        amount: anomaly.amount,
-        recoverable_amount: anomaly.recoverableAmount,
-        transaction_refs: anomaly.transactionRefs,
-        severity: anomaly.severity,
+        type: anomaly.type as string,
+        title: anomaly.title as string,
+        description: anomaly.description as string,
+        amount: anomaly.amount as number,
+        recoverable_amount: anomaly.recoverableAmount as number,
+        transaction_refs: anomaly.transactionRefs as string[],
+        severity: anomaly.severity as string,
       }))
 
       const { error: insertError } = await supabase
