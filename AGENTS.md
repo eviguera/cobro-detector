@@ -60,7 +60,6 @@ npm run build         # Build de producción
 ### Problemas Conocidos del Schema
 
 - `handle_new_user` (trigger function) sigue en `public` con SECURITY DEFINER — mover a schema privado.
-- La tabla `api_logs` no tiene RLS habilitado — evaluar si es necesario.
 
 ### Flujo de Auth con API Keys
 
