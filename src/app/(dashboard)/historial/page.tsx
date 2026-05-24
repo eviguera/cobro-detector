@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { FileSearch, Plus, AlertTriangle, CheckCircle2, FileText, CalendarDays } from 'lucide-react'
 import { formatCLP, formatDate } from '@/lib/utils'
 import type { Analysis } from '@/types/database.types'
@@ -49,17 +50,17 @@ async function getAnalysesData(userId: string, desde?: string, hasta?: string) {
 }
 
 interface Props {
-  searchParams: { periodo?: string } // En Next.js 15: searchParams: Promise<{ periodo?: string }>
+  searchParams: { periodo?: string }
 }
 
 export default async function HistorialPage({ searchParams }: Props) {
-  // Next.js 15: const periodo = (await searchParams).periodo ?? 'todas'
   const periodo = searchParams.periodo ?? 'todas'
   const dateRange = getPeriodoDates(periodo)
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const analyses = await getAnalysesData(user!.id, dateRange?.desde, dateRange?.hasta)
+  if (!user) redirect('/login')
+  const analyses = await getAnalysesData(user.id, dateRange?.desde, dateRange?.hasta)
 
   const totalRecoverable = analyses?.reduce((sum, a) => sum + (a.recoverable_amount ?? 0), 0) ?? 0
   const totalAnomalies = analyses?.reduce((sum, a) => sum + (a.anomalies_count ?? 0), 0) ?? 0

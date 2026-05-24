@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { FileSearch, TrendingDown, AlertTriangle, CheckCircle2, ArrowRight, Plus, BarChart3, Activity, ArrowUpRight, ArrowDownRight, Clock, Sparkles, Banknote, Shield, CalendarDays, Building2, Percent, Brain } from 'lucide-react'
 import { formatCLP, formatDate } from '@/lib/utils'
 import type { Analysis, Credits } from '@/types/database.types'
@@ -23,10 +24,11 @@ function getWeekdayLabel(date: Date): string {
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [analysesResult, creditsResult] = await Promise.all([
-    supabase.from('analyses').select('*').eq('user_id', user!.id).order('created_at', { ascending: false }).limit(10),
-    supabase.from('credits').select('*').eq('user_id', user!.id).single(),
+    supabase.from('analyses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
+    supabase.from('credits').select('*').eq('user_id', user.id).single(),
   ])
   const analyses = analysesResult.data as Analysis[] | null
   const credits = creditsResult.data as Credits | null

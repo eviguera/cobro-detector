@@ -2,13 +2,16 @@ import { PLANS } from '@/lib/plans'
 import { formatCLP } from '@/lib/utils'
 import { CheckCircle2, Zap, Percent } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import type { Credits } from '@/types/database.types'
 import { BuyButton } from './buy-button'
 
 export default async function PreciosPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: creditsData } = await supabase.from('credits').select('*').eq('user_id', user!.id).single()
+  if (!user) redirect('/login')
+
+  const { data: creditsData } = await supabase.from('credits').select('*').eq('user_id', user.id).single()
   const credits = creditsData as Credits | null
   const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
 
