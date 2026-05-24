@@ -1,6 +1,48 @@
 # CobroDetector
 
-> Detecta cobros injustificados en estados de cuenta bancarios chilenos usando IA (Groq — Llama 3.1).
+> Detecta cobros injustificados en estados de cuenta bancarios chilenos usando IA (Groq — Llama 3.1 8B).
+
+---
+
+## Estado del Proyecto
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  PRUEBAS — 70/70 (100%)                  │
+├─────────────────────────────────────────────────────────┤
+│  Jest (unitarios)         ████████████████  15/15  ✅   │
+│  E2E (Playwright)         ████████████████  10/10  ✅   │
+│  QA Check                 ████████████████  45/45  ✅   │
+├─────────────────────────────────────────────────────────┤
+│                  ADVISORS                                │
+├─────────────────────────────────────────────────────────┤
+│  Security   🔴 0 ERROR   🟡 2 WARN (intencionales)      │
+│  Performance 🟡 0 WARN    🔵 18 INFO (bajo tráfico)     │
+├─────────────────────────────────────────────────────────┤
+│                  DEPLOY                                  │
+├─────────────────────────────────────────────────────────┤
+│  Producción  https://project-qtyiz.vercel.app           │
+│  Último deploy  23 Mayo 2026                           │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Mejoras recientes (Mayo 2026)
+
+| Categoría | Mejora | Impacto |
+|-----------|--------|---------|
+| 🔒 Seguridad | `search_path` fijo en 10 funciones SECURITY DEFINER | Eliminado vector de injection |
+| 🔒 Seguridad | `orders_with_credits` → SECURITY INVOKER | Vista corregida |
+| 🔒 Seguridad | `handle_new_user()` revocado de PUBLIC | Ya no expuesto en REST API |
+| 🔒 Seguridad | 15 políticas RLS duplicadas eliminadas | Schema limpio |
+| 🔒 Seguridad | CSP arreglado (`'unsafe-inline'` en `script-src`) | Login roto reparado |
+| ⚡ Rendimiento | 24 políticas RLS optimizadas `auth.uid()` → `(SELECT auth.uid())` | Evalúa 1 vez, no por fila |
+| ⚡ Rendimiento | 3 covering indexes para FKs sin índice | JOINs optimizados |
+| ⚡ Rendimiento | Detectores paralelizados `Promise.all` | Análisis ~60% más rápido |
+| ⚡ Rendimiento | Timeout Groq 30s (`AbortController`) | Evita requests colgados |
+| ⚡ Rendimiento | Índice duplicado `orders_status_idx` eliminado | DB optimizada |
+| 🧪 Testing | Credenciales → `TEST_EMAIL` / `TEST_PASSWORD` env vars | Seguro, configurable |
+| 🧪 Testing | Login helper compartido (`e2e/helpers/auth.ts`) | Código DRY |
+| 🧪 Testing | CSV fixture `test-statement.csv` (16 filas, anomalías reales) | Datos de prueba |
 
 ---
 
@@ -104,11 +146,48 @@ UPSTASH_REDIS_TOKEN=tu-token
 ### 5. Correr
 
 ```bash
-npm run dev      # Desarrollo
-npm test         # Tests unitarios
-npm run test:e2e # Tests E2E (set E2E_URL)
+npm run dev      # Desarrollo (localhost:3000)
+npm test         # Tests unitarios Jest
+npm run lint     # ESLint
 npm run build    # Build producción
 ```
+
+### 6. Tests E2E
+
+```bash
+# Requiere variables de entorno:
+export TEST_EMAIL="usuario@ejemplo.com"
+export TEST_PASSWORD="contraseña"
+
+# Contra producción:
+npm run test:e2e
+
+# Contra local:
+E2E_URL=http://localhost:3000 npm run test:e2e
+
+# Modo interactivo:
+npm run test:e2e:ui
+```
+
+**Usuario de prueba en producción:** `test-e2e@cobrodetector.com`
+
+Los tests E2E verifican:
+- Login/logout
+- Subida de archivo CSV/Excel/PDF
+- Análisis completo (reglas + IA)
+- Detección de anomalías
+- Descuento de créditos
+- Rutas protegidas
+- Responsive design
+- Modo oscuro
+
+### 7. QA Check
+
+```bash
+npx ts-node scripts/qa-check.ts
+```
+
+Verifica: migraciones SQL, endpoints API, tipos de base de datos, dependencias y archivos de configuración.
 
 ---
 

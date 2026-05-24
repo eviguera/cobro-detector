@@ -23,7 +23,7 @@
       "type": "local",
       "command": ["npx", "-y", "@allpepper/memory-bank-mcp"],
       "environment": {
-        "MEMORY_BANK_ROOT": "<path-to-bank>"
+        "MEMORY_BANK_ROOT": "/Users/eduardoviguera/Desktop/COBRO/cobro-detector/.memory-bank"
       }
     },
     "filesystem": {

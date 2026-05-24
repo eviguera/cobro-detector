@@ -11,7 +11,9 @@
 -- =============================================
 
 CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = ''
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
@@ -19,7 +21,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION update_payment_methods_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = ''
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
@@ -27,7 +31,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION update_companies_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = ''
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
@@ -35,7 +41,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION update_api_keys_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = ''
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
@@ -335,72 +343,112 @@ ALTER TABLE api_logs        ENABLE ROW LEVEL SECURITY;
 
 
 -- =============================================
--- SECTION 6: RLS POLICIES
+-- SECTION 6: RLS POLICIES (optimizadas con (SELECT auth.uid()))
 -- =============================================
 
 -- profiles
-CREATE POLICY "profiles_select_own" ON profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "profiles_insert_own" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "profiles_update_own" ON profiles FOR UPDATE USING (auth.uid() = id);
+DROP POLICY IF EXISTS profiles_select_own ON profiles;
+DROP POLICY IF EXISTS profiles_insert_own ON profiles;
+DROP POLICY IF EXISTS profiles_update_own ON profiles;
+CREATE POLICY profiles_select_own ON profiles FOR SELECT USING ((SELECT auth.uid()) = id);
+CREATE POLICY profiles_insert_own ON profiles FOR INSERT WITH CHECK ((SELECT auth.uid()) = id);
+CREATE POLICY profiles_update_own ON profiles FOR UPDATE USING ((SELECT auth.uid()) = id);
 
 -- companies (via accountant_id)
-CREATE POLICY "companies_select_own" ON companies FOR SELECT USING (auth.uid() = accountant_id);
-CREATE POLICY "companies_insert_own" ON companies FOR INSERT WITH CHECK (auth.uid() = accountant_id);
-CREATE POLICY "companies_update_own" ON companies FOR UPDATE USING (auth.uid() = accountant_id);
-CREATE POLICY "companies_delete_own" ON companies FOR DELETE USING (auth.uid() = accountant_id);
+DROP POLICY IF EXISTS companies_select_own ON companies;
+DROP POLICY IF EXISTS companies_insert_own ON companies;
+DROP POLICY IF EXISTS companies_update_own ON companies;
+DROP POLICY IF EXISTS companies_delete_own ON companies;
+CREATE POLICY companies_select_own ON companies FOR SELECT USING ((SELECT auth.uid()) = accountant_id);
+CREATE POLICY companies_insert_own ON companies FOR INSERT WITH CHECK ((SELECT auth.uid()) = accountant_id);
+CREATE POLICY companies_update_own ON companies FOR UPDATE USING ((SELECT auth.uid()) = accountant_id);
+CREATE POLICY companies_delete_own ON companies FOR DELETE USING ((SELECT auth.uid()) = accountant_id);
 
 -- credits
-CREATE POLICY "credits_select_own" ON credits FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "credits_insert_own" ON credits FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "credits_update_own" ON credits FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS credits_select_own ON credits;
+DROP POLICY IF EXISTS credits_insert_own ON credits;
+DROP POLICY IF EXISTS credits_update_own ON credits;
+CREATE POLICY credits_select_own ON credits FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY credits_insert_own ON credits FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY credits_update_own ON credits FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- orders
-CREATE POLICY "orders_select_own" ON orders FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "orders_insert_own" ON orders FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "orders_update_own" ON orders FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS orders_select_own ON orders;
+DROP POLICY IF EXISTS orders_insert_own ON orders;
+DROP POLICY IF EXISTS orders_update_own ON orders;
+CREATE POLICY orders_select_own ON orders FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY orders_insert_own ON orders FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY orders_update_own ON orders FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- analyses
-CREATE POLICY "analyses_select_own" ON analyses FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "analyses_insert_own" ON analyses FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "analyses_update_own" ON analyses FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "analyses_delete_own" ON analyses FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS analyses_select_own ON analyses;
+DROP POLICY IF EXISTS analyses_insert_own ON analyses;
+DROP POLICY IF EXISTS analyses_update_own ON analyses;
+DROP POLICY IF EXISTS analyses_delete_own ON analyses;
+CREATE POLICY analyses_select_own ON analyses FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY analyses_insert_own ON analyses FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY analyses_update_own ON analyses FOR UPDATE USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY analyses_delete_own ON analyses FOR DELETE USING ((SELECT auth.uid()) = user_id);
 
 -- anomalies
-CREATE POLICY "anomalies_select_own" ON anomalies FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "anomalies_insert_own" ON anomalies FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "anomalies_update_own" ON anomalies FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS anomalies_select_own ON anomalies;
+DROP POLICY IF EXISTS anomalies_insert_own ON anomalies;
+DROP POLICY IF EXISTS anomalies_update_own ON anomalies;
+CREATE POLICY anomalies_select_own ON anomalies FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY anomalies_insert_own ON anomalies FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY anomalies_update_own ON anomalies FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- api_keys
-CREATE POLICY "api_keys_select_own" ON api_keys FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "api_keys_insert_own" ON api_keys FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "api_keys_update_own" ON api_keys FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "api_keys_delete_own" ON api_keys FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS api_keys_select_own ON api_keys;
+DROP POLICY IF EXISTS api_keys_insert_own ON api_keys;
+DROP POLICY IF EXISTS api_keys_update_own ON api_keys;
+DROP POLICY IF EXISTS api_keys_delete_own ON api_keys;
+CREATE POLICY api_keys_select_own ON api_keys FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY api_keys_insert_own ON api_keys FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY api_keys_update_own ON api_keys FOR UPDATE USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY api_keys_delete_own ON api_keys FOR DELETE USING ((SELECT auth.uid()) = user_id);
 
 -- payment_methods
-CREATE POLICY "payment_methods_select_own" ON payment_methods FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "payment_methods_insert_own" ON payment_methods FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "payment_methods_update_own" ON payment_methods FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "payment_methods_delete_own" ON payment_methods FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS payment_methods_select_own ON payment_methods;
+DROP POLICY IF EXISTS payment_methods_insert_own ON payment_methods;
+DROP POLICY IF EXISTS payment_methods_update_own ON payment_methods;
+DROP POLICY IF EXISTS payment_methods_delete_own ON payment_methods;
+CREATE POLICY payment_methods_select_own ON payment_methods FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY payment_methods_insert_own ON payment_methods FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY payment_methods_update_own ON payment_methods FOR UPDATE USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY payment_methods_delete_own ON payment_methods FOR DELETE USING ((SELECT auth.uid()) = user_id);
 
 -- success_charges
-CREATE POLICY "success_charges_select_own" ON success_charges FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "success_charges_insert_own" ON success_charges FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "success_charges_update_own" ON success_charges FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS success_charges_select_own ON success_charges;
+DROP POLICY IF EXISTS success_charges_insert_own ON success_charges;
+DROP POLICY IF EXISTS success_charges_update_own ON success_charges;
+CREATE POLICY success_charges_select_own ON success_charges FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY success_charges_insert_own ON success_charges FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY success_charges_update_own ON success_charges FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- company_members
-CREATE POLICY "company_members_select_own" ON company_members FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "company_members_insert_own" ON company_members FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "company_members_update_own" ON company_members FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "company_members_delete_own" ON company_members FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS company_members_select_own ON company_members;
+DROP POLICY IF EXISTS company_members_insert_own ON company_members;
+DROP POLICY IF EXISTS company_members_update_own ON company_members;
+DROP POLICY IF EXISTS company_members_delete_own ON company_members;
+CREATE POLICY company_members_select_own ON company_members FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY company_members_insert_own ON company_members FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY company_members_update_own ON company_members FOR UPDATE USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY company_members_delete_own ON company_members FOR DELETE USING ((SELECT auth.uid()) = user_id);
 
 -- success_plans
-CREATE POLICY "success_plans_select_own" ON success_plans FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "success_plans_insert_own" ON success_plans FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "success_plans_update_own" ON success_plans FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS success_plans_select_own ON success_plans;
+DROP POLICY IF EXISTS success_plans_insert_own ON success_plans;
+DROP POLICY IF EXISTS success_plans_update_own ON success_plans;
+CREATE POLICY success_plans_select_own ON success_plans FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY success_plans_insert_own ON success_plans FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY success_plans_update_own ON success_plans FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- api_logs
-CREATE POLICY "api_logs_insert_own"   ON api_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "api_logs_select_own"   ON api_logs FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS api_logs_insert_own ON api_logs;
+DROP POLICY IF EXISTS api_logs_select_own ON api_logs;
+CREATE POLICY api_logs_insert_own ON api_logs FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY api_logs_select_own ON api_logs FOR SELECT USING ((SELECT auth.uid()) = user_id);
 
 
 -- =============================================
@@ -408,7 +456,9 @@ CREATE POLICY "api_logs_select_own"   ON api_logs FOR SELECT USING (auth.uid() =
 -- =============================================
 
 CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = 'public'
+AS $$
 BEGIN
   INSERT INTO profiles (id, email, full_name)
   VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name');
@@ -462,7 +512,9 @@ RETURNS TABLE (
   user_id UUID,
   permissions TEXT[],
   rate_limit INTEGER
-) AS $$
+)
+SET search_path = 'public'
+AS $$
 DECLARE
   hash TEXT;
   key_record api_keys%ROWTYPE;
@@ -493,7 +545,9 @@ RETURNS TABLE (
   user_id UUID,
   permissions TEXT[],
   rate_limit INTEGER
-) AS $$
+)
+SET search_path = 'public'
+AS $$
 BEGIN
   RETURN QUERY SELECT * FROM internal.verify_api_key(key_text);
 END;
@@ -501,7 +555,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- consume_credit (core: SECURITY DEFINER en schema privado)
 CREATE OR REPLACE FUNCTION internal.consume_credit(p_user_id UUID, p_company_id UUID DEFAULT NULL)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+SET search_path = 'public'
+AS $$
 DECLARE
   credit_row credits%ROWTYPE;
   left_credits INTEGER;
@@ -531,7 +587,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- consume_credit (wrapper público: SECURITY INVOKER, user_id deriva de auth.uid())
 CREATE OR REPLACE FUNCTION public.consume_credit(p_company_id UUID DEFAULT NULL)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+SET search_path = ''
+AS $$
 BEGIN
   RETURN internal.consume_credit(auth.uid(), p_company_id);
 END;
@@ -539,7 +597,9 @@ $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 -- can_access_company (core: SECURITY DEFINER en schema privado)
 CREATE OR REPLACE FUNCTION internal.can_access_company(company_uuid UUID)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+SET search_path = 'public'
+AS $$
 DECLARE
   company_accountant UUID;
 BEGIN
@@ -550,14 +610,18 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- can_access_company (wrapper público: SECURITY INVOKER)
 CREATE OR REPLACE FUNCTION public.can_access_company(company_uuid UUID)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+SET search_path = ''
+AS $$
 BEGIN
   RETURN internal.can_access_company(company_uuid);
 END;
 $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 CREATE OR REPLACE FUNCTION cleanup_old_api_logs()
-RETURNS void AS $$
+RETURNS void
+SET search_path = ''
+AS $$
 BEGIN
   DELETE FROM api_logs WHERE created_at < NOW() - INTERVAL '30 days';
 END;
@@ -581,6 +645,9 @@ GRANT EXECUTE ON FUNCTION public.can_access_company(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION internal.consume_credit(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION internal.verify_api_key(TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION internal.can_access_company(UUID) TO authenticated;
+
+-- handle_new_user es solo para el trigger, no debe ser ejecutable por usuarios
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated;
 
 
 -- =============================================

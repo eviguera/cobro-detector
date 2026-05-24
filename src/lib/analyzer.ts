@@ -65,6 +65,9 @@ Responde SOLO JSON con esta estructura exacta:
   "summary": "Resumen en 2-3 oraciones"
 }`
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
+
   try {
     const chatCompletion = await getGroq().chat.completions.create({
       messages: [
@@ -74,7 +77,9 @@ Responde SOLO JSON con esta estructura exacta:
       model: 'llama-3.1-8b-instant',
       temperature: 0.1,
       response_format: { type: 'json_object' },
-    })
+    }, { signal: controller.signal })
+
+    clearTimeout(timeoutId)
 
     const text = chatCompletion.choices[0]?.message?.content || ''
     const clean = text.replace(/```json\n?|```\n?/g, '').trim()
@@ -94,7 +99,12 @@ Responde SOLO JSON con esta estructura exacta:
       summary: typeof parsed.summary === 'string' ? parsed.summary.substring(0, 500) : '',
     }
   } catch (error) {
-    console.error('Error en analyzeTransactionsWithAI:', error)
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error('Groq API timeout después de 30s')
+    } else {
+      console.error('Error en analyzeTransactionsWithAI:', error)
+    }
     return { anomalies: [], summary: 'No se pudo completar el análisis automático.' }
   }
 }
@@ -390,14 +400,11 @@ export async function analyzeFile(
     // Detectar banco
     const bank = detectBank('', transactions.map(tx => tx.description).join(' '))
 
-    // Ejecutar detección por reglas
-    const ruleAnomalies = detectAnomaliesRules(transactions)
-
-    // Detectar anomalías pre-etiquetadas en el CSV
-    const labeledAnomalies = detectLabeledAnomalies(transactions)
-
-    // Ejecutar análisis con IA
-    const aiResult = await analyzeTransactionsWithAI(transactions, bank)
+    const [ruleAnomalies, labeledAnomalies, aiResult] = await Promise.all([
+      Promise.resolve(detectAnomaliesRules(transactions)),
+      Promise.resolve(detectLabeledAnomalies(transactions)),
+      analyzeTransactionsWithAI(transactions, bank),
+    ])
 
     // Combinar resultados (IA + reglas + etiquetadas)
     const allAnomalies = [...ruleAnomalies, ...labeledAnomalies, ...aiResult.anomalies]
