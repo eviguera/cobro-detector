@@ -29,11 +29,11 @@ function KpiCard({ icon: Icon, value, label, trend, accent }: { icon: typeof Ban
     muted: 'text-gray-400 bg-gray-100 dark:bg-gray-800',
   }
   return (
-    <div className="rounded-xl bg-white dark:bg-gray-900 p-6 text-center" style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.06))' }}>
-      <div className={`inline-flex items-center justify-center w-11 h-11 rounded-2xl mb-3 ${colors[accent]}`}>
-        <Icon className="w-5 h-5" />
+    <div className="rounded-xl bg-white dark:bg-gray-900 p-4 sm:p-5 text-center" style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.06))' }}>
+      <div className={`inline-flex items-center justify-center w-9 h-9 rounded-xl mb-2 ${colors[accent]}`}>
+        <Icon className="w-4 h-4" />
       </div>
-      <p className="font-display font-bold text-2xl sm:text-3xl text-gray-900 dark:text-gray-100 tabular-nums leading-none mb-1.5 truncate">{value}</p>
+      <p className="font-display font-bold text-xl sm:text-2xl text-gray-900 dark:text-gray-100 tabular-nums leading-none mb-1.5 truncate">{value}</p>
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</p>
       {trend && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1.5">{trend}</p>}
     </div>
