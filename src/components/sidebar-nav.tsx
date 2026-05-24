@@ -26,8 +26,8 @@ export function SidebarNav() {
                 aria-current={isActive ? 'page' : undefined}
                 className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                    ? 'bg-[#4c6ef5] text-white font-semibold shadow-lg shadow-[#4c6ef5]/20'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                 }`}
               >
                 <item.icon className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />

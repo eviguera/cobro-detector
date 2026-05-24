@@ -241,7 +241,7 @@ export default function AnalisisPage() {
           <button
             onClick={runAnalysis}
             disabled={loading}
-            className="mt-6 w-full flex items-center justify-center gap-2.5 py-3.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            className="mt-6 w-full flex items-center justify-center gap-2.5 py-3.5 bg-[#4c6ef5] hover:bg-[#3b5bdb] text-white rounded-[30px] font-semibold text-sm transition-all duration-300 shadow-lg shadow-[#4c6ef5]/20 hover:shadow-xl hover:shadow-[#4c6ef5]/30 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -450,7 +450,7 @@ export default function AnalisisPage() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={() => router.push(`/historial/${result.analysisId}`)}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 flex items-center justify-center gap-2"
+              className="px-6 py-3 bg-[#4c6ef5] hover:bg-[#3b5bdb] text-white rounded-[30px] font-semibold text-sm transition-all duration-300 shadow-lg shadow-[#4c6ef5]/20 flex items-center justify-center gap-2"
             >
               <FileText className="w-4 h-4" />
               Ver en historial
@@ -467,7 +467,7 @@ export default function AnalisisPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 stagger-children">
-            <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5" style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.05))' }}>
               <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
                 Anomalías detectadas
               </p>
@@ -480,7 +480,7 @@ export default function AnalisisPage() {
                 </p>
               )}
             </div>
-            <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5" style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.05))' }}>
               <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
                 Monto recuperable
               </p>
@@ -489,7 +489,7 @@ export default function AnalisisPage() {
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">estimado</p>
             </div>
-            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 rounded-2xl p-5">
+            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 rounded-2xl p-5" style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.05))' }}>
               <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1.5">
                 Siguiente paso
               </p>
@@ -533,7 +533,7 @@ export default function AnalisisPage() {
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => router.push(`/historial/${result.analysisId}`)}
-              className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+              className="flex-1 py-3.5 bg-[#4c6ef5] hover:bg-[#3b5bdb] text-white rounded-[30px] font-semibold text-sm transition-all duration-300 shadow-lg shadow-[#4c6ef5]/20 hover:shadow-xl hover:shadow-[#4c6ef5]/30 hover:-translate-y-0.5 flex items-center justify-center gap-2"
             >
               <FileText className="w-4 h-4" />
               Ver reporte completo

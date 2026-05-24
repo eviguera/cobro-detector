@@ -28,7 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0f] flex">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0a0a0f] flex">
       <MobileSidebar
         creditsLeft={creditsLeft}
         creditsTotal={credits?.total ?? 0}
@@ -37,30 +37,30 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userInitial={(profile?.full_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
       />
 
-      <aside className="hidden lg:flex w-64 bg-white/80 dark:bg-[#0d0d14]/90 backdrop-blur-xl border-r border-gray-100 dark:border-gray-800/40 flex-col fixed h-full z-30">
-        <div className="p-5 border-b border-gray-100 dark:border-gray-800/30">
+      <aside className="hidden lg:flex w-64 bg-[#0f172a] flex-col fixed h-full z-30 shadow-2xl">
+        <div className="p-5 border-b border-gray-800/40">
           <Link href="/dashboard" className="group flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/30 group-hover:scale-105 transition-all duration-300">
+            <div className="w-8 h-8 bg-[#4c6ef5] rounded-xl flex items-center justify-center shadow-lg shadow-[#4c6ef5]/20 group-hover:shadow-xl group-hover:shadow-[#4c6ef5]/30 group-hover:scale-105 transition-all duration-300">
               <Shield className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm tracking-tight">CobroDetector</span>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium tracking-wider uppercase">Dashboard</p>
+              <span className="font-display font-bold text-white text-sm tracking-tight">CobroDetector</span>
+              <p className="text-[10px] text-gray-400 font-medium tracking-wider uppercase">Dashboard</p>
             </div>
           </Link>
         </div>
 
-        <div className="px-4 py-3 mx-3 mt-4 bg-gradient-to-br from-blue-50 to-blue-100/80 dark:from-blue-950/60 dark:to-blue-900/20 rounded-2xl border border-blue-200/60 dark:border-blue-800/30 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-blue-400/10 to-transparent rounded-full -translate-y-8 translate-x-8" />
-          <p className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold tracking-wider uppercase mb-1">Créditos</p>
-          <p className="text-3xl font-bold text-blue-700 dark:text-blue-300 tracking-tight">{creditsLeft}</p>
+        <div className="px-4 py-3 mx-3 mt-4 bg-[#1e293b] rounded-2xl border border-gray-700/30 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-[#4c6ef5]/10 to-transparent rounded-full -translate-y-8 translate-x-8" />
+          <p className="text-[11px] text-gray-400 font-semibold tracking-wider uppercase mb-1">Créditos</p>
+          <p className="text-3xl font-bold text-white tracking-tight font-display">{creditsLeft}</p>
           {creditsLeft === 0 ? (
-            <Link href="/precios" className="inline-flex items-center gap-1 mt-2 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+            <Link href="/precios" className="inline-flex items-center gap-1 mt-2 text-[11px] font-medium text-[#10b981] hover:text-[#34d399] transition-colors">
               <Sparkles className="w-3 h-3" />
               Comprar créditos <ChevronRight className="w-3 h-3" />
             </Link>
           ) : (
-            <p className="text-[11px] text-blue-500/70 dark:text-blue-400/60 mt-2">
+            <p className="text-[11px] text-gray-500 mt-2">
               de {credits?.total ?? 0} totales
             </p>
           )}
@@ -72,20 +72,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <ThemeToggle />
         </div>
 
-        <div className="p-4 border-t border-gray-100 dark:border-gray-800/30">
+        <div className="p-4 border-t border-gray-800/40 mt-auto">
           <div className="flex items-center gap-3 mb-3 px-1">
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div className="w-9 h-9 bg-[#4c6ef5] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md shadow-[#4c6ef5]/20">
               <span className="text-white text-sm font-bold">
                 {(profile?.full_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-tight">{profile?.full_name ?? 'Usuario'}</p>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{user.email}</p>
+              <p className="text-sm font-medium text-white truncate leading-tight">{profile?.full_name ?? 'Usuario'}</p>
+              <p className="text-[11px] text-gray-400 truncate">{user.email}</p>
             </div>
           </div>
           <form action="/api/logout" method="POST">
-            <button type="submit" className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-xl transition-all duration-200">
+            <button type="submit" className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 rounded-xl transition-all duration-200">
               <LogOut className="w-3.5 h-3.5" />
               Cerrar sesión
             </button>
