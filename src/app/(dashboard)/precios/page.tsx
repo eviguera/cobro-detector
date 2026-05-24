@@ -76,21 +76,11 @@ export default async function PreciosPage() {
 
               {plan.key === 'contador' ? (
                 <div className="space-y-2">
-                  <a
-                    href="/analisis?plan=platino"
-                    className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <Percent className="w-4 h-4" />
-                    20% de lo recuperado
-                  </a>
-                  <BuyButton.Default plan={plan} />
+                  <BuyButton plan={plan} variant="platino" />
+                  <BuyButton plan={plan} />
                 </div>
               ) : (
-                plan.highlighted ? (
-                  <BuyButton.Highlighted plan={plan} />
-                ) : (
-                  <BuyButton.Default plan={plan} />
-                )
+                <BuyButton plan={plan} variant={plan.percentage ? 'platino' : plan.highlighted ? 'highlighted' : 'default'} />
               )}
             </div>
           )
