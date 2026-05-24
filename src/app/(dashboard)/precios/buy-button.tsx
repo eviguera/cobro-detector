@@ -8,9 +8,9 @@ import { toast } from 'sonner'
 type ButtonVariant = 'default' | 'highlighted' | 'platino'
 
 const variantClasses: Record<ButtonVariant, string> = {
-  platino: 'bg-amber-500 text-white hover:bg-amber-600',
-  highlighted: 'bg-blue-600 text-white hover:bg-blue-700',
-  default: 'bg-gray-100 text-gray-900 hover:bg-gray-200',
+  platino: 'bg-amber-500 text-white hover:bg-amber-600 shadow-sm',
+  highlighted: 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm',
+  default: 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800/40',
 }
 
 const variantLabels: Record<ButtonVariant, (plan: Plan) => React.ReactNode> = {
