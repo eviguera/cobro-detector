@@ -385,3 +385,16 @@ input[type="reset"] {
   min-width: 24px;
   min-height: 24px;
 }
+
+/* Micro-interactions */
+@media (prefers-reduced-motion: no-preference) {
+  .btn-primary {
+    @apply transition-all duration-300 hover:scale-[1.02] active:scale-[0.98];
+  }
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md;
+  }
+  .link-hover {
+    @apply transition-colors duration-200 hover:text-blue-600 dark:hover:text-blue-400;
+  }
+}

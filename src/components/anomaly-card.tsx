@@ -43,10 +43,15 @@ function AnomalyCardBase({
   children,
 }: AnomalyCardBaseProps & { children?: React.ReactNode }) {
   const colorClasses = SEVERITY[severity]?.color ?? 'bg-white dark:bg-gray-900/60 border-gray-100 dark:border-gray-800/40'
+  const borderClass = severity === 'high'
+    ? 'border-red-300 dark:border-red-800 bg-gradient-to-br from-red-50/40 to-white dark:from-red-950/20 dark:to-gray-900/60'
+    : severity === 'medium'
+    ? 'border-amber-300 dark:border-amber-800 bg-gradient-to-br from-amber-50/40 to-white dark:from-amber-950/20 dark:to-gray-900/60'
+    : 'border-gray-200 dark:border-gray-800 bg-gradient-to-br from-gray-50/40 to-white dark:from-gray-900/40 dark:to-gray-900/60'
 
   return (
     <div
-      className={`rounded-2xl border p-5 transition-all duration-300 hover:shadow-md ${colorClasses}`}
+      className={`rounded-2xl border p-5 transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${borderClass}`}
       style={{ animationDelay: `${index * 60}ms` }}
     >
       <div className="flex items-start justify-between mb-3">

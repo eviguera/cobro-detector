@@ -5,6 +5,7 @@ import { Shield, LogOut, ChevronRight, Sparkles } from 'lucide-react'
 import type { Credits, Profile } from '@/types/database.types'
 import { SidebarNav } from '@/components/sidebar-nav'
 import { MobileSidebar } from '@/components/mobile-sidebar'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 async function getDashboardData(userId: string) {
   const supabase = await createClient()
@@ -66,6 +67,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
 
         <SidebarNav />
+
+        <div className="px-3 mt-2 space-y-0.5">
+          <ThemeToggle />
+        </div>
 
         <div className="p-4 border-t border-gray-100 dark:border-gray-800/30">
           <div className="flex items-center gap-3 mb-3 px-1">

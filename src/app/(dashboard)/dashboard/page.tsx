@@ -4,6 +4,7 @@ import { FileSearch, TrendingDown, AlertTriangle, CheckCircle2, ArrowRight, Plus
 import { formatCLP, formatDate } from '@/lib/utils'
 import type { Analysis, Credits } from '@/types/database.types'
 import { DashboardClient } from './dashboard-client'
+import { SavingsChart } from '@/components/savings-chart'
 
 function getDayLabel(date: Date, today: Date): string {
   const diff = today.getTime() - date.getTime()
@@ -107,6 +108,20 @@ export default async function DashboardPage() {
 
   const recentAnalyses = analyses?.slice(0, 5) ?? []
 
+  const monthlyRecovery = analyses?.reduce<Record<string, number>>((acc, a) => {
+    const month = a.created_at?.substring(0, 7) ?? 'unknown'
+    acc[month] = (acc[month] ?? 0) + (a.recoverable_amount ?? 0)
+    return acc
+  }, {}) ?? {}
+  const savingsData = Object.entries(monthlyRecovery)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-7)
+    .map(([month, amount]) => {
+      const [y, m] = month.split('-')
+      const names = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+      return { month: names[parseInt(m) - 1], amount }
+    })
+
   return (
     <div className="animate-fade-in-up space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
@@ -182,8 +197,71 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 stagger-children">
-        <div className="lg:col-span-2 bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 sm:p-6 shadow-sm">
+      {totalRecoverable > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 stagger-children">
+          <div className="lg:col-span-2">
+            <SavingsChart data={savingsData} total={totalRecoverable} />
+          </div>
+          <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 sm:p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+                <Brain className="w-[18px] h-[18px] text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Insights</h2>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">Resumen inteligente</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {topBank && (
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
+                  <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-4 h-4 text-red-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">{topBank[0]}</p>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                      {topBank[1].anomalies} anomalías · {formatCLP(topBank[1].recoverable)} recuperable
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {totalAnomalies > 0 && (
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Promedio por análisis</p>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                      {(totalAnomalies / (analysesWithAnomalies || 1)).toFixed(1)} anomalías por caso detectado
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
+                  <CalendarDays className="w-4 h-4 text-blue-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Última actividad</p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                    {recentAnalyses.length > 0
+                      ? getDayLabel(new Date(recentAnalyses[0].created_at), today)
+                      : 'Sin actividad'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 stagger-children">
+        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 sm:p-6 shadow-sm">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
@@ -241,62 +319,6 @@ export default async function DashboardPage() {
               })}
             </div>
           )}
-        </div>
-
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 sm:p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
-              <Brain className="w-[18px] h-[18px] text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Insights</h2>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500">Resumen inteligente</p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {topBank && (
-              <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
-                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
-                  <Building2 className="w-4 h-4 text-red-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">{topBank[0]}</p>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                    {topBank[1].anomalies} anomalías · {formatCLP(topBank[1].recoverable)} recuperable
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {totalAnomalies > 0 && (
-              <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Promedio por análisis</p>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                    {(totalAnomalies / (analysesWithAnomalies || 1)).toFixed(1)} anomalías por caso detectado
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
-                <CalendarDays className="w-4 h-4 text-blue-500" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Última actividad</p>
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                  {recentAnalyses.length > 0
-                    ? getDayLabel(new Date(recentAnalyses[0].created_at), today)
-                    : 'Sin actividad'}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
