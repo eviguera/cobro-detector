@@ -13,7 +13,7 @@ test.describe.serial('Flujo E2E autenticado', () => {
     await page.waitForTimeout(3000)
 
     const fileInput = page.locator('input[type="file"]').first()
-    await fileInput.setInputFiles('/Users/eduardoviguera/Desktop/COBRO/cobro-detector/test-statement.csv')
+    await fileInput.setInputFiles('e2e/fixtures/test-statement.csv')
 
     const analyzeButton = page.getByRole('button', { name: /analizar|enviar|procesar/i }).first()
     await expect(analyzeButton).toBeEnabled({ timeout: 5000 })
@@ -57,7 +57,7 @@ test.describe.serial('Flujo E2E autenticado', () => {
     await uploadButton.click()
 
     const fileInput = page.locator('input[type="file"]').first()
-    await fileInput.setInputFiles('/Users/eduardoviguera/Desktop/COBRO/cobro-detector/test-statement.csv')
+    await fileInput.setInputFiles('e2e/fixtures/test-statement.csv')
 
     const analyzeButton = page.getByRole('button', { name: /analizar|enviar|procesar/i }).first()
     await expect(analyzeButton).toBeEnabled({ timeout: 5000 })
