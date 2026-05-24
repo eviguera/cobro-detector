@@ -33,7 +33,7 @@ function KpiCard({ icon: Icon, value, label, trend, accent }: { icon: typeof Ban
       <div className={`inline-flex items-center justify-center w-11 h-11 rounded-2xl mb-3 ${colors[accent]}`}>
         <Icon className="w-5 h-5" />
       </div>
-      <p className="font-display font-bold text-3xl sm:text-4xl text-gray-900 dark:text-gray-100 tabular-nums leading-none mb-1.5">{value}</p>
+      <p className="font-display font-bold text-2xl sm:text-3xl text-gray-900 dark:text-gray-100 tabular-nums leading-none mb-1.5 truncate">{value}</p>
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</p>
       {trend && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1.5">{trend}</p>}
     </div>
