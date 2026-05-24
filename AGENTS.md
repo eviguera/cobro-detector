@@ -42,6 +42,12 @@ npm run build         # Build de producción
 - Los tipos de base de datos en `src/types/database.types.ts` se **mantienen manualmente**, no son auto-generados. Si se agregan o modifican tablas/columnas en SQL, actualizar el archivo de tipos.
 - ESLint usa `eslint-config-next` (extiende `next/core-web-vitals` + `next/typescript`). Config en `eslint.config.mjs` (flat config).
 
+## Quirks de React / Next.js
+
+- **NO usar factory pattern para crear componentes** (ej: `createVariantComponent()`). Causa React error #419 en producción — referencias de componente inestables entre server/client render. Usar un solo componente con prop `variant` en vez de `BuyButton.Default`, `BuyButton.Highlighted`, etc.
+- **Nunca usar `user!.id` sin null check** en server components. Si `supabase.auth.getUser()` retorna `null` (cookie expirada, sesión inválida), el `!` rompe con error 500 y digest de Next.js. Siempre: `if (!user) redirect('/login')`.
+- CSP en `next.config.js` requiere `'unsafe-inline'` en `script-src` para que Next.js funcione correctamente en producción. Sin esto, los scripts inline de hidratación son bloqueados y el login/login rompe silenciosamente.
+
 ## Base de Datos Supabase
 
 ### Schema
@@ -59,7 +65,10 @@ npm run build         # Build de producción
 
 ### Problemas Conocidos del Schema
 
-- `handle_new_user` (trigger function) sigue en `public` con SECURITY DEFINER — mover a schema privado.
+- **Resuelto**: `handle_new_user` movido a `internal` y revocado de PUBLIC. `orders_with_credits` corregido a SECURITY INVOKER.
+- **Resuelto**: `search_path` fijo en todas las funciones (10 funciones con `SET search_path = 'public'` o `SET search_path = ''`).
+- **Resuelto**: Políticas RLS duplicadas eliminadas (~80 → 38 políticas limpias).
+- **Resuelto**: `orders_status_idx` duplicado eliminado. 3 covering indexes agregados para FKs sin índice.
 
 ### Flujo de Auth con API Keys
 
