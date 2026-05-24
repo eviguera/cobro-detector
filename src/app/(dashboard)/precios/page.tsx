@@ -4,7 +4,6 @@ import { CheckCircle2, Zap, Percent } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { Credits } from '@/types/database.types'
-import { BuyButton } from './buy-button'
 
 export default async function PreciosPage() {
   const supabase = await createClient()
@@ -74,28 +73,20 @@ export default async function PreciosPage() {
                 ))}
               </ul>
 
-              {plan.key === 'contador' ? (
-                <div className="space-y-2">
-                  <a
-                    href="/analisis?plan=platino"
-                    className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Percent className="w-4 h-4" />
-                    20% de lo recuperado
-                  </a>
-                  {plan.highlighted ? (
-                    <BuyButton.Highlighted plan={plan} />
-                  ) : (
-                    <BuyButton.Default plan={plan} />
-                  )}
-                </div>
-              ) : (
-                plan.highlighted ? (
-                  <BuyButton.Highlighted plan={plan} />
+              <a
+                href={plan.percentage ? '/analisis?plan=platino' : '#'}
+                className={`w-full py-2.5 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
+                  plan.percentage ? 'bg-amber-500 hover:bg-amber-600 text-white' :
+                  plan.highlighted ? 'bg-blue-600 hover:bg-blue-700 text-white' :
+                  'bg-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100'
+                }`}
+              >
+                {plan.percentage ? (
+                  <>Comenzar ahora</>
                 ) : (
-                  <BuyButton.Default plan={plan} />
-                )
-              )}
+                  <>Comprar {plan.name} — {formatCLP(plan.price)}</>
+                )}
+              </a>
             </div>
           )
         })}
@@ -106,22 +97,10 @@ export default async function PreciosPage() {
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm mb-3">Preguntas frecuentes</h3>
           <div className="space-y-4">
             {[
-              {
-                q: '¿Los créditos vencen?',
-                a: 'No. Los créditos que compras son permanentes y puedes usarlos cuando quieras.',
-              },
-              {
-                q: '¿Qué incluye un análisis?',
-                a: 'Detección de comisiones duplicadas, errores en cuotas, cargos no reconocidos, resumen con IA y reporte detallado listo para el banco.',
-              },
-              {
-                q: '¿Cómo funciona el plan Platino?',
-                a: 'Sin costo fijo. Subís tu estado de cuenta, detectamos los cobros injustificados, y solo pagás el 20% de lo que lográs recuperar. El reporte se libera una vez acreditado el pago.',
-              },
-              {
-                q: '¿Cómo pago?',
-                a: 'Aceptamos tarjetas de débito y crédito a través de Mercado Pago.',
-              },
+              { q: '¿Los créditos vencen?', a: 'No. Los créditos que compras son permanentes.' },
+              { q: '¿Qué incluye un análisis?', a: 'Detección de comisiones duplicadas, errores en cuotas, cargos no reconocidos, resumen con IA y reporte detallado.' },
+              { q: '¿Cómo funciona el plan Platino?', a: 'Sin costo fijo. Solo pagás el 20% de lo que lográs recuperar.' },
+              { q: '¿Cómo pago?', a: 'Aceptamos tarjetas de débito y crédito a través de Mercado Pago.' },
             ].map(item => (
               <div key={item.q}>
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.q}</p>
