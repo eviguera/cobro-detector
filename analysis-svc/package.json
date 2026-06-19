@@ -1,0 +1,31 @@
+{
+  "name": "analysis-svc",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "@supabase/supabase-js": "^2.105.4",
+    "groq-sdk": "^1.2.0",
+    "pdf-parse": "^1.1.1",
+    "exceljs": "^4.4.0",
+    "csv-parse": "^5.5.0",
+    "zod": "^3.23.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0"
+  }
+}

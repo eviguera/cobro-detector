@@ -1,0 +1,40 @@
+services:
+  api-svc:
+    build: ./api-svc
+    ports:
+      - "3004:3004"
+    env_file:
+      - .env
+    depends_on:
+      - analysis-svc
+      - payment-svc
+      - notification-svc
+      - admin-svc
+
+  analysis-svc:
+    build: ./analysis-svc
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+
+  payment-svc:
+    build: ./payment-svc
+    ports:
+      - "3002:3002"
+    env_file:
+      - .env
+
+  notification-svc:
+    build: ./notification-svc
+    ports:
+      - "3003:3003"
+    env_file:
+      - .env
+
+  admin-svc:
+    build: ./admin-svc
+    ports:
+      - "3005:3005"
+    env_file:
+      - .env
