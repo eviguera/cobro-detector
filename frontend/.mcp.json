@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "remote",
+      "url": "https://mcp.supabase.com/mcp?project_ref=mcwqqcngfibhgluvixlu"
+    },
+    "vercel": {
+      "type": "remote",
+      "url": "https://mcp.vercel.com/mcp"
+    },
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+      "environment": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_TOKEN}"
+      }
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "allpepper-memory-bank": {
+      "type": "local",
+      "command": ["npx", "-y", "@allpepper/memory-bank-mcp"],
+      "environment": {
+        "MEMORY_BANK_ROOT": "/Users/eduardoviguera/Desktop/COBRO/cobro-detector/.memory-bank"
+      }
+    },
+    "filesystem": {
+      "type": "local",
+      "command": ["docker", "run", "-i", "--rm", "mcp/filesystem", "/Users/eduardoviguera/Desktop/COBRO/cobro-detector"]
+    }
+  }
+}

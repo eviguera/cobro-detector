@@ -1,0 +1,75 @@
+---
+title: "Cómo detectar cobros duplicados en tu estado de cuenta bancario"
+description: "Aprende a identificar comisiones duplicadas en estados de cuenta de bancos chilenos. Guía paso a paso con ejemplos reales de Santander, BCI y Banco de Chile."
+date: "2026-05-15"
+author: "Equipo CobroDetector"
+tags: ["comisiones", "bancos", "guía", "detección"]
+image: "/og/blog-cobros-duplicados.png"
+---
+
+# Cómo detectar cobros duplicados en tu estado de cuenta bancario
+
+Si tienes un negocio en Chile y aceptas pagos con tarjeta de crédito, es muy probable que estés pagando comisiones de más sin saberlo. Los bancos cobran una comisión por cada venta con tarjeta, y cuando ofreces cuotas sin interés, esa comisión **se multiplica por cada cuota** — cuando legalmente solo debería cobrarse una vez.
+
+## El problema invisible
+
+Imagina que un cliente compra $100.000 en tu tienda en 6 cuotas sin interés. El banco te cobrará una comisión (digamos 2.5%) **seis veces**: una por cada cuota. Pero la ley chilena establece que el comercio solo debe pagar la comisión **una vez** por transacción.
+
+El resultado: estás perdiendo aproximadamente un **15% del valor de cada venta en cuotas**.
+
+## Cómo detectarlo manualmente
+
+Si quieres revisar tu estado de cuenta tú mismo, busca estos patrones:
+
+### Patrón 1: Comisiones con nombre del comercio repetido
+
+En estados de cuenta Santander, las comisiones de crédito aparecen con la descripción del comercio:
+
+```
+VENTA TC 6 CTAS COMERCIO X    -$100.000
+COMISION CREDITO COMERCIO X    -$2.500
+COMISION CREDITO COMERCIO X    -$2.500
+COMISION CREDITO COMERCIO X    -$2.500
+COMISION CREDITO COMERCIO X    -$2.500
+COMISION CREDITO COMERCIO X    -$2.500
+COMISION CREDITO COMERCIO X    -$2.500
+```
+
+En este ejemplo, se cobraron 6 comisiones de $2.500 cuando solo correspondía una. El monto recuperable es de **$12.500**.
+
+### Patrón 2: Montos idénticos en fechas cercanas
+
+Busca cargos con el mismo monto que aparezcan en ventanas de 7 días o menos. Los bancos a veces duplican cobros por error administrativo.
+
+### Patrón 3: Cargos con descripciones genéricas
+
+Cualquier cargo con descripciones como "COM.", "CARGO", "SERV.", "ADM." sin mayor detalle merece ser investigado. Muchos son legítimos, pero algunos son errores del sistema.
+
+## Los bancos más problemáticos
+
+Según nuestros datos de análisis:
+
+| Banco | Frecuencia de anomalías |
+|-------|------------------------|
+| **Santander** | Muy alta — formato de comisiones predecible pero propenso a duplicación |
+| **BCI** | Alta — comisiones duplicadas en ventas a cuotas |
+| **Banco de Chile** | Media — errores principalmente en cuotas sin interés |
+| **BancoEstado** | Media — cargos administrativos no detallados |
+
+## ¿Qué hacer si encuentras cobros duplicados?
+
+1. **Documenta**: Identifica cada transacción duplicada con fecha, descripción y monto
+2. **Calcula**: Suma el monto total que te deben devolver
+3. **Reclama**: Presenta una carta formal al banco detallando cada cobro
+4. **Escala**: Si el banco no responde en 10 días hábiles, puedes escalar a la CMF
+
+## La alternativa automática
+
+Revisar manualmente cientos de transacciones no es viable para un negocio. CobroDetector automatiza este proceso:
+
+- Subes tu estado de cuenta (PDF, Excel o CSV)
+- Nuestra IA analiza cada transacción
+- Detecta comisiones duplicadas, errores en cuotas y cargos no reconocidos
+- Genera una carta de reclamo lista para presentar al banco
+
+**[Prueba CobroDetector gratis →](/login)**

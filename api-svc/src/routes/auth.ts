@@ -4,10 +4,18 @@ import { SupabaseApiKeyRepository } from '../infrastructure/supabase-api-key-rep
 import { createServiceClient } from '../infrastructure/supabase-client.js'
 import { VerifyKeyUseCase } from '../application/verify-key.use-case.js'
 
-export async function authRoutes(app: FastifyInstance) {
-  const supabase = createServiceClient()
-  const keyRepo = new SupabaseApiKeyRepository(supabase)
+let supabase: ReturnType<typeof createServiceClient> | null = null
+let keyRepo: SupabaseApiKeyRepository | null = null
 
+function getRepo() {
+  if (!supabase) {
+    supabase = createServiceClient()
+    keyRepo = new SupabaseApiKeyRepository(supabase)
+  }
+  return keyRepo!
+}
+
+export async function authRoutes(app: FastifyInstance) {
   app.post('/v1/verify', async (request, reply) => {
     const schema = z.object({
       apiKey: z.string().min(1),
@@ -18,7 +26,7 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: parsed.error.issues[0].message })
     }
 
-    const useCase = new VerifyKeyUseCase(keyRepo)
+    const useCase = new VerifyKeyUseCase(getRepo())
     const result = await useCase.execute(parsed.data.apiKey)
 
     if (!result.authenticated) {
@@ -30,7 +38,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get('/v1/keys/:userId', async (request, reply) => {
     const { userId } = request.params as { userId: string }
-    const keys = await keyRepo.findByUserId(userId)
+    const keys = await getRepo().findByUserId(userId)
     return reply.send(keys.map(k => ({
       id: k.id,
       name: k.name,
