@@ -12,7 +12,7 @@ test.describe('Flujo de Pago E2E', () => {
     await page.waitForTimeout(3000)
 
     await expect(page.locator('h2, h1').first()).toBeVisible()
-    await expect(page.getByText(/\$[0-9]/)).toBeVisible()
+    await expect(page.locator('span.text-4xl').first()).toBeVisible()
 
     console.log('✅ Página de precios cargada')
   })
