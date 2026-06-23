@@ -106,7 +106,7 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-40 transition-opacity" onClick={skip} />
+      <div className="fixed inset-0 bg-black/20 z-40 transition-opacity pointer-events-none" />
       {children}
       <div className="fixed z-50 pointer-events-none" style={{ inset: 0 }}>
         <div

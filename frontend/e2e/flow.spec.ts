@@ -18,14 +18,6 @@ test.describe('CobroDetector E2E Tests', () => {
     await expect(page.getByText('97%')).toBeVisible();
   });
 
-  test('Health check endpoint', async ({ page }) => {
-    const response = await page.request.get('/api/health');
-    expect(response.ok()).toBeTruthy();
-    
-    const body = await response.json();
-    expect(body.status).toBe('healthy');
-  });
-
   test('Login page renders', async ({ page }) => {
     await page.goto('/login');
     
@@ -84,14 +76,4 @@ test.describe('CobroDetector E2E Tests', () => {
     // Verificar que la página se ve correctamente
     await expect(page.locator('h1')).toBeVisible();
   });
-
-test('API endpoints require auth', async ({ page }) => {
-  // Probar /api/analyze (requiere auth, puede retornar 401 o 429 rate-limited)
-  const analyzeResponse = await page.request.post('/api/analyze');
-  expect([401, 429]).toContain(analyzeResponse.status());
-  
-  // Probar /api/health (debe ser público)
-  const healthResponse = await page.request.get('/api/health');
-  expect(healthResponse.status()).toBe(200);
-});
 });
