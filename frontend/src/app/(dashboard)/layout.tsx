@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Shield, LogOut, ChevronRight, Sparkles } from 'lucide-react'
+import { Shield, ChevronRight, Sparkles } from 'lucide-react'
 import type { Profile, Credits } from '@/domain'
 import { SidebarNav } from '@/components/sidebar-nav'
 import { MobileSidebar } from '@/components/mobile-sidebar'

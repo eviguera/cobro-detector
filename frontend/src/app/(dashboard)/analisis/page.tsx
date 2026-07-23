@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, Clock, RotateCcw } from 'lucide-react'
+import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, RotateCcw } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { formatCLP } from '@/lib/utils'
-import { AnomalyCard } from '@/components/anomaly-card'
+
 import { createClient } from '@/lib/supabase/client'
 import { submitAnalysis, NoCreditsError } from '@/application/submit-analysis'
 import type { AnalysisRunResponse } from '@/domain'

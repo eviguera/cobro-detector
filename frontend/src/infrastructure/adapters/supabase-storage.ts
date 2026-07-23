@@ -31,7 +31,7 @@ export async function createAnalysisRecord(
   fileName: string,
   fileType: string,
   fileUrl: string,
-  isPlatino: boolean,
+  _isPlatino: boolean,
 ): Promise<string> {
   const supabase = createClient()
 
