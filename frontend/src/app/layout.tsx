@@ -2,11 +2,23 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from 'next-themes'
+import * as Sentry from '@sentry/nextjs'
 
 export const metadata: Metadata = {
   title: 'CobroDetector · Detecta cobros injustificados de tu banco',
   description: 'Sube tu estado de cuenta y nuestra IA detecta comisiones duplicadas, errores en cuotas y cargos no reconocidos. Recupera tu dinero.',
   keywords: 'cobros duplicados, comisiones bancarias, estado de cuenta, Santander, BCI, Chile',
+}
+
+// Inicializar Sentry en el cliente
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    tracesSampleRate: 0.1,
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
+    environment: process.env.NODE_ENV || 'development',
+  })
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

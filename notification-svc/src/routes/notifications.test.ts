@@ -19,7 +19,11 @@ vi.mock('../infrastructure/adapters/supabase-event-repository.adapter.js', () =>
 }))
 
 vi.mock('../infrastructure/adapters/supabase-client.js', () => ({
-  createServiceClient: vi.fn().mockReturnValue({}),
+  createServiceClient: vi.fn().mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }),
+  }),
 }))
 
 import { notificationRoutes } from './notifications.js'

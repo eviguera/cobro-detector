@@ -14,7 +14,7 @@ export class SupabaseMetricsRepository implements MetricsRepository {
     const totalUsers = usersResult.count ?? 0
     const analyses = analysesResult.data ?? []
     const totalAnalyses = analyses.length
-    const totalAnomalies = 0
+    const totalAnomalies = analyses.filter(a => (a as Record<string, unknown>).status === 'completed').length
     const totalRecovered = analyses.reduce((sum, a) => sum + ((a as Record<string, unknown>).recoverable_amount as number || 0), 0)
     const revenue = (ordersResult.data ?? []).reduce((sum, o) => sum + ((o as Record<string, unknown>).amount_clp as number || 0), 0)
     const activeUsers = new Set(analyses.map(a => (a as Record<string, unknown>).user_id as string)).size

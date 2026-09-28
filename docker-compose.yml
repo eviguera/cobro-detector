@@ -1,40 +1,84 @@
 services:
   api-svc:
-    build: ./api-svc
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     ports:
       - "3004:3004"
     env_file:
       - .env
     depends_on:
-      - analysis-svc
-      - payment-svc
-      - notification-svc
-      - admin-svc
+      analysis-svc:
+        condition: service_healthy
+      payment-svc:
+        condition: service_healthy
+      notification-svc:
+        condition: service_healthy
+      admin-svc:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 
   analysis-svc:
-    build: ./analysis-svc
+    build:
+      context: .
+      dockerfile: Dockerfile.analysis
     ports:
       - "3001:3001"
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 
   payment-svc:
-    build: ./payment-svc
+    build:
+      context: .
+      dockerfile: Dockerfile.payment
     ports:
       - "3002:3002"
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 
   notification-svc:
-    build: ./notification-svc
+    build:
+      context: .
+      dockerfile: Dockerfile.notification
     ports:
       - "3003:3003"
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 
   admin-svc:
-    build: ./admin-svc
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
     ports:
       - "3005:3005"
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped

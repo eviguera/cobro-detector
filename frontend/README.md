@@ -194,46 +194,53 @@ Verifica: migraciones SQL, endpoints API, tipos de base de datos, dependencias y
 ## Estructura del proyecto
 
 ```
-src/
-├── app/
-│   ├── (auth)/login/              # Login y registro
-│   ├── (dashboard)/
-│   │   ├── dashboard/             # Home con métricas y búsqueda
-│   │   ├── analisis/              # Upload + resultados + paywall Platino
-│   │   ├── historial/             # Lista con filtro (semana/mes/año) y delete
-│   │   │   └── [id]/              # Detalle con anomalías, reporte, paywall
-│   │   └── precios/               # Planes y compra
-│   ├── api/
-│   │   ├── analyze/               # POST: upload + análisis síncrono
-│   │   ├── analyses/[id]/         # DELETE: eliminar análisis
-│   │   ├── companies/             # CRUD multi-empresa
-│   │   ├── documents/             # Cartas reclamo (DOCX/PDF)
-│   │   ├── payments/
-│   │   │   ├── create/            # Crear preferencia MP
-│   │   │   ├── webhook/           # Recibir notificaciones MP
-│   │   │   └── unlock-report/     # Pago 20% para desbloquear reporte
-│   │   └── v1/analyses/[id]/      # API pública (API key auth)
-│   └── page.tsx                   # Landing page
-├── components/
-│   └── anomaly-card.tsx           # Tarjeta de anomalía
-├── lib/
-│   ├── analyzer.ts                # Motor de detección (reglas + IA)
-│   ├── parser.ts                  # Parser CSV/Excel/PDF
-│   ├── plans.ts                   # Configuración de planes
-│   ├── mercadopago.ts             # Cliente Mercado Pago
-│   ├── api-auth.ts                # Auth API keys (SHA-256 vía RPC)
-│   ├── api-error.ts               # Manejo de errores HTTP
-│   ├── security.ts                # Sanitización + verificación webhook
-│   ├── rate-limit.ts              # Rate limiting (Upstash Redis)
-│   ├── analysis-queue.ts          # Procesamiento asíncrono de análisis
-│   ├── document-generator.ts      # Generación Word/PDF
-│   ├── services/
-│   │   ├── credit.service.ts      # Gestión de créditos
-│   │   └── company.service.ts     # Gestión multi-empresa
-│   └── supabase/                  # Clientes Supabase (server/client/middleware)
-└── types/
-    └── database.types.ts          # Tipos TypeScript (manuales)
+cobro-detector/
+├── frontend/                      # Next.js App (Vercel)
+│   ├── src/
+│   │   ├── app/                   # Páginas (App Router)
+│   │   │   ├── (auth)/login/      # Login y registro
+│   │   │   ├── (dashboard)/
+│   │   │   │   ├── dashboard/     # Home con métricas y búsqueda
+│   │   │   │   ├── analisis/      # Upload + resultados + paywall Platino
+│   │   │   │   ├── historial/     # Lista con filtro y paginación
+│   │   │   │   │   └── [id]/      # Detalle con anomalías, reporte, paywall
+│   │   │   │   └── precios/       # Planes y compra
+│   │   │   └── page.tsx           # Landing page
+│   │   ├── components/            # Componentes React
+│   │   ├── domain/                # Tipos del dominio
+│   │   ├── application/           # Casos de uso
+│   │   ├── infrastructure/        # HTTP clients y adapters
+│   │   └── lib/                   # Utilidades y servicios
+│   ├── e2e/                       # Tests E2E (Playwright)
+│   ├── docs/                      # Documentación
+│   └── scripts/                   # Scripts de QA y utilidades
+├── analysis-svc/                 # Microservicio de análisis (Fastify)
+├── payment-svc/                  # Microservicio de pagos (Fastify)
+├── api-svc/                      # Microservicio de API keys (Fastify)
+├── admin-svc/                    # Microservicio de administración (Fastify)
+├── notification-svc/             # Microservicio de notificaciones (Fastify)
+├── supabase/                      # Migraciones SQL
+├── docker-compose.yml             # Orquestación local
+└── docs/                          # Documentación de deploy
 ```
+
+### Microservicios
+
+| Servicio | Puerto | Descripción |
+|----------|--------|-------------|
+| `analysis-svc` | 3001 | Análisis de estados de cuenta con IA |
+| `payment-svc` | 3002 | Procesamiento de pagos con MercadoPago |
+| `api-svc` | 3004 | Autenticación y gestión de API keys |
+| `admin-svc` | 3005 | Métricas y administración |
+| `notification-svc` | 3003 | Notificaciones por email (Resend) |
+
+Todos los microservicios usan:
+- **Fastify** como framework HTTP
+- **TypeScript** con arquitectura hexagonal
+- **Supabase** como base de datos
+- **Vitest** para tests
+- **Graceful shutdown** para cierre limpio
+- **Validación de variables de entorno** con Zod
 
 ---
 

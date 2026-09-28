@@ -34,33 +34,41 @@ function getPeriodoDates(periodo?: string): { desde?: string; hasta?: string } |
   return { desde: desde.toISOString(), hasta }
 }
 
-async function getAnalysesData(userId: string, desde?: string, hasta?: string) {
+const PAGE_SIZE = 10
+
+async function getAnalysesData(userId: string, desde?: string, hasta?: string, page: number = 1) {
   const supabase = await createClient()
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
   let query = supabase
     .from('analyses')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
+    .range(from, to)
 
   if (desde) query = query.gte('created_at', desde)
   if (hasta) query = query.lte('created_at', hasta)
 
-  const { data: analysesData } = await query
-  return analysesData as Analysis[] | null
+  const { data: analysesData, count } = await query
+  return { analyses: analysesData as Analysis[] | null, total: count ?? 0 }
 }
 
 interface Props {
-  searchParams: { periodo?: string }
+  searchParams: { periodo?: string; page?: string }
 }
 
 export default async function HistorialPage({ searchParams }: Props) {
   const periodo = searchParams.periodo ?? 'todas'
+  const page = Math.max(1, parseInt(searchParams.page ?? '1', 10))
   const dateRange = getPeriodoDates(periodo)
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const analyses = await getAnalysesData(user.id, dateRange?.desde, dateRange?.hasta)
+  const { analyses, total } = await getAnalysesData(user.id, dateRange?.desde, dateRange?.hasta, page)
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const totalRecoverable = analyses?.reduce((sum, a) => sum + (a.recoverable_amount ?? 0), 0) ?? 0
   const totalAnomalies = analyses?.reduce((sum, a) => sum + (a.anomalies_count ?? 0), 0) ?? 0
@@ -244,6 +252,34 @@ export default async function HistorialPage({ searchParams }: Props) {
               return <div key={analysis.id}>{content}</div>
             })}
           </div>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-6">
+          <Link
+            href={`/historial?periodo=${periodo}&page=${page - 1}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              page <= 1
+                ? 'text-gray-300 dark:text-gray-600 pointer-events-none'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            Anterior
+          </Link>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            Página {page} de {totalPages}
+          </span>
+          <Link
+            href={`/historial?periodo=${periodo}&page=${page + 1}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              page >= totalPages
+                ? 'text-gray-300 dark:text-gray-600 pointer-events-none'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            Siguiente
+          </Link>
         </div>
       )}
     </div>

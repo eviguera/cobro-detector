@@ -5,14 +5,8 @@ const withMDX = require('@next/mdx')({
 
 const nextConfig = {
   pageExtensions: ['ts', 'tsx', 'js', 'jsx', 'md', 'mdx'],
-  // NOTA: ignoreBuildErrors está activo porque @supabase/ssr (v0.10.3) sigue
-  // teniendo problemas de inferencia con el Database genérico (retorna 'never').
-  // Los tipos en database.types.ts están sincronizados con las migraciones.
-  // Para eliminar ignoreBuildErrors en el futuro:
-  // 1. Esperar fix definitivo de @supabase/ssr
-  // 2. O migrar a @supabase/supabase-js directamente para server components
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: [

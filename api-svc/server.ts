@@ -1,10 +1,3 @@
-import Fastify from 'fastify'
-import { healthRoutes } from './src/routes/health.js'
-import { authRoutes } from './src/routes/auth.js'
-
-const app = Fastify({ logger: true })
-
-await app.register(healthRoutes)
-await app.register(authRoutes)
-
-app.listen({ port: parseInt(process.env.PORT ?? '3004', 10), host: '0.0.0.0' })
+// Este archivo es un wrapper para mantener compatibilidad con el Dockerfile.
+// El entrypoint real está en src/index.ts
+import './src/index.js'

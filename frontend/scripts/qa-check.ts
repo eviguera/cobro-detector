@@ -38,27 +38,19 @@ async function main() {
     }
   }
 
-  // 2. Verificar endpoints API
-  console.log('\n2. Verificando endpoints API...')
-  const apiEndpoints = [
-    'src/app/api/analyze/route.ts',
-    'src/app/api/payments/create/route.ts',
-    'src/app/api/payments/webhook/route.ts',
-    'src/app/api/payments/unlock-report/route.ts',
-    'src/app/api/documents/complaint-letter/route.ts',
-    'src/app/api/documents/complaint-letter/pdf/route.ts',
-    'src/app/api/companies/route.ts',
-    'src/app/api/companies/[id]/route.ts',
-    'src/app/api/v1/analyses/[id]/route.ts',
+  // 2. Verificar estructura de microservicios
+  console.log('\n2. Verificando estructura de microservicios...')
+  const microservices = [
+    '../analysis-svc/src/index.ts',
+    '../payment-svc/src/index.ts',
+    '../api-svc/src/index.ts',
+    '../admin-svc/src/index.ts',
+    '../notification-svc/src/index.ts',
   ]
 
-  for (const endpoint of apiEndpoints) {
-    const exists = fs.existsSync(path.join(process.cwd(), endpoint))
-    check(exists, `Endpoint existe: ${endpoint}`)
-    if (exists) {
-      const content = fs.readFileSync(path.join(process.cwd(), endpoint), 'utf8')
-      check(content.includes('export async function'), `${endpoint} tiene handler exportado`)
-    }
+  for (const service of microservices) {
+    const exists = fs.existsSync(path.join(process.cwd(), service))
+    check(exists, `Microservicio existe: ${service}`)
   }
 
   // 3. Verificar tipos de base de datos
@@ -93,6 +85,22 @@ async function main() {
   // 6. Verificar documentación
   console.log('\n6. Verificando documentación...')
   check(fs.existsSync('README.md'), 'README.md existe')
+
+  // 7. Verificar configuración de variables de entorno
+  console.log('\n7. Verificando variables de entorno...')
+  const envExample = fs.readFileSync('.env.example', 'utf8')
+  const requiredEnvVars = [
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_ANALYSIS_SVC_URL',
+    'NEXT_PUBLIC_PAYMENT_SVC_URL',
+    'NEXT_PUBLIC_AUTH_API_URL',
+    'NEXT_PUBLIC_ADMIN_SVC_URL',
+    'NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY',
+  ]
+  for (const envVar of requiredEnvVars) {
+    check(envExample.includes(envVar), `Variable de entorno documentada: ${envVar}`)
+  }
 
   // Resumen
   console.log('\n' + '='.repeat(50))

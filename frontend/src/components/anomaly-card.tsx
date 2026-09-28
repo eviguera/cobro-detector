@@ -74,24 +74,21 @@ function AnomalyCardBase({
   )
 }
 
-function Compact(props: AnomalyCardBaseProps) {
-  return <AnomalyCardBase {...props} />
+interface AnomalyCardProps extends AnomalyCardBaseProps {
+  variant?: 'compact' | 'full'
 }
 
-function Full(props: AnomalyCardBaseProps) {
+export function AnomalyCard({ variant = 'compact', ...props }: AnomalyCardProps) {
   return (
     <AnomalyCardBase {...props}>
-      <div className="mt-4 pt-4 border-t border-white/60">
-        <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">¿Cómo reclamar?</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {getClaimInstructions(props.type)}
-        </p>
-      </div>
+      {variant === 'full' && (
+        <div className="mt-4 pt-4 border-t border-white/60">
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">¿Cómo reclamar?</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            {getClaimInstructions(props.type)}
+          </p>
+        </div>
+      )}
     </AnomalyCardBase>
   )
-}
-
-export const AnomalyCard = {
-  Compact,
-  Full,
 }

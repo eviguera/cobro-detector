@@ -1,7 +1,19 @@
 import type { FastifyInstance } from 'fastify'
+import { createServiceClient } from '../infrastructure/adapters/supabase-client.js'
 
 export async function healthRoutes(app: FastifyInstance) {
   app.get('/health', async () => {
-    return { status: 'ok', service: 'notification-svc', timestamp: new Date().toISOString() }
+    try {
+      const supabase = createServiceClient()
+      const { error } = await supabase.from('events').select('id', { count: 'exact', head: true })
+      
+      if (error) {
+        return { status: 'degraded', service: 'notification-svc', timestamp: new Date().toISOString(), db: 'error' }
+      }
+      
+      return { status: 'ok', service: 'notification-svc', timestamp: new Date().toISOString(), db: 'connected' }
+    } catch {
+      return { status: 'degraded', service: 'notification-svc', timestamp: new Date().toISOString(), db: 'disconnected' }
+    }
   })
 }

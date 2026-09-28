@@ -16,9 +16,23 @@ test.describe('Flujo de Pago E2E', () => {
 
     console.log('✅ Página de precios cargada')
   })
+
+  test('Planes de precios son visibles', async ({ page }) => {
+    const ok = await login(page, email, password)
+    if (!ok) { test.skip(); return }
+
+    await page.goto('/precios')
+    await page.waitForTimeout(2000)
+
+    // Verificar que hay al menos un plan visible
+    const planCards = page.locator('[class*="plan"], [class*="card"]').first()
+    await expect(planCards).toBeVisible()
+
+    console.log('✅ Planes de precios visibles')
+  })
 })
 
-test.describe('Deduplicación E2E', () => {
+test.describe('Análisis E2E', () => {
   test('Análisis no genera anomalías duplicadas', async ({ page }) => {
     test.setTimeout(120000)
     const ok = await login(page, email, password)

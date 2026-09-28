@@ -109,7 +109,7 @@ describe('admin routes', () => {
       expect(JSON.parse(res.body)).toEqual({
         totalUsers: 150,
         totalAnalyses: 2,
-        totalAnomalies: 0,
+        totalAnomalies: 2,
         totalRecovered: 40000,
         revenue: 49800,
         activeUsers: 2,

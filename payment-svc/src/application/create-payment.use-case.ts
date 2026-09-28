@@ -53,9 +53,9 @@ export class CreatePaymentUseCase {
       appUrl: params.appUrl,
     })
 
-    await this.orderRepo.updateStatus(order.id, { mp_preference_id: initPoint === sandboxInitPoint ? undefined : initPoint })
+    await this.orderRepo.updateStatus(order.id, { mp_preference_id: initPoint })
 
-    return { orderId: order.id, preferenceId: initPoint === sandboxInitPoint ? initPoint : initPoint, initPoint, sandboxInitPoint }
+    return { orderId: order.id, preferenceId: initPoint, initPoint, sandboxInitPoint }
   }
 }
 

@@ -48,7 +48,11 @@ vi.mock('../infrastructure/adapters/supabase-credit-repository.adapter.js', () =
 }))
 
 vi.mock('../infrastructure/adapters/supabase-client.js', () => ({
-  createServiceClient: vi.fn(() => ({})),
+  createServiceClient: vi.fn(() => ({
+    from: vi.fn(() => ({
+      select: vi.fn().mockResolvedValue({ data: [], error: null }),
+    })),
+  })),
 }))
 
 const { paymentRoutes } = await import('./payments.js')
