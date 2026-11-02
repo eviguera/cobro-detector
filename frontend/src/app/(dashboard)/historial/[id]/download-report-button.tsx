@@ -257,7 +257,7 @@ ${cobroCards}
 
       if (format === 'pdf') {
         const buffer = await generatePDFDocument(letterData)
-        const blob = new Blob([buffer], { type: 'application/pdf' })
+        const blob = new Blob([buffer.buffer as unknown as BlobPart], { type: 'application/pdf' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
@@ -266,7 +266,7 @@ ${cobroCards}
         URL.revokeObjectURL(url)
       } else if (format === 'docx') {
         const buffer = await generateWordDocument(letterData)
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+        const blob = new Blob([buffer.buffer as unknown as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
