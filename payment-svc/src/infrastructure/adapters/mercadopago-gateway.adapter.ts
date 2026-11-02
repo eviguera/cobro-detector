@@ -26,6 +26,15 @@ export class MercadoPagoGatewayAdapter implements PaymentGateway {
     const client = getMPClient()
     const preference = new Preference(client)
 
+    // HARDENED (2026-11): notification_url apunta al webhook del payment-svc.
+    // Usar PAYMENT_SVC_PUBLIC_URL (URL pública accesible por MercadoPago) con
+    // fallback a PAYMENT_SERVICE_URL y, por último, a params.appUrl.
+    const paymentSvcUrl =
+      process.env.PAYMENT_SVC_PUBLIC_URL ??
+      process.env.PAYMENT_SERVICE_URL ??
+      params.appUrl
+    const notificationUrl = `${paymentSvcUrl.replace(/\/$/, '')}/v1/webhook`
+
     const result = await preference.create({
       body: {
         items: params.items.map(item => ({
@@ -43,6 +52,7 @@ export class MercadoPagoGatewayAdapter implements PaymentGateway {
           pending: params.backUrls.pending,
         },
         external_reference: params.externalReference,
+        notification_url: notificationUrl,
         metadata: params.metadata as Record<string, unknown>,
         auto_return: 'approved',
         statement_descriptor: params.statementDescriptor ?? 'COBRODETECTOR',
@@ -56,22 +66,49 @@ export class MercadoPagoGatewayAdapter implements PaymentGateway {
     }
   }
 
-  verifyWebhook(signature: string, rawBody: string): boolean {
+  /**
+   * HARDENED (2026-11):
+   * - `request-id` se toma del HEADER `x-request-id` (MP no lo manda en el body).
+   * - Comparación del HMAC con timingSafeEqual (sin timing leaks).
+   * - Se rechaza cualquier ts con más de 5 min de diferencia (anti-replay).
+   */
+  verifyWebhook(signature: string, rawBody: string, requestId?: string): boolean {
     const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET
     if (!secret) throw new Error('Missing MERCADOPAGO_WEBHOOK_SECRET')
 
-    const [ts, hash] = signature.split(',')
-    const tsValue = ts.replace('ts=', '')
-    const hashValue = hash.replace('v1=', '')
+    const parts = signature.split(',').map((p) => p.trim())
+    const tsPart = parts.find((p) => p.startsWith('ts='))
+    const hashPart = parts.find((p) => p.startsWith('v1='))
+    if (!tsPart || !hashPart) return false
+    const tsValue = tsPart.slice(3)
+    const hashValue = hashPart.slice(3)
 
-    const body = JSON.parse(rawBody)
-    const dataId = body?.data?.id ?? ''
-    const webhookId = body?.['request-id'] ?? ''
+    // Anti-replay: MP envía ts en segundos UTC; no aceptar mensajes viejos futuros.
+    const ts = Number(tsValue)
+    const SKEW_SECONDS = 5 * 60
+    if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > SKEW_SECONDS) {
+      return false
+    }
 
-    const manifest = `id:${dataId};request-id:${webhookId};ts:${tsValue};`
+    let dataId = ''
+    let bodyRequestId = ''
+    try {
+      const body = JSON.parse(rawBody)
+      dataId = body?.data?.id ?? ''
+      bodyRequestId = body?.['request-id'] ?? ''
+    } catch {
+      return false
+    }
+
+    const effectiveRequestId = requestId || bodyRequestId || ''
+
+    const manifest = `id:${dataId};request-id:${effectiveRequestId};ts:${tsValue};`
 
     const hmac = crypto.createHmac('sha256', secret).update(manifest).digest('hex')
-    return hmac === hashValue
+    const provided = Buffer.from(hashValue, 'utf8')
+    const expected = Buffer.from(hmac, 'utf8')
+    if (provided.length !== expected.length) return false
+    return crypto.timingSafeEqual(provided, expected)
   }
 
   async getPaymentStatus(paymentId: string): Promise<{ status: string; statusDetail?: string; externalRef?: string }> {

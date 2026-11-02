@@ -3,6 +3,7 @@ import { ProcessWebhookUseCase } from './process-webhook.use-case.js'
 import type { PaymentGateway } from '../domain/ports/payment-gateway.port'
 import type { OrderRepository } from '../domain/ports/order-repository.port'
 import type { CreditRepository } from '../domain/ports/credit.repository.port'
+import type { AnalysisRepository } from '../domain/ports/analysis-repository.port'
 
 function mockPaymentGateway(overrides?: Partial<PaymentGateway>): PaymentGateway {
   return {
@@ -49,6 +50,13 @@ function mockCreditRepository(overrides?: Partial<CreditRepository>): CreditRepo
   }
 }
 
+function mockAnalysisRepository(overrides?: Partial<AnalysisRepository>): AnalysisRepository {
+  return {
+    markCompleted: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  }
+}
+
 function validBody(type = 'payment', overrides = {}): string {
   return JSON.stringify({
     type,
@@ -64,6 +72,7 @@ describe('ProcessWebhookUseCase', () => {
       mockPaymentGateway(),
       mockOrderRepository(),
       mockCreditRepository(),
+      mockAnalysisRepository(),
     )
 
     await expect(useCase.execute(validBody(), null))
@@ -76,11 +85,12 @@ describe('ProcessWebhookUseCase', () => {
       paymentGateway,
       mockOrderRepository(),
       mockCreditRepository(),
+      mockAnalysisRepository(),
     )
 
-    await expect(useCase.execute(validBody(), 'ts=123,v1=badhash'))
+    await expect(useCase.execute(validBody(), 'ts=123,v1=badhash', 'req-123'))
       .rejects.toThrow('Firma inválida')
-    expect(paymentGateway.verifyWebhook).toHaveBeenCalledWith('ts=123,v1=badhash', validBody())
+    expect(paymentGateway.verifyWebhook).toHaveBeenCalledWith('ts=123,v1=badhash', validBody(), 'req-123')
   })
 
   it('skips processing when type is not payment', async () => {
@@ -89,6 +99,7 @@ describe('ProcessWebhookUseCase', () => {
       paymentGateway,
       mockOrderRepository(),
       mockCreditRepository(),
+      mockAnalysisRepository(),
     )
 
     const result = await useCase.execute(validBody('plan'), 'ts=123,v1=hash')
@@ -101,6 +112,7 @@ describe('ProcessWebhookUseCase', () => {
       mockPaymentGateway(),
       mockOrderRepository(),
       mockCreditRepository(),
+      mockAnalysisRepository(),
     )
 
     await expect(useCase.execute(JSON.stringify({ type: 'payment', data: {} }), 'ts=123,v1=hash'))
@@ -115,28 +127,32 @@ describe('ProcessWebhookUseCase', () => {
       paymentGateway,
       mockOrderRepository(),
       mockCreditRepository(),
+      mockAnalysisRepository(),
     )
 
     await expect(useCase.execute(validBody(), 'ts=123,v1=hash'))
       .rejects.toThrow('Sin referencia externa')
   })
 
-  it('returns unlock: true when externalRef starts with unlock_', async () => {
+  it('marks analysis as completed when externalRef starts with unlock_', async () => {
     const paymentGateway = mockPaymentGateway({
       getPaymentStatus: vi.fn().mockResolvedValue({
         status: 'approved',
         externalRef: 'unlock_analysis-123',
       }),
     })
+    const analysisRepo = mockAnalysisRepository()
     const useCase = new ProcessWebhookUseCase(
       paymentGateway,
       mockOrderRepository(),
       mockCreditRepository(),
+      analysisRepo,
     )
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
 
-    expect(result).toEqual({ received: true, unlock: true })
+    expect(result).toEqual({ received: true, unlock: true, analysisId: 'analysis-123' })
+    expect(analysisRepo.markCompleted).toHaveBeenCalledWith('analysis-123')
   })
 
   it('throws when externalRef is not a valid UUID', async () => {
@@ -150,6 +166,7 @@ describe('ProcessWebhookUseCase', () => {
       paymentGateway,
       mockOrderRepository(),
       mockCreditRepository(),
+      mockAnalysisRepository(),
     )
 
     await expect(useCase.execute(validBody(), 'ts=123,v1=hash'))
@@ -160,7 +177,7 @@ describe('ProcessWebhookUseCase', () => {
     const paymentGateway = mockPaymentGateway()
     const orderRepo = mockOrderRepository()
     const creditRepo = mockCreditRepository()
-    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo)
+    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, mockAnalysisRepository())
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
 
@@ -182,7 +199,7 @@ describe('ProcessWebhookUseCase', () => {
     })
     const orderRepo = mockOrderRepository()
     const creditRepo = mockCreditRepository()
-    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo)
+    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, mockAnalysisRepository())
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
 
@@ -208,6 +225,7 @@ describe('ProcessWebhookUseCase', () => {
       mockPaymentGateway(),
       orderRepo,
       creditRepo,
+      mockAnalysisRepository(),
     )
 
     await useCase.execute(validBody(), 'ts=123,v1=hash')
@@ -222,6 +240,7 @@ describe('ProcessWebhookUseCase', () => {
       mockPaymentGateway(),
       orderRepo,
       mockCreditRepository(),
+      mockAnalysisRepository(),
     )
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')

@@ -42,8 +42,11 @@ export class SupabaseAnalysisRepository implements AnalysisRepository {
   }
 
   async storeResults(analysisId: string, userId: string, result: AnalysisResult, isPlatino: boolean): Promise<void> {
-    const finalStatus = isPlatino ? 'awaiting_payment' : 'completed'
     const anomalies = result.anomalies ?? []
+    const recoverableAmount = result.totalRecoverable ?? 0
+    // Platino solo bloquea el reporte cuando hay algo que cobrar.
+    // Sin anomalías no corresponde pedir pago.
+    const finalStatus = isPlatino && recoverableAmount > 0 ? 'awaiting_payment' : 'completed'
     const { error } = await this.supabase
       .from('analyses')
       .update({

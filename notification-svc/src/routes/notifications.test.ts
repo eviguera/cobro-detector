@@ -19,8 +19,28 @@ vi.mock('../infrastructure/adapters/supabase-event-repository.adapter.js', () =>
 }))
 
 vi.mock('../infrastructure/adapters/supabase-client.js', () => ({
-  createServiceClient: vi.fn().mockReturnValue({}),
+  createServiceClient: vi.fn().mockReturnValue({
+    // Stub del ownership check: el análisis pertenece al usuario autenticado.
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { user_id: 'user-1' }, error: null }),
+    })),
+  }),
 }))
+
+// HARDENED (2026-11): ambas rutas exigen JWT. El helper se testea en runtime
+// con token real; acá se mockea como usuario autenticado.
+vi.mock('../security/supabase-jwt.js', () => {
+  const authUser = { id: 'user-1', email: 'user@example.com', role: 'authenticated' }
+  return {
+    requireAuth: vi.fn().mockImplementation(async (request: { authUser: unknown }) => {
+      request.authUser = authUser
+      return true
+    }),
+    requireSelfOr403: vi.fn().mockImplementation(async () => true),
+  }
+})
 
 import { notificationRoutes } from './notifications.js'
 import { healthRoutes } from './health.js'

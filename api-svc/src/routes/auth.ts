@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { SupabaseApiKeyRepository } from '../infrastructure/supabase-api-key-repository.js'
 import { createServiceClient } from '../infrastructure/supabase-client.js'
 import { VerifyKeyUseCase } from '../application/verify-key.use-case.js'
+import { requireSelfOr403 } from '../security/supabase-jwt.js'
 
 let supabase: ReturnType<typeof createServiceClient> | null = null
 let keyRepo: SupabaseApiKeyRepository | null = null
@@ -38,6 +39,11 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get('/v1/keys/:userId', async (request, reply) => {
     const { userId } = request.params as { userId: string }
+
+    // HARDENED (2026-11): solo el dueño puede listar sus API keys (antes público).
+    const ok = await requireSelfOr403(request, reply, userId)
+    if (!ok) return reply
+
     const keys = await getRepo().findByUserId(userId)
     return reply.send(keys.map(k => ({
       id: k.id,

@@ -367,20 +367,19 @@ CREATE POLICY companies_update_own ON companies FOR UPDATE USING ((SELECT auth.u
 CREATE POLICY companies_delete_own ON companies FOR DELETE USING ((SELECT auth.uid()) = accountant_id);
 
 -- credits
+-- HARDENED (2026-11): el usuario NO escribe credits. La acreditación se hace
+-- con handle_new_user y consume_credit/via service role (webhook de pagos).
 DROP POLICY IF EXISTS credits_select_own ON credits;
 DROP POLICY IF EXISTS credits_insert_own ON credits;
 DROP POLICY IF EXISTS credits_update_own ON credits;
 CREATE POLICY credits_select_own ON credits FOR SELECT USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY credits_insert_own ON credits FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY credits_update_own ON credits FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- orders
+-- HARDENED (2026-11): órdenes las crea payment-svc (service role); webhook actualiza status.
 DROP POLICY IF EXISTS orders_select_own ON orders;
 DROP POLICY IF EXISTS orders_insert_own ON orders;
 DROP POLICY IF EXISTS orders_update_own ON orders;
 CREATE POLICY orders_select_own ON orders FOR SELECT USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY orders_insert_own ON orders FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY orders_update_own ON orders FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- analyses
 DROP POLICY IF EXISTS analyses_select_own ON analyses;
@@ -389,8 +388,15 @@ DROP POLICY IF EXISTS analyses_update_own ON analyses;
 DROP POLICY IF EXISTS analyses_delete_own ON analyses;
 CREATE POLICY analyses_select_own ON analyses FOR SELECT USING ((SELECT auth.uid()) = user_id);
 CREATE POLICY analyses_insert_own ON analyses FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY analyses_update_own ON analyses FOR UPDATE USING ((SELECT auth.uid()) = user_id);
+-- HARDENED (2026-11): UPDATE limitado a la columna `status` (retry/error recovery de UI).
+-- El service role persiste el resto (anomalías, resumen, métricas).
+CREATE POLICY analyses_update_own ON analyses FOR UPDATE TO authenticated
+  USING ((SELECT auth.uid()) = user_id)
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 CREATE POLICY analyses_delete_own ON analyses FOR DELETE USING ((SELECT auth.uid()) = user_id);
+-- Solo la columna status es actualizable por el usuario (permission denied en el resto).
+REVOKE UPDATE ON analyses FROM authenticated;
+GRANT UPDATE (status) ON analyses TO authenticated;
 
 -- anomalies
 DROP POLICY IF EXISTS anomalies_select_own ON anomalies;
@@ -398,7 +404,6 @@ DROP POLICY IF EXISTS anomalies_insert_own ON anomalies;
 DROP POLICY IF EXISTS anomalies_update_own ON anomalies;
 CREATE POLICY anomalies_select_own ON anomalies FOR SELECT USING ((SELECT auth.uid()) = user_id);
 CREATE POLICY anomalies_insert_own ON anomalies FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY anomalies_update_own ON anomalies FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- api_keys
 DROP POLICY IF EXISTS api_keys_select_own ON api_keys;
@@ -406,9 +411,7 @@ DROP POLICY IF EXISTS api_keys_insert_own ON api_keys;
 DROP POLICY IF EXISTS api_keys_update_own ON api_keys;
 DROP POLICY IF EXISTS api_keys_delete_own ON api_keys;
 CREATE POLICY api_keys_select_own ON api_keys FOR SELECT USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY api_keys_insert_own ON api_keys FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY api_keys_update_own ON api_keys FOR UPDATE USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY api_keys_delete_own ON api_keys FOR DELETE USING ((SELECT auth.uid()) = user_id);
+-- HARDENED (2026-11): creación/edición/borraje solo vía api-svc (service role).
 
 -- payment_methods
 DROP POLICY IF EXISTS payment_methods_select_own ON payment_methods;
@@ -416,17 +419,14 @@ DROP POLICY IF EXISTS payment_methods_insert_own ON payment_methods;
 DROP POLICY IF EXISTS payment_methods_update_own ON payment_methods;
 DROP POLICY IF EXISTS payment_methods_delete_own ON payment_methods;
 CREATE POLICY payment_methods_select_own ON payment_methods FOR SELECT USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY payment_methods_insert_own ON payment_methods FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY payment_methods_update_own ON payment_methods FOR UPDATE USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY payment_methods_delete_own ON payment_methods FOR DELETE USING ((SELECT auth.uid()) = user_id);
+-- HARDENED (2026-11): tokenización de tarjetas exclusivamente vía payment-svc.
 
 -- success_charges
 DROP POLICY IF EXISTS success_charges_select_own ON success_charges;
 DROP POLICY IF EXISTS success_charges_insert_own ON success_charges;
 DROP POLICY IF EXISTS success_charges_update_own ON success_charges;
 CREATE POLICY success_charges_select_own ON success_charges FOR SELECT USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY success_charges_insert_own ON success_charges FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY success_charges_update_own ON success_charges FOR UPDATE USING ((SELECT auth.uid()) = user_id);
+-- HARDENED (2026-11): escritura de cobros solo vía backend.
 
 -- company_members
 DROP POLICY IF EXISTS company_members_select_own ON company_members;
@@ -434,17 +434,14 @@ DROP POLICY IF EXISTS company_members_insert_own ON company_members;
 DROP POLICY IF EXISTS company_members_update_own ON company_members;
 DROP POLICY IF EXISTS company_members_delete_own ON company_members;
 CREATE POLICY company_members_select_own ON company_members FOR SELECT USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY company_members_insert_own ON company_members FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY company_members_update_own ON company_members FOR UPDATE USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY company_members_delete_own ON company_members FOR DELETE USING ((SELECT auth.uid()) = user_id);
+-- HARDENED (2026-11): invitaciones/roles se gestionan por backend (evita self-invitación/escalada de rol).
 
 -- success_plans
 DROP POLICY IF EXISTS success_plans_select_own ON success_plans;
 DROP POLICY IF EXISTS success_plans_insert_own ON success_plans;
 DROP POLICY IF EXISTS success_plans_update_own ON success_plans;
 CREATE POLICY success_plans_select_own ON success_plans FOR SELECT USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY success_plans_insert_own ON success_plans FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY success_plans_update_own ON success_plans FOR UPDATE USING ((SELECT auth.uid()) = user_id);
+-- HARDENED (2026-11): planes los define el backend.
 
 -- api_logs
 DROP POLICY IF EXISTS api_logs_insert_own ON api_logs;
@@ -713,15 +710,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'outgoing_webhooks' AND policyname = 'outgoing_webhooks_select_own') THEN
     CREATE POLICY outgoing_webhooks_select_own ON outgoing_webhooks FOR SELECT USING ((SELECT auth.uid()) = user_id);
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'outgoing_webhooks' AND policyname = 'outgoing_webhooks_insert_own') THEN
-    CREATE POLICY outgoing_webhooks_insert_own ON outgoing_webhooks FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'outgoing_webhooks' AND policyname = 'outgoing_webhooks_update_own') THEN
-    CREATE POLICY outgoing_webhooks_update_own ON outgoing_webhooks FOR UPDATE USING ((SELECT auth.uid()) = user_id);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'outgoing_webhooks' AND policyname = 'outgoing_webhooks_delete_own') THEN
-    CREATE POLICY outgoing_webhooks_delete_own ON outgoing_webhooks FOR DELETE USING ((SELECT auth.uid()) = user_id);
-  END IF;
+  -- HARDENED (2026-11): registro/config de webhooks salientes solo vía backend (la firma HMAC del webhook es secreto compartido).
 END $$;
 
 CREATE OR REPLACE FUNCTION dispatch_outgoing_webhooks()

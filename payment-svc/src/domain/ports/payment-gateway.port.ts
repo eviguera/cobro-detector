@@ -15,7 +15,12 @@ export interface PaymentGateway {
     statementDescriptor?: string
   }): Promise<PaymentPreference>
 
-  verifyWebhook(signature: string, body: string): boolean
+  /**
+ * Verifica la firma del webhook de MercadoPago.
+ * `signature` es el header `x-signature` ("ts=<ts>,v1=<hmac>") y `requestId`
+ * el header `x-request-id` (MP lo envía como header, NO en el body).
+ */
+verifyWebhook(signature: string, body: string, requestId?: string): boolean
 
   getPaymentStatus(paymentId: string): Promise<{ status: string; statusDetail?: string; externalRef?: string }>
 }

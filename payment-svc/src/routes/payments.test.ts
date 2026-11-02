@@ -48,8 +48,30 @@ vi.mock('../infrastructure/adapters/supabase-credit-repository.adapter.js', () =
 }))
 
 vi.mock('../infrastructure/adapters/supabase-client.js', () => ({
-  createServiceClient: vi.fn(() => ({})),
+  createServiceClient: vi.fn(() => ({
+    // Stub del ownership check de /v1/unlock: el análisis pertenece al usuario autenticado.
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { id: 'analysis-1', user_id: 'user-1' }, error: null }),
+    })),
+  })),
 }))
+
+// HARDENED (2026-11): las rutas protegidas exigen JWT. El helper se testea por
+// separado (runtime con token real), acá se mockea como usuario autenticado.
+vi.mock('../security/supabase-jwt.js', () => {
+  const authUser = { id: 'user-1', email: 'test@test.com', role: 'authenticated' }
+  return {
+    requireAuth: vi.fn().mockImplementation(async (request: { authUser: unknown }) => {
+      request.authUser = authUser
+      return true
+    }),
+    requireSelfOr403: vi.fn().mockImplementation(async (_request: unknown, _reply: unknown, userId: string) => {
+      return userId === 'user-1'
+    }),
+  }
+})
 
 const { paymentRoutes } = await import('./payments.js')
 const { healthRoutes } = await import('./health.js')
@@ -72,8 +94,11 @@ describe('Payment Routes', () => {
     const res = await app.inject({ method: 'GET', url: '/health' })
 
     expect(res.statusCode).toBe(200)
-    expect(res.json()).toMatchObject({ status: 'ok', service: 'payment-svc' })
-    expect(res.json()).toHaveProperty('timestamp')
+    const body = res.json()
+    expect(body.service).toBe('payment-svc')
+    expect(['ok', 'degraded']).toContain(body.status)
+    expect(body).toHaveProperty('timestamp')
+    expect(body).toHaveProperty('checks')
   })
 
   it('POST /v1/preferences with valid body returns 200', async () => {

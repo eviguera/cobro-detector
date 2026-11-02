@@ -1,16 +1,35 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { createServiceClient } from '../infrastructure/adapters/supabase-client.js'
 import { SupabaseMetricsRepository } from '../infrastructure/adapters/supabase-metrics.repository.js'
 import { GetMetricsUseCase } from '../application/get-metrics.use-case.js'
 import { GetSystemHealthUseCase } from '../application/get-system-health.use-case.js'
+import { requireAuth } from '../security/supabase-jwt.js'
 
 const supabase = createServiceClient()
 const metricsRepo = new SupabaseMetricsRepository(supabase)
 const getMetrics = new GetMetricsUseCase(metricsRepo)
 const getSystemHealth = new GetSystemHealthUseCase(metricsRepo)
 
+/**
+ * HARDENED (2026-11): metrics/intelligence exponían métricas de toda la
+ * plataforma sin auth. Ahora exigen JWT de Supabase + profiles.is_admin = true
+ * (verificado server-side con el service role client).
+ */
+async function requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  await requireAuth(request, reply)
+  if (reply.sent) return
+  const { data } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', request.authUser.id)
+    .maybeSingle()
+  if (!data?.is_admin) {
+    await reply.status(403).send({ error: 'Forbidden: admin access required' })
+  }
+}
+
 export async function adminRoutes(app: FastifyInstance) {
-  app.get('/v1/metrics', async (_request, reply) => {
+  app.get('/v1/metrics', { preHandler: [requireAdmin] }, async (_request, reply) => {
     const metrics = await getMetrics.execute()
     return reply.send(metrics)
   })
@@ -20,7 +39,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send(health)
   })
 
-  app.get('/v1/intelligence', async (_request, reply) => {
+  app.get('/v1/intelligence', { preHandler: [requireAdmin] }, async (_request, reply) => {
     const [totalUsersResult, usersWithAnalyses, usersWithAnomalies, allProfiles] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact', head: true }),
       supabase

@@ -65,10 +65,22 @@ vi.mock('../infrastructure/adapters/supabase-client.js', () => {
         select: vi.fn((_columns: string, _options?: any) => {
           const res = resultForTable(table)
           const promise = Promise.resolve(res)
-          return Object.assign(promise, { eq: vi.fn(() => promise) })
+          return Object.assign(promise, { eq: vi.fn(() => promise), maybeSingle: vi.fn(() => Promise.resolve({ data: { is_admin: true }, error: null })) })
         }),
       })),
     })),
+  }
+})
+
+// HARDENED (2026-11): /v1/metrics y /v1/intelligence exigen JWT de admin.
+// El helper se testea en runtime con token real; acá se mockea como admin.
+vi.mock('../security/supabase-jwt.js', () => {
+  const authUser = { id: 'user-1', email: 'admin@cobrodetector.com', role: 'authenticated' }
+  return {
+    requireAuth: vi.fn().mockImplementation(async (request: { authUser: unknown }) => {
+      request.authUser = authUser
+      return true
+    }),
   }
 })
 

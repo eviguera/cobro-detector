@@ -1,6 +1,7 @@
 import type { PaymentGateway } from '../domain/ports/payment-gateway.port'
 import type { OrderRepository } from '../domain/ports/order-repository.port'
 import type { CreditRepository } from '../domain/ports/credit.repository.port'
+import type { AnalysisRepository } from '../domain/ports/analysis-repository.port'
 
 interface SuccessChargeRow {
   id: string
@@ -14,13 +15,14 @@ export class ProcessWebhookUseCase {
   constructor(
     private paymentGateway: PaymentGateway,
     private orderRepo: OrderRepository,
-    private creditRepo: CreditRepository
+    private creditRepo: CreditRepository,
+    private analysisRepo: AnalysisRepository
   ) {}
 
-  async execute(rawBody: string, signature: string | null) {
+  async execute(rawBody: string, signature: string | null, requestId?: string) {
     if (!signature) throw new Error('Falta firma')
 
-    const isValid = this.paymentGateway.verifyWebhook(signature, rawBody)
+    const isValid = this.paymentGateway.verifyWebhook(signature, rawBody, requestId)
     if (!isValid) throw new Error('Firma inválida')
 
     const body = JSON.parse(rawBody)
@@ -36,7 +38,9 @@ export class ProcessWebhookUseCase {
     if (!externalRef) throw new Error('Sin referencia externa')
 
     if (externalRef.startsWith('unlock_')) {
-      return { received: true, unlock: true }
+      const analysisId = externalRef.replace('unlock_', '')
+      await this.analysisRepo.markCompleted(analysisId)
+      return { received: true, unlock: true, analysisId }
     }
 
     if (!this.uuidRegex.test(externalRef)) throw new Error('externalRef inválido')
@@ -57,6 +61,12 @@ export class ProcessWebhookUseCase {
   ) {
     const orderStatus = status === 'approved' ? 'paid' : status === 'rejected' ? 'failed' : 'pending'
 
+    // HARDENED (2026-11): solo actualizar si la orden no está ya pagada/fallida.
+    // Evita doble acreditación si llegan webhooks duplicados de MercadoPago.
+    if (order.status === 'paid' || order.status === 'failed') {
+      return
+    }
+
     await this.orderRepo.updateStatus(order.id, {
       status: orderStatus,
       mp_payment_id: String(paymentId),
@@ -64,7 +74,7 @@ export class ProcessWebhookUseCase {
       mp_detail: statusDetail ?? null,
     })
 
-    if (status === 'approved' && order.status !== 'paid') {
+    if (status === 'approved') {
       await this.creditRepo.addCredits(order.user_id, order.credits_purchased)
     }
   }

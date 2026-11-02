@@ -61,15 +61,18 @@ export class RunAnalysisUseCase {
       await this.analysisRepo.insertAnomalies(analysisId, userId, anomaliesToInsert)
     }
 
+    const recoverableAmount = result.totalRecoverable ?? 0
+    const awaitingPayment = isPlatino && recoverableAmount > 0
+
     return {
       totalTransactions: result.totalTransactions ?? 0,
       anomaliesCount: anomalies.length,
-      recoverableAmount: result.totalRecoverable ?? 0,
+      recoverableAmount,
       anomalies,
       summary: result.aiSummary ?? undefined,
       bank: result.bank ?? undefined,
-      awaitingPayment: isPlatino,
-      paymentAmount: isPlatino ? Math.round((result.totalRecoverable ?? 0) * 0.2) : undefined,
+      awaitingPayment,
+      paymentAmount: awaitingPayment ? Math.round(recoverableAmount * 0.2) : undefined,
     }
   }
 
