@@ -1,13 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, CheckCircle2, Loader2, RotateCcw } from 'lucide-react'
 import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
 import type { DetectedAnomaly, ParsedTransaction, Analysis } from '@/domain'
 import { AnomalyCard } from '@/components/anomaly-card'
 
 import DownloadReportButton from './download-report-button'
 import PaywallButton from './paywall-button'
+import AutoRefresh from './auto-refresh'
 
 interface Props {
   params: { id: string }
@@ -36,7 +37,70 @@ export default async function AnalysisDetailPage({ params }: Props) {
   const totalMedium = anomalies.filter(a => a.severity === 'medium').length
   const totalLow    = anomalies.filter(a => a.severity === 'low').length
 
-  if (analysis.status === 'awaiting_payment') {
+  // Platino sin monto recuperable no tiene nada que cobrar: el reporte es libre.
+  const reportUnlocked =
+    analysis.status === 'completed' ||
+    (analysis.status === 'awaiting_payment' && (analysis.recoverable_amount ?? 0) <= 0)
+
+  if (analysis.status === 'processing' || analysis.status === 'pending') {
+    return (
+      <div className="animate-fade-in max-w-2xl">
+        <AutoRefresh />
+        <Link href="/historial" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Volver al historial
+        </Link>
+
+        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-8 shadow-sm text-center">
+          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            Análisis en proceso
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+            Estamos revisando <strong>{analysis.file_name}</strong>. Esta página se actualiza sola.
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            Suele tomar menos de 1 minuto. Puedes volver más tarde desde el historial.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (analysis.status === 'error' || analysis.status === 'failed') {
+    return (
+      <div className="animate-fade-in max-w-2xl">
+        <Link href="/historial" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Volver al historial
+        </Link>
+
+        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-8 shadow-sm text-center">
+          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            El análisis no se completó
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+            No pudimos procesar <strong>{analysis.file_name}</strong>.
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">
+            El archivo puede estar dañado o el servicio no respondió. Intenta subirlo de nuevo.
+          </p>
+          <Link
+            href="/analisis"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Reintentar análisis
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (analysis.status === 'awaiting_payment' && (analysis.recoverable_amount ?? 0) > 0) {
     const pct = Math.round((analysis.recoverable_amount ?? 0) * 0.2)
     return (
       <div className="animate-fade-in max-w-2xl">
@@ -74,7 +138,11 @@ export default async function AnalysisDetailPage({ params }: Props) {
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-6 text-center">
             Para desbloquear el reporte completo, realizá el pago del 20% ({formatCLP(pct)}) a través de MercadoPago.
           </p>
-          <PaywallButton analysisId={params.id} amount={pct} />
+          <PaywallButton
+            analysisId={params.id}
+            recoverableAmount={analysis.recoverable_amount ?? 0}
+            fileName={analysis.file_name}
+          />
           <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-3">
             El reporte se libera automáticamente al acreditarse el pago
           </p>
@@ -96,11 +164,13 @@ export default async function AnalysisDetailPage({ params }: Props) {
             {analysis.bank ?? 'Banco no detectado'} · Analizado el {formatDate(analysis.created_at)}
           </p>
         </div>
-        <DownloadReportButton analysis={analysis} anomalies={anomalies} transactions={transactions} />
+        {reportUnlocked && (
+          <DownloadReportButton analysis={analysis} anomalies={anomalies} transactions={transactions} />
+        )}
       </div>
 
       {/* Summary metrics */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
           { label: 'Transacciones', value: analysis.total_transactions, sub: 'analizadas', color: '' },
           { label: 'Anomalías', value: analysis.anomalies_count, sub: `${totalHigh} alta · ${totalMedium} media · ${totalLow} baja`, color: 'text-red-600' },
@@ -133,8 +203,9 @@ export default async function AnalysisDetailPage({ params }: Props) {
 
           <div className="space-y-3">
             {anomalies.map((anomaly, i) => (
-              <AnomalyCard.Full
+              <AnomalyCard
                 key={i}
+                variant="full"
                 type={anomaly.type}
                 severity={anomaly.severity}
                 title={anomaly.title}

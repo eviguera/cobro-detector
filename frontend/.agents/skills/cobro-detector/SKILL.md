@@ -1,3 +1,8 @@
+---
+name: cobro-detector
+description: Skill hub del proyecto CobroDetector. Mapa completo de la documentación (PRD, TRD, UI/UX, flujos, backend schema, plan), stack, planes, bancos soportados, arquitectura hexagonal y skills coordinados. Usar al iniciar cualquier tarea en el proyecto para ubicar el documento o skill correcto antes de implementar.
+---
+
 # CobroDetector — Skill Maestro
 
 Skill hub del proyecto. Proporciona el mapa completo de documentación y referencias rápidas. Para detalles, consultar los documentos específicos o el skill `cobro-detector-db`.

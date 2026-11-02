@@ -32,6 +32,11 @@ function getClaimInstructions(type: string): string {
   }
 }
 
+interface AnomalyCardProps extends AnomalyCardBaseProps {
+  /** "compact" para listas, "full" añade instrucciones de reclamo. */
+  variant?: 'compact' | 'full'
+}
+
 function AnomalyCardBase({
   type,
   severity,
@@ -40,8 +45,8 @@ function AnomalyCardBase({
   detail,
   recoverableAmount,
   index = 0,
-  children,
-}: AnomalyCardBaseProps & { children?: React.ReactNode }) {
+  variant = 'compact',
+}: AnomalyCardProps) {
   const borderClass = severity === 'high'
     ? 'border-red-300 dark:border-red-800 bg-gradient-to-br from-red-50/40 to-white dark:from-red-950/20 dark:to-gray-900/60'
     : severity === 'medium'
@@ -69,29 +74,18 @@ function AnomalyCardBase({
       {detail && (
         <p className="text-xs opacity-60 mt-2 font-mono">{detail}</p>
       )}
-      {children}
+      {variant === 'full' && (
+        <div className="mt-4 pt-4 border-t border-white/60">
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">¿Cómo reclamar?</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            {getClaimInstructions(type)}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
 
-function Compact(props: AnomalyCardBaseProps) {
+export function AnomalyCard(props: AnomalyCardProps) {
   return <AnomalyCardBase {...props} />
-}
-
-function Full(props: AnomalyCardBaseProps) {
-  return (
-    <AnomalyCardBase {...props}>
-      <div className="mt-4 pt-4 border-t border-white/60">
-        <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">¿Cómo reclamar?</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {getClaimInstructions(props.type)}
-        </p>
-      </div>
-    </AnomalyCardBase>
-  )
-}
-
-export const AnomalyCard = {
-  Compact,
-  Full,
 }

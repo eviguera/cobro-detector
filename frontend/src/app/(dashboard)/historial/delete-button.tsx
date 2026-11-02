@@ -1,8 +1,9 @@
 'use client'
 
-import { Trash2, Loader2 } from 'lucide-react'
+import { Trash2, Loader2, Check } from 'lucide-react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 
 interface Props {
@@ -15,7 +16,10 @@ export default function DeleteAnalysisButton({ id, fileName }: Props) {
   const [confirming, setConfirming] = useState(false)
   const router = useRouter()
 
-  const handleClick = async () => {
+  const handleClick = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
     if (!confirming) {
       setConfirming(true)
       return
@@ -29,48 +33,63 @@ export default function DeleteAnalysisButton({ id, fileName }: Props) {
         .delete()
         .eq('id', id)
 
-      if (!error) {
-        router.refresh()
+      if (error) {
+        toast.error('No pudimos eliminar el análisis. Intenta de nuevo.')
+        return
       }
+
+      toast.success('Análisis eliminado')
+      setConfirming(false)
+      router.refresh()
     } catch (err) {
       console.error('Error al eliminar análisis:', err)
+      toast.error('No pudimos eliminar el análisis. Intenta de nuevo.')
+    } finally {
       setLoading(false)
-      setConfirming(false)
     }
   }
 
   const handleCancel = (e: React.MouseEvent) => {
+    e.preventDefault()
     e.stopPropagation()
     setConfirming(false)
   }
 
-  return (
-    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-      {confirming && (
+  if (confirming) {
+    return (
+      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
         <button
-          onClick={handleCancel}
-          className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-0.5 rounded transition-colors"
-          title="Cancelar"
+          type="button"
+          onClick={handleClick}
+          disabled={loading}
+          aria-label={`Confirmar eliminación de ${fileName}`}
+          className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-2 py-1 text-[10px] font-semibold text-red-700 transition-colors hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 disabled:opacity-60"
         >
-          ✕
+          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+          Eliminar
         </button>
-      )}
-      <button
-        onClick={handleClick}
-        disabled={loading}
-        className={`p-1.5 rounded-lg transition-all duration-200 ${
-          confirming
-            ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
-            : 'text-gray-400 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-        }`}
-        title={confirming ? `Confirmar eliminación de "${fileName}"` : 'Eliminar análisis'}
-      >
-        {loading ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <Trash2 className="w-3.5 h-3.5" />
-        )}
-      </button>
-    </div>
+        <button
+          type="button"
+          onClick={handleCancel}
+          aria-label="Cancelar eliminación"
+          className="rounded-lg px-1.5 py-1 text-[10px] font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+        >
+          Cancelar
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
+      aria-label={`Eliminar análisis ${fileName}`}
+      title="Eliminar análisis"
+      className="rounded-lg p-1.5 text-gray-400 transition-all duration-200 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400 disabled:opacity-60"
+    >
+      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+    </button>
   )
 }

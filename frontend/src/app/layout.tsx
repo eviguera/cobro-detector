@@ -10,11 +10,17 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://mcwqqcngfibhgluvixlu.supabase.co" />
-        <link rel="dns-prefetch" href="https://mcwqqcngfibhgluvixlu.supabase.co" />
+        {supabaseUrl && (
+          <>
+            <link rel="preconnect" href={supabaseUrl} />
+            <link rel="dns-prefetch" href={supabaseUrl} />
+          </>
+        )}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>

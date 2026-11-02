@@ -7,6 +7,41 @@ let ratelimit: Ratelimit | null = null
 let strictRatelimit: Ratelimit | null = null
 let authRatelimit: Ratelimit | null = null
 
+// ---- Fallback en memoria cuando Upstash no está configurado ----
+// Evita fail-open: si no hay Redis, seguimos limitando por IP con un store local.
+interface MemoryWindow {
+  hits: number
+  resetAt: number
+}
+
+const memoryStore = new Map<string, MemoryWindow>()
+
+function memoryCleanup() {
+  const now = Date.now()
+  for (const [key, w] of memoryStore.entries()) {
+    if (now > w.resetAt) memoryStore.delete(key)
+  }
+}
+
+function memoryLimit(key: string, maxHits: number, windowMs: number): { success: boolean; limit: number; remaining: number; reset: number } {
+  memoryCleanup()
+  const now = Date.now()
+  const existing = memoryStore.get(key)
+
+  if (!existing || now > existing.resetAt) {
+    memoryStore.set(key, { hits: 1, resetAt: now + windowMs })
+    return { success: true, limit: maxHits, remaining: maxHits - 1, reset: now + windowMs }
+  }
+
+  if (existing.hits >= maxHits) {
+    return { success: false, limit: maxHits, remaining: 0, reset: existing.resetAt }
+  }
+
+  existing.hits++
+  memoryStore.set(key, existing)
+  return { success: true, limit: maxHits, remaining: maxHits - existing.hits, reset: existing.resetAt }
+}
+
 function getRateLimit() {
   if (ratelimit) return ratelimit
   
@@ -14,7 +49,7 @@ function getRateLimit() {
   const redisToken = process.env.UPSTASH_REDIS_TOKEN
   
   if (!redisUrl || !redisToken) {
-    console.warn('⚠️ Rate limiting disabled: UPSTASH_REDIS_URL or UPSTASH_REDIS_TOKEN not configured')
+    console.warn('⚠️ Rate limiting disabled: UPSTASH_REDIS_URL or UPSTASH_REDIS_TOKEN not configured — using in-memory fallback')
     return null
   }
   
@@ -74,7 +109,8 @@ export async function checkStrictRateLimit(ip: string, keyPrefix = 'strict'): Pr
   const rl = getStrictRateLimit()
   
   if (!rl) {
-    return { success: true }
+    // Fallback en memoria: 3 requests por minuto por IP (fail-closed, no fail-open)
+    return memoryLimit(`mem-strict:${keyPrefix}:${sanitizeIp(ip)}`, 3, 60_000)
   }
   
   const safeIp = sanitizeIp(ip)
@@ -94,7 +130,8 @@ export async function checkAuthRateLimit(ip: string): Promise<RateLimitResult> {
   const rl = getAuthRateLimit()
 
   if (!rl) {
-    return { success: true }
+    // Fallback en memoria: 5 requests por minuto por IP (fail-closed, no fail-open)
+    return memoryLimit(`mem-auth:${sanitizeIp(ip)}`, 5, 60_000)
   }
 
   const safeIp = sanitizeIp(ip)

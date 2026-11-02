@@ -38,7 +38,7 @@ export async function createPaymentPreference(params: {
       back_urls: params.backUrls,
       auto_return: 'approved',
       external_reference: params.externalReference,
-      notification_url: `${params.appUrl}/api/payments/webhook`,
+      notification_url: `${(process.env.NEXT_PUBLIC_PAYMENT_SVC_URL ?? params.appUrl).replace(/\/$/, '')}/v1/webhook`,
       statement_descriptor: params.statementDescriptor ?? 'COBRO DETECTOR',
       metadata: params.metadata,
     },

@@ -26,43 +26,54 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [analysesResult, creditsResult] = await Promise.all([
+  const [recentResult, statsResult, creditsResult] = await Promise.all([
     supabase.from('analyses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
+    supabase
+      .from('analyses')
+      .select('recoverable_amount, anomalies_count, status, bank, created_at')
+      .eq('user_id', user.id),
     supabase.from('credits').select('*').eq('user_id', user.id).single(),
   ])
-  const analyses = analysesResult.data as Analysis[] | null
+  const recentAnalysesAll = recentResult.data as Analysis[] | null
+  // Las métricas se calculan sobre TODOS los análisis, no sobre la muestra
+  // de 10 que se muestra en la lista.
+  const allAnalyses = statsResult.data as Array<Pick<Analysis, 'recoverable_amount' | 'anomalies_count' | 'status' | 'bank' | 'created_at'>> | null
   const credits = creditsResult.data as Credits | null
 
-  const totalRecoverable = analyses?.reduce((sum, a) => sum + (a.recoverable_amount ?? 0), 0) ?? 0
-  const totalAnomalies = analyses?.reduce((sum, a) => sum + (a.anomalies_count ?? 0), 0) ?? 0
+  const countedAnalyses = allAnalyses?.filter(a => a.status !== 'error' && a.status !== 'failed') ?? []
+  const totalRecoverable = countedAnalyses.reduce((sum, a) => sum + (a.recoverable_amount ?? 0), 0)
+  const totalAnomalies = countedAnalyses.reduce((sum, a) => sum + (a.anomalies_count ?? 0), 0)
   const creditsLeft = (credits?.total ?? 0) - (credits?.used ?? 0)
-  const completedAnalyses = analyses?.filter(a => a.status === 'completed').length ?? 0
-  const totalAnalyses = analyses?.length ?? 0
+  const completedAnalyses = allAnalyses?.filter(a => a.status === 'completed').length ?? 0
+  const totalAnalyses = allAnalyses?.length ?? 0
   const creditUsage = credits?.total ? Math.round(((credits?.used ?? 0) / credits.total) * 100) : 0
 
-  const analysesWithAnomalies = analyses?.filter(a => (a.anomalies_count ?? 0) > 0).length ?? 0
-  const detectionRate = totalAnalyses > 0 ? Math.round((analysesWithAnomalies / totalAnalyses) * 100) : 0
+  const completedWithAnomalies = allAnalyses?.filter(a => a.status === 'completed' && (a.anomalies_count ?? 0) > 0).length ?? 0
+  const detectionRate = completedAnalyses > 0 ? Math.round((completedWithAnomalies / completedAnalyses) * 100) : 0
 
-  const bankStats = analyses?.reduce<Record<string, { count: number; anomalies: number; recoverable: number }>>((acc, a) => {
+  const bankStats = countedAnalyses.reduce<Record<string, { count: number; anomalies: number; recoverable: number }>>((acc, a) => {
     const bank = a.bank ?? 'Desconocido'
     if (!acc[bank]) acc[bank] = { count: 0, anomalies: 0, recoverable: 0 }
     acc[bank].count++
     acc[bank].anomalies += a.anomalies_count ?? 0
     acc[bank].recoverable += a.recoverable_amount ?? 0
     return acc
-  }, {}) ?? {}
+  }, {})
 
   const topBank = Object.entries(bankStats)
     .filter(([name]) => name !== 'Desconocido')
     .sort(([, a], [, b]) => b.anomalies - a.anomalies)[0]
+
+  const toLocalDateKey = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
   const dailyAnalyses: { date: string; count: number; dateObj: Date }[] = []
   const today = new Date()
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today)
     d.setDate(d.getDate() - i)
-    const dateStr = d.toISOString().split('T')[0]
-    const count = analyses?.filter(a => a.created_at?.startsWith(dateStr)).length ?? 0
+    const dateStr = toLocalDateKey(d)
+    const count = allAnalyses?.filter(a => a.created_at && toLocalDateKey(new Date(a.created_at)) === dateStr).length ?? 0
     dailyAnalyses.push({ date: dateStr, count, dateObj: d })
   }
   const maxDailyCount = Math.max(...dailyAnalyses.map(d => d.count), 1)
@@ -92,7 +103,7 @@ export default async function DashboardPage() {
       value: `${detectionRate}%`,
       icon: Percent,
       trend: detectionRate === 0 ? 'empty' as const : detectionRate > 50 ? 'high' as const : 'low' as const,
-      sub: `${analysesWithAnomalies} de ${totalAnalyses} con anomalías`,
+      sub: `${completedWithAnomalies} de ${completedAnalyses} completados`,
       detail: detectionRate === 0 ? 'Sin anomalías detectadas aún' : 'de análisis tienen cobros incorrectos',
       accent: detectionRate > 0 ? 'danger' as const : 'muted' as const,
     },
@@ -108,9 +119,9 @@ export default async function DashboardPage() {
     },
   ]
 
-  const recentAnalyses = analyses?.slice(0, 5) ?? []
+  const recentAnalyses = recentAnalysesAll?.slice(0, 5) ?? []
 
-  const monthlyRecovery = analyses?.reduce<Record<string, number>>((acc, a) => {
+  const monthlyRecovery = countedAnalyses.reduce<Record<string, number>>((acc, a) => {
     const month = a.created_at?.substring(0, 7) ?? 'unknown'
     acc[month] = (acc[month] ?? 0) + (a.recoverable_amount ?? 0)
     return acc
@@ -238,7 +249,7 @@ export default async function DashboardPage() {
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Promedio por análisis</p>
                     <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                      {(totalAnomalies / (analysesWithAnomalies || 1)).toFixed(1)} anomalías por caso detectado
+                      {(totalAnomalies / (completedWithAnomalies || 1)).toFixed(1)} anomalías por caso detectado
                     </p>
                   </div>
                 </div>
@@ -324,7 +335,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <DashboardClient analyses={analyses ?? []}
+      <DashboardClient analyses={recentAnalysesAll ?? []}
         emptyState={
           <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 text-center py-16 px-6 shadow-sm">
             <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 flex items-center justify-center shadow-inner">

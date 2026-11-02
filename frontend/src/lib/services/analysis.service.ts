@@ -29,12 +29,17 @@ export async function uploadFileToStorage(
     throw new Error(`Error al subir archivo: ${uploadError?.message || 'desconocido'}`)
   }
 
-  const { data: { publicUrl } } = supabase
+  // HARDENED (2026-11): bucket privado → signed URL temporal (1h) en vez de URL pública permanente.
+  const { data: signedData, error: signedError } = await supabase
     .storage
     .from('analysis-files')
-    .getPublicUrl(storagePath)
+    .createSignedUrl(storagePath, 3600)
 
-  return { fileName: storagePath, fileUrl: publicUrl }
+  if (signedError || !signedData?.signedUrl) {
+    throw new Error(`Error al generar URL firmada: ${signedError?.message || 'desconocido'}`)
+  }
+
+  return { fileName: storagePath, fileUrl: signedData.signedUrl }
 }
 
 export async function createAnalysisWithPlan(
@@ -53,7 +58,7 @@ export async function createAnalysisWithPlan(
         file_name: file.name,
         file_type: file.type,
         file_url: fileUrl,
-        status: 'processing',
+        status: 'awaiting_payment',
       })
       .select()
       .single()
@@ -129,7 +134,7 @@ export async function executeAndStoreAnalysis(
     throw new Error(result.error || 'El motor de análisis no pudo procesar el archivo')
   }
 
-  const finalStatus = isPlatino ? 'awaiting_payment' : 'completed'
+  const finalStatus = isPlatino && (result.totalRecoverable ?? 0) > 0 ? 'awaiting_payment' : 'completed'
 
   await supabase
     .from('analyses')
@@ -167,15 +172,18 @@ export async function executeAndStoreAnalysis(
       .insert(anomaliesToInsert)
   }
 
+  const recoverableAmount = result.totalRecoverable ?? 0
+  const awaitingPayment = isPlatino && recoverableAmount > 0
+
   return {
     totalTransactions: txCount,
     anomaliesCount: anomalyCount,
-    recoverableAmount: result.totalRecoverable ?? 0,
+    recoverableAmount,
     anomalies: result.anomalies ?? [],
     summary: result.aiSummary ?? undefined,
     bank: result.bank ?? undefined,
-    awaitingPayment: isPlatino,
-    paymentAmount: isPlatino ? Math.round((result.totalRecoverable ?? 0) * 0.2) : undefined,
+    awaitingPayment,
+    paymentAmount: awaitingPayment ? Math.round(recoverableAmount * 0.2) : undefined,
   }
 }
 

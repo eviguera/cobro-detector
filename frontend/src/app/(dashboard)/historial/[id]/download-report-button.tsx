@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { formatCLP, getAnomalyTypeLabel, getSeverityLabel } from '@/lib/utils'
 import { escapeXml } from '@/lib/security'
 import { SEVERITY } from '@/lib/constants'
+import { generateWordDocument, generatePDFDocument } from '@/lib/document-generator'
 import type { Analysis, DetectedAnomaly, ParsedTransaction } from '@/domain'
 
 interface Props {
@@ -37,10 +38,10 @@ function buildTransactionTable(anomaly: DetectedAnomaly, txMap: Map<string, Pars
     const dangerRow = badge.includes('REVERSAR') ? 'background:#fff5f5;' : ''
 
     return `<tr style="${dangerRow}">
-      <td style="font-family:monospace;font-size:11px;">${tx.id}</td>
-      <td>${tx.date}</td>
-      <td style="max-width:200px;word-break:break-word;">${tx.description}</td>
-      <td>${tx.category ?? '—'}</td>
+      <td style="font-family:monospace;font-size:11px;">${escapeXml(tx.id)}</td>
+      <td>${escapeXml(tx.date)}</td>
+      <td style="max-width:200px;word-break:break-word;">${escapeXml(tx.description)}</td>
+      <td>${escapeXml(tx.category ?? '—')}</td>
       <td style="text-align:right;color:#dc2626;font-family:monospace;">$${Math.abs(tx.amount).toLocaleString('es-CL')}</td>
       <td>${badge}</td>
     </tr>`
@@ -78,6 +79,7 @@ function getClaimInstructions(type: string): string {
 
 export default function DownloadReportButton({ analysis, anomalies, transactions }: Props) {
   const [loading, setLoading] = useState(false)
+  const [format, setFormat] = useState<'pdf' | 'docx' | 'html'>('html')
 
   const generateHTML = () => {
     const totalRecoverable = formatCLP(analysis.recoverable_amount)
@@ -171,7 +173,7 @@ export default function DownloadReportButton({ analysis, anomalies, transactions
   <div class="subtitle">
     <span>Archivo: <strong>${escapeXml(analysis.file_name)}</strong></span>
     <span style="color:#d1d5db;">·</span>
-    <span>Banco: <strong>${analysis.bank ?? 'No detectado'}</strong></span>
+    <span>Banco: <strong>${escapeXml(analysis.bank ?? 'No detectado')}</strong></span>
     <span style="color:#d1d5db;">·</span>
     <span>Analizado: <strong>${date}</strong></span>
   </div>
@@ -234,7 +236,7 @@ ${cobroCards}
 <div class="footer">
   <p><strong>CobroDetector</strong> · Reporte generado automáticamente el ${today}</p>
   <p>La detección de cobros injustificados se basa en reglas de negocio bancario chileno y análisis por inteligencia artificial (Llama 3.1 8B via Groq).</p>
-  <p>ID de análisis: ${analysis.id} · Este documento no constituye asesoría legal.</p>
+  <p>ID de análisis: ${escapeXml(analysis.id)} · Este documento no constituye asesoría legal.</p>
 </div>
 
 </body>
@@ -244,27 +246,68 @@ ${cobroCards}
   const handleDownload = async () => {
     setLoading(true)
     try {
-      const html = generateHTML()
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `reporte-cobros-${analysis.id.slice(0, 8)}.html`
-      a.click()
-      URL.revokeObjectURL(url)
+      const date = new Date(analysis.created_at).toLocaleDateString('es-CL')
+
+      const letterData = {
+        analysis,
+        anomalies,
+        bankName: analysis.bank ?? undefined,
+        date,
+      }
+
+      if (format === 'pdf') {
+        const buffer = await generatePDFDocument(letterData)
+        const blob = new Blob([buffer], { type: 'application/pdf' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `reporte-cobros-${analysis.id.slice(0, 8)}.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+      } else if (format === 'docx') {
+        const buffer = await generateWordDocument(letterData)
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `reporte-cobros-${analysis.id.slice(0, 8)}.docx`
+        a.click()
+        URL.revokeObjectURL(url)
+      } else {
+        const html = generateHTML()
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `reporte-cobros-${analysis.id.slice(0, 8)}.html`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <button
-      onClick={handleDownload}
-      disabled={loading}
-      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
-    >
-      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-      Descargar reporte
-    </button>
+    <div className="flex items-center gap-3">
+      <select
+        value={format}
+        onChange={e => setFormat(e.target.value as 'pdf' | 'docx' | 'html')}
+        disabled={loading}
+        className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+      >
+        <option value="html">HTML (imprimir)</option>
+        <option value="pdf">PDF</option>
+        <option value="docx">Word (DOCX)</option>
+      </select>
+      <button
+        onClick={handleDownload}
+        disabled={loading}
+        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
+      >
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+        Descargar reporte
+      </button>
+    </div>
   )
 }

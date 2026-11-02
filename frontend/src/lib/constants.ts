@@ -52,7 +52,9 @@ export const ANALYSIS_STATUS: Record<string, string> = {
   dismissed: 'Descartado',
   processing: 'Procesando',
   completed: 'Completado',
+  awaiting_payment: 'Pendiente de pago',
   failed: 'Error',
+  error: 'Error',
 }
 
 

@@ -204,6 +204,8 @@ export interface AnalysisRunResponse {
   recoverableAmount: number
   summary: string
   bank: string
+  awaitingPayment?: boolean
+  paymentAmount?: number
 }
 
 export interface PaymentPreference {
@@ -211,6 +213,7 @@ export interface PaymentPreference {
   init_point?: string
   sandbox_init_point?: string
   preference_id: string
+  unlocked?: boolean
 }
 
 export interface MercadoPagoWebhookEvent {

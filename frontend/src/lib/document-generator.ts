@@ -1,4 +1,4 @@
-import type { Analysis, Anomaly } from '@/types/database.types'
+import type { Analysis, DetectedAnomaly } from '@/domain'
 import { formatCLP } from '@/lib/utils'
 import { escapeXml } from '@/lib/security'
 
@@ -22,11 +22,11 @@ const getPdfLib = async () => {
 
 interface LetterData {
   analysis: Analysis
-  anomalies: Anomaly[]
-  bankName: string
-  businessName: string
-  userName: string
-  rut: string
+  anomalies: DetectedAnomaly[]
+  bankName?: string
+  businessName?: string
+  userName?: string
+  rut?: string
   date: string
 }
 
@@ -35,7 +35,7 @@ async function generateComplaintLetter(data: LetterData): Promise<Document> {
   const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel } = docx
   const { analysis, anomalies, bankName, businessName, userName, rut, date } = data
 
-  const totalRecoverable = anomalies.reduce((sum, a) => sum + a.recoverable_amount, 0)
+  const totalRecoverable = anomalies.reduce((sum, a) => sum + a.recoverableAmount, 0)
 
   return new Document({
     sections: [
@@ -147,7 +147,7 @@ async function generateComplaintLetter(data: LetterData): Promise<Document> {
                       children: [new Paragraph(escapeXml(anomaly.title || '')), new Paragraph({ children: [new TextRun({ text: escapeXml(anomaly.description || ''), size: 8 })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun(formatCLP(anomaly.recoverable_amount))] })],
+                      children: [new Paragraph({ children: [new TextRun(formatCLP(anomaly.recoverableAmount))] })],
                     }),
                   ],
                 })
@@ -213,15 +213,15 @@ async function generateComplaintLetter(data: LetterData): Promise<Document> {
   })
 }
 
-export async function generateWordDocument(data: LetterData): Promise<Buffer> {
+export async function generateWordDocument(data: LetterData): Promise<Uint8Array> {
   const docx = await getDocx()
   const { Packer } = docx
   const doc = await generateComplaintLetter(data)
   const buffer = await Packer.toBuffer(doc)
-  return buffer
+  return new Uint8Array(buffer)
 }
 
-export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
+export async function generatePDFDocument(data: LetterData): Promise<Uint8Array> {
   const pdfLib = await getPdfLib()
   const { PDFDocument, rgb, StandardFonts } = pdfLib
 
@@ -232,7 +232,7 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-  const totalRecoverable = data.anomalies.reduce((sum, a) => sum + a.recoverable_amount, 0)
+  const totalRecoverable = data.anomalies.reduce((sum, a) => sum + a.recoverableAmount, 0)
 
   let currentPage = page
   let yPosition = height - 50
@@ -260,15 +260,15 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
   })
   yPosition -= 20
 
-  drawOrNewPage((_p) => { currentPage.drawText(`Nombre: ${escapeXml(data.userName)}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
-  drawOrNewPage((_p) => { currentPage.drawText(`RUT: ${escapeXml(data.rut || 'No especificado')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
-  drawOrNewPage((_p) => { currentPage.drawText(`Empresa: ${escapeXml(data.businessName || 'No especificado')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 25 })
+  drawOrNewPage((_p) => { currentPage.drawText(`Nombre: ${escapeXml(data.userName ?? 'No especificado')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
+  drawOrNewPage((_p) => { currentPage.drawText(`RUT: ${escapeXml(data.rut ?? 'No especificado')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
+  drawOrNewPage((_p) => { currentPage.drawText(`Empresa: ${escapeXml(data.businessName ?? 'No especificado')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 25 })
 
   currentPage.drawText('DATOS DEL BANCO', {
     x: 50, y: yPosition, size: 14, font: boldFont,
   })
   yPosition -= 20
-  drawOrNewPage((_p) => { currentPage.drawText(`Banco: ${escapeXml(data.bankName)}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
+  drawOrNewPage((_p) => { currentPage.drawText(`Banco: ${escapeXml(data.bankName ?? '')}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 18 })
   drawOrNewPage((_p) => { currentPage.drawText(`Período: ${data.analysis.period_start || 'N/A'} al ${data.analysis.period_end || 'N/A'}`, { x: 50, y: yPosition, size: fontSize, font }); return yPosition - 25 })
 
   currentPage.drawText('MOTIVO DEL RECLAMO', {
@@ -304,7 +304,7 @@ export async function generatePDFDocument(data: LetterData): Promise<Buffer> {
     })
     yPosition -= 12
 
-    currentPage.drawText(`  Monto: ${formatCLP(anomaly.recoverable_amount)}`, {
+    currentPage.drawText(`  Monto: ${formatCLP(anomaly.recoverableAmount)}`, {
       x: 50, y: yPosition, size: 10, font,
     })
     yPosition -= 20

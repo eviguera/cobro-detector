@@ -3,6 +3,55 @@ const withMDX = require('@next/mdx')({
   extension: /\.mdx?$/,
 })
 
+// La URL de Supabase define qué orígenes se permiten en CSP e imágenes.
+// Antes estaba hardcodeada a un proyecto que ya no existe.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+let supabaseUrlParsed = null
+try {
+  if (supabaseUrl) supabaseUrlParsed = new URL(supabaseUrl)
+} catch {
+  supabaseUrlParsed = null
+}
+const supabaseOrigin = supabaseUrlParsed ? supabaseUrlParsed.origin : ''
+const isDev = process.env.NODE_ENV !== 'production'
+
+const devOrigins = isDev
+  ? ['http://localhost:*', 'http://127.0.0.1:*', 'ws://localhost:*', 'ws://127.0.0.1:*']
+  : []
+
+const connectSrc = [
+  "'self'",
+  supabaseOrigin,
+  'https://*.supabase.co',
+  'https://*.vercel.app',
+  ...devOrigins,
+]
+  .filter(Boolean)
+  .join(' ')
+
+const imgSrc = [
+  "'self'",
+  'data:',
+  'blob:',
+  supabaseOrigin,
+  'https://*.supabase.co',
+  'https://*.vercel.app',
+  ...(isDev ? ['http://localhost:*', 'http://127.0.0.1:*'] : []),
+]
+  .filter(Boolean)
+  .join(' ')
+
+const remotePatterns = supabaseUrlParsed
+  ? [
+      {
+        protocol: supabaseUrlParsed.protocol.replace(':', ''),
+        hostname: supabaseUrlParsed.hostname,
+        ...(supabaseUrlParsed.port ? { port: supabaseUrlParsed.port } : {}),
+        pathname: '/storage/v1/object/**',
+      },
+    ]
+  : []
+
 const nextConfig = {
   pageExtensions: ['ts', 'tsx', 'js', 'jsx', 'md', 'mdx'],
   // NOTA: ignoreBuildErrors está activo porque @supabase/ssr (v0.10.3) sigue
@@ -15,12 +64,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'mcwqqcngfibhgluvixlu.supabase.co',
-      },
-    ],
+    remotePatterns,
   },
   experimental: {
     serverActions: {
@@ -43,7 +87,16 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.vercel.app; font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://mcwqqcngfibhgluvixlu.supabase.co https://*.vercel.app;",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              `img-src ${imgSrc}`,
+              "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com",
+              `connect-src ${connectSrc}`,
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+            ].join('; ') + ';',
           },
           {
             key: 'Referrer-Policy',

@@ -17,7 +17,7 @@ export function SavingsChart({ data, total }: SavingsChartProps) {
     <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold tracking-wider uppercase">Ahorro estimado</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold tracking-wider uppercase">Monto estimado a reclamar</p>
           <p className="text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400 mt-1">
             {formatCLP(total)}
           </p>

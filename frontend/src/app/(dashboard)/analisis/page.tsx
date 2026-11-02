@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
-import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, RotateCcw } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, RotateCcw, CreditCard, ShieldAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { formatCLP } from '@/lib/utils'
+import Link from 'next/link'
 
 import { createClient } from '@/lib/supabase/client'
-import { submitAnalysis, NoCreditsError } from '@/application/submit-analysis'
+import { submitAnalysis, NoCreditsError, AnalysisFailedError } from '@/application/submit-analysis'
 import type { AnalysisRunResponse } from '@/domain'
 
 type Step = 'upload' | 'analyzing' | 'done'
@@ -49,7 +50,45 @@ export default function AnalisisPage() {
   const [currentAnalysisStep, setCurrentAnalysisStep] = useState(0)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [creditsLeft, setCreditsLeft] = useState<number | null>(null)
+  const [elapsed, setElapsed] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const cancelledRef = useRef(false)
+
+  const isPlatino = planFromUrl === 'platino'
+  const hasNoCredits = creditsLeft === 0 && !isPlatino
+
+  // Saldo real para avisar ANTES de subir, no después de gastar el intento.
+  useEffect(() => {
+    let cancelled = false
+    const supabase = createClient()
+    supabase
+      .from('credits')
+      .select('total, used')
+      .single()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        // Si falla la lectura, no asumimos "sin créditos": bloquearíamos a un
+        // usuario que sí tiene saldo. Dejamos el aviso en manos del backend.
+        if (error && error.code !== 'PGRST116') {
+          setCreditsLeft(null)
+          return
+        }
+        setCreditsLeft(data ? Math.max(0, (data.total ?? 0) - (data.used ?? 0)) : 0)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  // Cronómetro visible durante el análisis: da feedback de que sigue vivo.
+  useEffect(() => {
+    if (step !== 'analyzing') return
+    setElapsed(0)
+    const timer = setInterval(() => setElapsed(seconds => seconds + 1), 1000)
+    return () => clearInterval(timer)
+  }, [step])
+
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   const handleFile = useCallback((f: File) => {
     const allowed = ['application/pdf', 'application/vnd.ms-excel',
@@ -74,10 +113,22 @@ export default function AnalisisPage() {
   }, [handleFile])
 
   const runAnalysis = async () => {
-    if (!file) return
+    if (!file || loading) return
+
+    if (hasNoCredits) {
+      toast.error('No tienes créditos disponibles. Compra un plan para continuar.')
+      router.push('/precios')
+      return
+    }
+
+    cancelledRef.current = false
     setLoading(true)
     setStep('analyzing')
     setCurrentAnalysisStep(0)
+    setElapsed(0)
+
+    const controller = new AbortController()
+    abortRef.current = controller
 
     const interval = setInterval(() => {
       setCurrentAnalysisStep(prev => {
@@ -89,56 +140,110 @@ export default function AnalisisPage() {
       })
     }, 900)
 
+    // Si el servicio no responde, cortar a los 2 minutos en vez de dejar
+    // al usuario atrapado en una pantalla de progreso infinita.
+    const timeout = setTimeout(() => controller.abort(), 120_000)
+
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        toast.error('Debes iniciar sesión')
+        toast.error('Tu sesión expiró. Vuelve a iniciar sesión.')
+        setStep('upload')
+        router.push('/login')
         return
       }
-
-      const isPlatino = planFromUrl === 'platino'
 
       const analysisResult = await submitAnalysis({
         file,
         userId: user.id,
         isPlatino,
+        signal: controller.signal,
       })
 
-      clearInterval(interval)
+      if (cancelledRef.current) return
+
       setCurrentAnalysisStep(ANALYSIS_STEPS.length - 1)
+
+      // Platino solo paga cuando hay algo que recuperar. Sin anomalías no
+      // corresponde mostrar un paywall de $0.
+      const awaitingPayment = Boolean(analysisResult.awaitingPayment) ||
+        (isPlatino && (analysisResult.recoverableAmount ?? 0) > 0 && (analysisResult.anomaliesCount ?? 0) > 0)
 
       const resultData: AnalysisResult = {
         ...analysisResult,
         anomalies: [],
-        awaitingPayment: isPlatino,
-        paymentAmount: isPlatino ? Math.round((analysisResult.recoverableAmount ?? 0) * 0.2) : undefined,
+        awaitingPayment,
+        paymentAmount: awaitingPayment ? Math.round((analysisResult.recoverableAmount ?? 0) * 0.2) : undefined,
       }
 
-      await new Promise(r => setTimeout(r, 600))
       setResult(resultData)
       setStep('done')
-      setLoading(false)
-      toast.success('Análisis completado exitosamente')
+      toast.success(
+        awaitingPayment
+          ? 'Análisis listo. Revisa el reporte para desbloquearlo.'
+          : 'Análisis completado exitosamente',
+      )
     } catch (err: unknown) {
-      clearInterval(interval)
-      setLoading(false)
+      if (cancelledRef.current) return
+
       if (err instanceof NoCreditsError) {
         toast.error('No tienes créditos disponibles. Compra un plan para continuar.')
+        setStep('upload')
         router.push('/precios')
         return
       }
+
+      if (err instanceof AnalysisFailedError) {
+        const timedOut = /abort/i.test(err.message)
+        setResult({
+          analysisId: err.analysisId,
+          status: 'failed',
+          totalTransactions: 0,
+          anomaliesCount: 0,
+          recoverableAmount: 0,
+          summary: '',
+          bank: '',
+          syncError: timedOut
+            ? 'El análisis está tardando más de lo esperado. Puedes revisar el historial en unos minutos; si no aparece, vuelve a intentarlo.'
+            : err.message,
+        })
+        setStep('done')
+        toast.error(timedOut ? 'El análisis está tardando más de lo esperado' : 'No pudimos completar el análisis')
+        return
+      }
+
+      if (err instanceof Error && err.name === 'AbortError') {
+        toast.error('El análisis tardó demasiado. Intenta nuevamente.')
+        setStep('upload')
+        return
+      }
+
       toast.error(err instanceof Error ? err.message : 'Error al analizar el archivo')
       setStep('upload')
+    } finally {
+      clearInterval(interval)
+      clearTimeout(timeout)
+      abortRef.current = null
+      setLoading(false)
     }
   }
+
+  const cancelAnalysis = useCallback(() => {
+    cancelledRef.current = true
+    abortRef.current?.abort()
+    setStep('upload')
+    setLoading(false)
+    toast('Análisis cancelado')
+  }, [])
 
   const resetForm = useCallback(() => {
     setStep('upload')
     setFile(null)
     setResult(null)
     setCurrentAnalysisStep(0)
+    setElapsed(0)
     setLoading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }, [])
@@ -159,17 +264,55 @@ export default function AnalisisPage() {
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
             Sube tu estado de cuenta bancario y detectamos cobros injustificados en minutos.
           </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {isPlatino ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                Plan Platino · pagas solo el 20% si encontramos cobros
+              </span>
+            ) : creditsLeft !== null ? (
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                hasNoCredits
+                  ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                  : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+              }`}>
+                <CreditCard className="w-3.5 h-3.5" />
+                {hasNoCredits
+                  ? 'Sin créditos disponibles'
+                  : `${creditsLeft} crédito${creditsLeft !== 1 ? 's' : ''} disponible${creditsLeft !== 1 ? 's' : ''}`}
+              </span>
+            ) : null}
+          </div>
         </div>
 
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => fileInputRef.current?.click()}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click() } }}
+        {hasNoCredits && (
+          <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/40 dark:bg-amber-900/20">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                  Necesitas créditos para analizar
+                </p>
+                <p className="mt-0.5 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                  Cada análisis consume 1 crédito. Compra un plan para continuar o usa el Plan Platino.
+                </p>
+              </div>
+              <Link
+                href="/precios"
+                className="flex-shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700"
+              >
+                Ver planes
+              </Link>
+            </div>
+          </div>
+        )}
+
+        <label
+          htmlFor="analysis-file"
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-8 sm:p-12 text-center transition-all duration-300 ${
+          className={`relative block cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-300 focus-within:ring-2 focus-within:ring-blue-500/30 sm:p-12 ${
             file
               ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/10'
               : dragging
@@ -178,12 +321,13 @@ export default function AnalisisPage() {
           }`}
         >
           <input
+            id="analysis-file"
             ref={fileInputRef}
             type="file"
-            className="hidden"
+            className="sr-only"
             accept=".pdf,.xlsx,.xls,.csv"
             onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
-            aria-label="Seleccionar archivo de estado de cuenta"
+            aria-describedby="analysis-file-help"
           />
 
           {file ? (
@@ -198,7 +342,13 @@ export default function AnalisisPage() {
                 {(file.size / 1024).toFixed(0)} KB
               </p>
               <button
-                onClick={e => { e.stopPropagation(); setFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                type="button"
+                onClick={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setFile(null)
+                  if (fileInputRef.current) fileInputRef.current.value = ''
+                }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
               >
                 <X className="w-3 h-3" />
@@ -222,12 +372,12 @@ export default function AnalisisPage() {
               <p className="text-sm text-gray-400 dark:text-gray-500 mb-2">
                 o haz clic para seleccionar un archivo
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-400 font-mono">
+              <p id="analysis-file-help" className="text-xs text-gray-400 dark:text-gray-400 font-mono">
                 PDF, Excel (.xlsx) o CSV · Máximo 10MB
               </p>
             </div>
           )}
-        </div>
+        </label>
 
         <div className="mt-6 bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-100 dark:border-gray-800/40 p-4 shadow-sm">
           <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 mb-3 uppercase tracking-wider">
@@ -250,26 +400,42 @@ export default function AnalisisPage() {
         </div>
 
         {file && (
-          <button
-            onClick={runAnalysis}
-            disabled={loading}
-            className="mt-6 w-full flex items-center justify-center gap-2.5 py-3.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4" />
-            )}
-            Analizar ahora (usa 1 crédito)
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          hasNoCredits ? (
+            <Link
+              href="/precios"
+              className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-xl bg-amber-500 py-3.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-amber-600"
+            >
+              <CreditCard className="w-4 h-4" />
+              Comprar créditos para analizar
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          ) : (
+            <button
+              onClick={runAnalysis}
+              disabled={loading}
+              className="mt-6 w-full flex items-center justify-center gap-2.5 py-3.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              {isPlatino ? 'Analizar con Plan Platino' : 'Analizar ahora (usa 1 crédito)'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )
         )}
       </div>
     )
   }
 
   if (step === 'analyzing') {
-    const progress = ((currentAnalysisStep + 1) / ANALYSIS_STEPS.length) * 100
+    const rawProgress = ((currentAnalysisStep + 1) / ANALYSIS_STEPS.length) * 100
+    // Nunca mostrar 100% mientras el servicio sigue trabajando.
+    const progress = currentAnalysisStep >= ANALYSIS_STEPS.length - 1 ? 92 : Math.min(rawProgress, 90)
+    const elapsedLabel = elapsed < 60
+      ? `${elapsed}s`
+      : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
 
     return (
       <div className="animate-fade-in-up max-w-lg mx-auto pt-16 sm:pt-24">
@@ -284,14 +450,19 @@ export default function AnalisisPage() {
           Analizando tu estado de cuenta
         </h2>
         <p className="text-gray-400 dark:text-gray-500 text-sm text-center mb-10">
-          Esto puede tomar hasta 1 minuto
+          Normalmente toma menos de 1 minuto · {elapsedLabel}
         </p>
 
-        <div className="mb-8">
+        <div className="mb-8" role="status" aria-live="polite" aria-label="Progreso del análisis">
           <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-700 ease-out"
               style={{ width: `${progress}%` }}
+              role="progressbar"
+              aria-valuenow={Math.round(progress)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Progreso del análisis: ${Math.round(progress)} por ciento completado`}
             />
           </div>
           <div className="flex justify-between mt-2">
@@ -300,7 +471,7 @@ export default function AnalisisPage() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm space-y-0.5">
+        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm space-y-0.5" aria-live="polite" aria-label="Paso actual del análisis">
           {ANALYSIS_STEPS.map((s, i) => {
             const isCompleted = i < currentAnalysisStep
             const isActive = i === currentAnalysisStep
@@ -336,6 +507,15 @@ export default function AnalisisPage() {
             )
           })}
         </div>
+
+        <button
+          type="button"
+          onClick={cancelAnalysis}
+          className="mt-5 flex w-full items-center justify-center gap-2 py-2.5 text-sm text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+        >
+          <X className="w-3.5 h-3.5" />
+          Cancelar análisis
+        </button>
       </div>
     )
   }
@@ -395,7 +575,7 @@ export default function AnalisisPage() {
           </div>
         </div>
         <h2 className="text-xl font-display font-bold text-gray-900 dark:text-gray-50 text-center mb-2">
-          Error al analizar el archivo
+          No pudimos completar el análisis
         </h2>
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl p-4 mb-6">
           <p className="text-sm text-red-700 dark:text-red-300 font-mono whitespace-pre-wrap">
@@ -403,20 +583,22 @@ export default function AnalisisPage() {
           </p>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6">
-          Se intentará procesar en segundo plano. Revisa el historial en unos minutos.
+          El archivo se subió correctamente, pero el servicio de análisis no respondió.
+          Puedes reintentar con el mismo archivo o revisar el historial.
         </p>
-        <div className="flex gap-3 justify-center">
-          <button
-            onClick={() => router.push(`/historial/${result.analysisId}`)}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all"
-          >
-            Ver en historial
-          </button>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={resetForm}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Intentar de nuevo
+          </button>
+          <button
+            onClick={() => router.push(`/historial/${result.analysisId}`)}
             className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold text-sm transition-all"
           >
-            Intentar de nuevo
+            Ver en historial
           </button>
         </div>
       </div>
@@ -449,7 +631,11 @@ export default function AnalisisPage() {
           <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
             Anomalías detectadas
           </p>
-          <p className="text-3xl font-display font-bold text-red-600 dark:text-red-400">
+          <p className={`text-3xl font-display font-bold ${
+            (result.anomaliesCount ?? 0) > 0
+              ? 'text-red-600 dark:text-red-400'
+              : 'text-emerald-600 dark:text-emerald-400'
+          }`}>
             <span className="tabular-nums">{result.anomaliesCount}</span>
           </p>
         </div>
@@ -462,12 +648,26 @@ export default function AnalisisPage() {
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">estimado</p>
         </div>
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 rounded-2xl p-5">
-          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1.5">
+        <div className={`rounded-2xl p-5 ${
+          (result.anomaliesCount ?? 0) > 0
+            ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40'
+            : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40'
+        }`}>
+          <p className={`text-xs font-medium uppercase tracking-wider mb-1.5 ${
+            (result.anomaliesCount ?? 0) > 0
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-blue-600 dark:text-blue-400'
+          }`}>
             Siguiente paso
           </p>
-          <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-            Descarga el reporte y ve al banco
+          <p className={`text-sm font-semibold ${
+            (result.anomaliesCount ?? 0) > 0
+              ? 'text-emerald-900 dark:text-emerald-100'
+              : 'text-blue-900 dark:text-blue-100'
+          }`}>
+            {(result.anomaliesCount ?? 0) > 0
+              ? 'Descarga el reporte y ve al banco'
+              : 'No encontramos cobros injustificados'}
           </p>
         </div>
       </div>
@@ -492,7 +692,7 @@ export default function AnalisisPage() {
           className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5 flex items-center justify-center gap-2"
         >
           <FileText className="w-4 h-4" />
-          Ver reporte completo
+          {(result.anomaliesCount ?? 0) > 0 ? 'Ver reporte completo' : 'Ver detalle del análisis'}
           <ArrowRight className="w-4 h-4" />
         </button>
         <button

@@ -18,12 +18,17 @@ export async function uploadFileToStorage(file: File, userId: string): Promise<s
     throw new Error(`Error al subir archivo: ${uploadError?.message || 'desconocido'}`)
   }
 
-  const { data: { publicUrl } } = supabase
+  // HARDENED (2026-11): bucket privado → signed URL temporal (1h) en vez de URL pública permanente.
+  const { data: signedData, error: signedError } = await supabase
     .storage
     .from('analysis-files')
-    .getPublicUrl(storagePath)
+    .createSignedUrl(storagePath, 3600)
 
-  return publicUrl
+  if (signedError || !signedData?.signedUrl) {
+    throw new Error(`Error al generar URL firmada: ${signedError?.message || 'desconocido'}`)
+  }
+
+  return signedData.signedUrl
 }
 
 export async function createAnalysisRecord(
@@ -31,7 +36,7 @@ export async function createAnalysisRecord(
   fileName: string,
   fileType: string,
   fileUrl: string,
-  _isPlatino: boolean,
+  isPlatino: boolean,
 ): Promise<string> {
   const supabase = createClient()
 
@@ -42,7 +47,9 @@ export async function createAnalysisRecord(
       file_name: fileName,
       file_type: fileType,
       file_url: fileUrl,
-      status: 'processing',
+      // `awaiting_payment` marca el plan Platino desde el inicio: analysis-svc
+      // lo lee antes de ejecutar y decide si debe bloquear el reporte.
+      status: isPlatino ? 'awaiting_payment' : 'processing',
     })
     .select()
     .single()
@@ -52,6 +59,17 @@ export async function createAnalysisRecord(
   }
 
   return data.id
+}
+
+export async function deleteAnalysisRecord(analysisId: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('analyses').delete().eq('id', analysisId)
+}
+
+/** Evita que un análisis quede "procesando" para siempre si el servicio no responde. */
+export async function markAnalysisFailed(analysisId: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('analyses').update({ status: 'error' }).eq('id', analysisId)
 }
 
 export async function consumeCredit(userId: string): Promise<boolean> {
@@ -77,12 +95,16 @@ export async function consumeCredit(userId: string): Promise<boolean> {
   const left = (credits.total ?? 0) - (credits.used ?? 0)
   if (left <= 0) return false
 
-  const { error: updateError } = await supabase
+  const { data: updated, error: updateError } = await supabase
     .from('credits')
     .update({ used: (credits.used ?? 0) + 1 })
     .eq('user_id', userId)
     .eq('used', credits.used ?? 0)
     .is('company_id', null)
+    .select('user_id')
 
-  return !updateError
+  // El update condicional puede afectar 0 filas si otra pestaña consumió el
+  // crédito entre la lectura y la escritura. Sin esta comprobación se gastaba
+  // dos veces el mismo crédito.
+  return !updateError && (updated?.length ?? 0) > 0
 }
