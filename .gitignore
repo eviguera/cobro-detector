@@ -1,7 +1,19 @@
+# Secrets: nunca commitear (cualquier .env / .env.local en cualquier carpeta)
 .env
+.env.*
+*.bak-*
+!.env.example
+*/.env.example
 node_modules/
 dist/
 .next/
 .DS_Store
 *.log
 .vercel
+
+# Worktrees / estado de agente local (no commitear)
+.opencode/
+frontend/.agents/
+opencode.json
+.bash_history-*
+/tmp/
