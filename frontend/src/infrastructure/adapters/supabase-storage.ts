@@ -1,24 +1,49 @@
 import { createClient } from '@/lib/supabase/client'
+import {
+  encryptFileAES256GCM,
+  exportKeyRaw,
+  generateFileEncryptionKey,
+  toBase64,
+} from '@/lib/encryption'
 
-export async function uploadFileToStorage(file: File, userId: string): Promise<string> {
+export interface UploadResult {
+  storagePath: string
+  signedUrl: string
+  ivBase64: string
+  encryptionKeyBase64: string
+}
+
+/**
+ * Cifra el archivo con AES-256-GCM ANTES de subirlo a Supabase Storage.
+ * Devuelve la ruta de almacenamiento, URL firmada, IV y clave de cifrado
+ * (ambos en base64 para poder pasarse al backend).
+ */
+export async function uploadFileToStorage(
+  file: File,
+  userId: string,
+): Promise<UploadResult> {
   const supabase = createClient()
-  const fileBuffer = await file.arrayBuffer()
   const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const storagePath = `${userId}/${Date.now()}-${safeFileName}`
+  const storagePath = `${userId}/${Date.now()}-${safeFileName}.enc`
 
-  const { data: uploadData, error: uploadError } = await supabase
+  // Generar clave efímera y cifrar antes de subir
+  const key = await generateFileEncryptionKey()
+  const { encrypted, iv } = await encryptFileAES256GCM(file, key)
+
+  const { error: uploadError } = await supabase
     .storage
     .from('analysis-files')
-    .upload(storagePath, fileBuffer, {
-      contentType: file.type,
+    .upload(storagePath, encrypted, {
+      contentType: 'application/octet-stream',
       upsert: false,
+      cacheControl: '3600',
     })
 
-  if (uploadError || !uploadData) {
+  if (uploadError) {
     throw new Error(`Error al subir archivo: ${uploadError?.message || 'desconocido'}`)
   }
 
-  // HARDENED (2026-11): bucket privado → signed URL temporal (1h) en vez de URL pública permanente.
+  // URL firmada temporal (1 hora) para que el microservicio descargue y descifre
   const { data: signedData, error: signedError } = await supabase
     .storage
     .from('analysis-files')
@@ -28,15 +53,28 @@ export async function uploadFileToStorage(file: File, userId: string): Promise<s
     throw new Error(`Error al generar URL firmada: ${signedError?.message || 'desconocido'}`)
   }
 
-  return signedData.signedUrl
+  const keyRaw = await exportKeyRaw(key)
+
+  return {
+    storagePath,
+    signedUrl: signedData.signedUrl,
+    ivBase64: toBase64(iv),
+    encryptionKeyBase64: toBase64(keyRaw),
+  }
 }
 
+/**
+ * Crea un registro de análisis con metadatos de cifrado y ruta de Storage.
+ */
 export async function createAnalysisRecord(
   userId: string,
   fileName: string,
   fileType: string,
   fileUrl: string,
   isPlatino: boolean,
+  storagePath?: string | null,
+  encryptionKeyIv?: string | null,
+  encryptionKeyBase64?: string | null,
 ): Promise<string> {
   const supabase = createClient()
 
@@ -47,6 +85,9 @@ export async function createAnalysisRecord(
       file_name: fileName,
       file_type: fileType,
       file_url: fileUrl,
+      storage_path: storagePath ?? null,
+      encryption_key_iv: encryptionKeyIv ?? null,
+      encryption_key_base64: encryptionKeyBase64 ?? null,
       // `awaiting_payment` marca el plan Platino desde el inicio: analysis-svc
       // lo lee antes de ejecutar y decide si debe bloquear el reporte.
       status: isPlatino ? 'awaiting_payment' : 'processing',
@@ -61,8 +102,21 @@ export async function createAnalysisRecord(
   return data.id
 }
 
-export async function deleteAnalysisRecord(analysisId: string): Promise<void> {
+/**
+ * Elimina el registro de análisis Y el archivo de Storage asociado.
+ * Requiere que el registro tenga la columna storage_path.
+ */
+export async function deleteAnalysisRecord(
+  analysisId: string,
+  storagePath?: string | null,
+): Promise<void> {
   const supabase = createClient()
+
+  // Eliminar el archivo de Storage si existe la ruta
+  if (storagePath) {
+    await supabase.storage.from('analysis-files').remove([storagePath])
+  }
+
   await supabase.from('analyses').delete().eq('id', analysisId)
 }
 
@@ -103,8 +157,5 @@ export async function consumeCredit(userId: string): Promise<boolean> {
     .is('company_id', null)
     .select('user_id')
 
-  // El update condicional puede afectar 0 filas si otra pestaña consumió el
-  // crédito entre la lectura y la escritura. Sin esta comprobación se gastaba
-  // dos veces el mismo crédito.
   return !updateError && (updated?.length ?? 0) > 0
 }

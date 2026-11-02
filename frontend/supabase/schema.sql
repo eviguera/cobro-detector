@@ -156,6 +156,11 @@ CREATE TABLE IF NOT EXISTS analyses (
   file_name TEXT NOT NULL,
   file_type TEXT NOT NULL,
   file_url TEXT,
+  -- Campos de cifrado y retención (seguridad de datos bancarios)
+  storage_path TEXT,                 -- Ruta en Supabase Storage del archivo cifrado
+  encryption_key_iv TEXT,            -- IV del cifrado AES-256-GCM (base64)
+  encryption_key_base64 TEXT,        -- Clave de cifrado (base64) para que analysis-svc descifre
+  file_deleted_at TIMESTAMPTZ,       -- Timestamp de eliminación del archivo de Storage
   bank TEXT,
   period_start DATE,
   period_end DATE,

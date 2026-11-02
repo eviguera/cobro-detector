@@ -5,15 +5,32 @@ const POLL_INTERVAL_MS = 3000
 // Un poco menos que el timeout de 2 min del frontend para dejar margen de reacción.
 const MAX_ELAPSED_MS = 110_000
 
-export function runAnalysis(analysisId: string, signal?: AbortSignal): Promise<AnalysisRunResponse> {
+interface EncryptionData {
+  storagePath: string
+  ivBase64: string
+  encryptionKeyBase64: string
+}
+
+export function runAnalysis(
+  analysisId: string,
+  encryptionData: EncryptionData,
+  signal?: AbortSignal,
+): Promise<AnalysisRunResponse> {
   return (async () => {
     // 1. Encolar el análisis: el backend devuelve 202 Accepted inmediatamente.
+    // Se envían los metadatos de cifrado para que el microservicio pueda
+    // descargar, descifrar y eliminar el archivo de Storage.
     await apiFetch<{ analysisId: string; status: string; message: string }>(
       services.analysis.baseUrl,
       '/v1/analyze',
       {
         method: 'POST',
-        body: JSON.stringify({ analysisId }),
+        body: JSON.stringify({
+          analysisId,
+          storage_path: encryptionData.storagePath,
+          encryption_key_iv: encryptionData.ivBase64,
+          encryption_key_base64: encryptionData.encryptionKeyBase64,
+        }),
         signal,
       },
     )

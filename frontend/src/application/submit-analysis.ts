@@ -1,4 +1,11 @@
-import { uploadFileToStorage, createAnalysisRecord, consumeCredit, deleteAnalysisRecord, markAnalysisFailed } from '@/infrastructure/adapters/supabase-storage'
+import {
+  uploadFileToStorage,
+  createAnalysisRecord,
+  consumeCredit,
+  deleteAnalysisRecord,
+  markAnalysisFailed,
+  type UploadResult,
+} from '@/infrastructure/adapters/supabase-storage'
 import { runAnalysis } from '@/infrastructure/http/analysis-api'
 import type { AnalysisRunResponse } from '@/domain'
 
@@ -29,21 +36,36 @@ export interface SubmitAnalysisParams {
 export async function submitAnalysis(params: SubmitAnalysisParams): Promise<AnalysisRunResponse> {
   const { file, userId, isPlatino, signal } = params
 
-  const fileUrl = await uploadFileToStorage(file, userId)
+  // 1. Cifrar archivo antes de subir (AES-256-GCM)
+  const upload: UploadResult = await uploadFileToStorage(file, userId)
 
-  const analysisId = await createAnalysisRecord(userId, file.name, file.type, fileUrl, isPlatino)
+  // 2. Crear registro de análisis con metadatos de cifrado y ruta de Storage
+  const analysisId = await createAnalysisRecord(
+    userId,
+    file.name,
+    file.type,
+    upload.signedUrl,
+    isPlatino,
+    upload.storagePath,
+    upload.ivBase64,
+    upload.encryptionKeyBase64,
+  )
 
   if (!isPlatino) {
     const consumed = await consumeCredit(userId)
     if (!consumed) {
       // No dejar un análisis huérfano en el historial cuando no hay créditos.
-      await deleteAnalysisRecord(analysisId).catch(() => {})
+      await deleteAnalysisRecord(analysisId, upload.storagePath).catch(() => {})
       throw new NoCreditsError()
     }
   }
 
   try {
-    return await runAnalysis(analysisId, signal)
+    return await runAnalysis(analysisId, {
+      storagePath: upload.storagePath,
+      ivBase64: upload.ivBase64,
+      encryptionKeyBase64: upload.encryptionKeyBase64,
+    }, signal)
   } catch (error) {
     // En un abort (cancelación o timeout) el backend puede seguir procesando:
     // no marcamos error para no pisar un resultado que sí llegue a guardarse.

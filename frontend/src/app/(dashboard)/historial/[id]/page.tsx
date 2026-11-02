@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, AlertTriangle, CheckCircle2, Loader2, RotateCcw } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, CheckCircle2, Loader2, RotateCcw, Lock, Trash2, ShieldCheck } from 'lucide-react'
 import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
 import type { DetectedAnomaly, ParsedTransaction, Analysis } from '@/domain'
 import { AnomalyCard } from '@/components/anomaly-card'
+import { SecurityBadge } from '@/components/security-badge'
 
 import DownloadReportButton from './download-report-button'
 import PaywallButton from './paywall-button'
@@ -163,10 +164,81 @@ export default async function AnalysisDetailPage({ params }: Props) {
           <p className="text-sm text-gray-400 mt-1">
             {analysis.bank ?? 'Banco no detectado'} · Analizado el {formatDate(analysis.created_at)}
           </p>
+          {/* Badge de confianza */}
+          <SecurityBadge variant="compact" className="mt-3" />
         </div>
         {reportUnlocked && (
           <DownloadReportButton analysis={analysis} anomalies={anomalies} transactions={transactions} />
         )}
+      </div>
+
+      {/* Estado de seguridad del análisis */}
+      <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-6 shadow-sm mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
+            Estado de seguridad
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            {
+              title: 'Encriptado',
+              subtitle: 'AES-256',
+              icon: Lock,
+              status: 'Activo',
+              statusColor: 'text-emerald-600 dark:text-emerald-400',
+              cardBg: 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/40',
+              iconBg: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              title: 'Procesado',
+              subtitle: 'Análisis completo',
+              icon: CheckCircle2,
+              status:
+                analysis.status === 'completed'
+                  ? 'Completado'
+                  : analysis.status === 'processing' || analysis.status === 'pending'
+                    ? 'En proceso'
+                    : analysis.status === 'awaiting_payment'
+                      ? 'Pendiente de pago'
+                      : 'Error',
+              statusColor:
+                analysis.status === 'completed'
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : analysis.status === 'error' || analysis.status === 'failed'
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-amber-600 dark:text-amber-400',
+              cardBg: 'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40',
+              iconBg: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
+            },
+            {
+              title: 'Eliminado',
+              subtitle: 'CSV auto-eliminado',
+              icon: Trash2,
+              status: 'Sí (tras procesar)',
+              statusColor: 'text-amber-600 dark:text-amber-400',
+              cardBg: 'bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/40',
+              iconBg: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
+            },
+          ].map((item) => (
+            <div key={item.title} className={`${item.cardBg} rounded-xl p-4`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mb-3 ${item.iconBg}`}>
+                <item.icon className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5">
+                {item.title}
+              </p>
+              <p className="text-[10px] text-gray-600 dark:text-gray-400 mb-1.5 leading-tight">
+                {item.subtitle}
+              </p>
+              <p className={`text-sm font-bold ${item.statusColor}`}>{item.status}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+          Tu archivo se procesa de forma segura y se elimina automáticamente del servidor una vez finalizado el análisis. No almacenamos el contenido original del CSV.
+        </p>
       </div>
 
       {/* Summary metrics */}

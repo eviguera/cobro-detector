@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, RotateCcw, CreditCard, ShieldAlert } from 'lucide-react'
+import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, RotateCcw, CreditCard, ShieldAlert, Lock } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { formatCLP } from '@/lib/utils'
 import Link from 'next/link'
 
+import { SecurityBadge } from '@/components/security-badge'
 import { createClient } from '@/lib/supabase/client'
 import { submitAnalysis, NoCreditsError, AnalysisFailedError } from '@/application/submit-analysis'
 import type { AnalysisRunResponse } from '@/domain'
@@ -90,7 +91,7 @@ export default function AnalisisPage() {
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  const handleFile = useCallback((f: File) => {
+  const handleFile = useCallback(async (f: File) => {
     const allowed = ['application/pdf', 'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'text/csv']
@@ -102,8 +103,55 @@ export default function AnalisisPage() {
       toast.error('El archivo es demasiado grande. Máximo 10MB.')
       return
     }
+
+    // Validar magic bytes (firma del archivo) para evitar archivos renombrados
+    // o con contenido malicioso disfrazado de CSV/Excel/PDF.
+    const valid = await validateFileMagicBytes(f)
+    if (!valid) {
+      toast.error('El archivo no parece ser un PDF, Excel o CSV válido.')
+      return
+    }
+
     setFile(f)
   }, [])
+
+  /**
+   * Valida los "magic bytes" (primeros bytes del archivo) para confirmar
+   * que el archivo es realmente del tipo que dice ser, y no un archivo
+   * renombrado con contenido potencialmente malicioso.
+   */
+  async function validateFileMagicBytes(file: File): Promise<boolean> {
+    const header = await file.slice(0, 16).arrayBuffer()
+    const bytes = new Uint8Array(header)
+
+    // PDF: %PDF (0x25 0x50 0x44 0x46)
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      return bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46
+    }
+
+    // Excel moderno (.xlsx): PK\x03\x04 (ZIP-based)
+    // Excel antiguo (.xls): 0xD0 0xCF 0x11 0xE0 (OLE2)
+    if (file.name.toLowerCase().endsWith('.xlsx')) {
+      return bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04
+    }
+    if (file.name.toLowerCase().endsWith('.xls')) {
+      return bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0
+    }
+
+    // CSV: no tiene magic bytes fijos, pero debe ser texto legible
+    if (file.name.toLowerCase().endsWith('.csv')) {
+      // Verificar que los primeros bytes sean caracteres imprimibles (ASCII)
+      for (let i = 0; i < Math.min(bytes.length, 16); i++) {
+        const b = bytes[i]
+        if (b !== 0x0a && b !== 0x0d && b !== 0x09 && (b < 0x20 || b > 0x7e)) {
+          return false
+        }
+      }
+      return true
+    }
+
+    return true
+  }
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -258,9 +306,15 @@ export default function AnalisisPage() {
               Nuevo análisis
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-display font-bold text-gray-900 dark:text-gray-50 tracking-tight">
-            Analizar estado de cuenta
-          </h1>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-3xl sm:text-4xl font-display font-bold text-gray-900 dark:text-gray-50 tracking-tight">
+              Analizar estado de cuenta
+            </h1>
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800/40">
+              <Lock className="w-3 h-3" />
+              Conexión cifrada (HTTPS)
+            </span>
+          </div>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
             Sube tu estado de cuenta bancario y detectamos cobros injustificados en minutos.
           </p>
@@ -306,6 +360,24 @@ export default function AnalisisPage() {
             </div>
           </div>
         )}
+
+        {/* Mensaje de privacidad antes de subir */}
+        <div className="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/20 p-4">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 w-5 h-5 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                Privacidad de tus datos
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-emerald-700 dark:text-emerald-300">
+                Tu CSV se procesa y se elimina automáticamente, no lo guardamos. Toda la conexión es cifrada con SSL/TLS.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sellos de seguridad cerca del área de drop */}
+        <SecurityBadge variant="grid" className="mb-6" />
 
         <label
           htmlFor="analysis-file"

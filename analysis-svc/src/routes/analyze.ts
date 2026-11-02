@@ -9,6 +9,12 @@ import type { QueueJob } from '../domain/ports/queue.port.js'
 
 const supabase = createServiceClient()
 
+// Hosts permitidos para descargar archivos (anti-SSRF).
+function isAllowedSupabaseHost(hostname: string): boolean {
+  const allowed = ['supabase.co', 'supabase.in', 'supabase.storage.googleapis.com']
+  return allowed.some(domain => hostname.endsWith(domain))
+}
+
 const analyzeSchema = z.object({
   analysisId: z.string().uuid(),
 })
@@ -55,7 +61,7 @@ export async function analyzeRoutes(app: FastifyInstance) {
 
     const { data: analysis, error } = await userSupabase
       .from('analyses')
-      .select('*')
+      .select('*, storage_path, encryption_key_iv, encryption_key_base64')
       .eq('id', analysisId)
       .single()
 
@@ -73,6 +79,23 @@ export async function analyzeRoutes(app: FastifyInstance) {
     const fileUrl = analysis.file_url as string
     const fileType = analysis.file_type as string
     const fileName = analysis.file_name as string
+    const storagePath = analysis.storage_path as string | null
+    const encryptionKeyIv = analysis.encryption_key_iv as string | null
+    const encryptionKeyBase64 = analysis.encryption_key_base64 as string | null
+
+    // HARDENED (2026-11): anti-SSRF — validar que fileUrl apunte a Supabase Storage
+    // del proyecto y no a una URL externa controlada por el usuario.
+    try {
+      const fileUrlObj = new URL(fileUrl)
+      if (fileUrlObj.protocol !== 'https:') {
+        return reply.status(400).send({ error: 'File URL must use HTTPS' })
+      }
+      if (!isAllowedSupabaseHost(fileUrlObj.hostname)) {
+        return reply.status(400).send({ error: 'File URL host not allowed' })
+      }
+    } catch {
+      return reply.status(400).send({ error: 'Invalid file URL' })
+    }
 
     // HARDENED (2026-11): el análisis se ejecuta de forma asíncrona mediante
     // una cola Redis. El endpoint devuelve 202 Accepted inmediatamente y el
@@ -85,6 +108,9 @@ export async function analyzeRoutes(app: FastifyInstance) {
       fileType,
       companyId: (analysis.company_id as string | null) ?? null,
       analysisId,
+      storagePath,
+      encryptionKeyIv,
+      encryptionKeyBase64,
     }
 
     await queue.enqueue(job)

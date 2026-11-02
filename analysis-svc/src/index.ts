@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import crypto from 'node:crypto'
 import * as Sentry from '@sentry/node'
 import { analyzeRoutes } from './routes/analyze.js'
 import { healthRoutes } from './routes/health.js'
@@ -51,6 +52,21 @@ const analysisRepo = new SupabaseAnalysisRepository(supabase)
 // Cola de análisis asíncrono (Redis). Se comparte con las rutas para enqueue.
 const runAnalysis = new RunAnalysisUseCase(pipeline, analysisRepo, queue)
 
+// --- Utilidad de descifrado AES-256-GCM ---
+const ENC_ALGORITHM = 'aes-256-gcm'
+
+function decryptFileAES256GCM(
+  encrypted: Buffer,
+  keyBase64: string,
+  ivBase64: string,
+): Buffer {
+  const key = Buffer.from(keyBase64, 'base64')
+  const iv = Buffer.from(ivBase64, 'base64')
+  const decipher = crypto.createDecipheriv(ENC_ALGORITHM, key, iv)
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
+  return decrypted
+}
+
 // --- Worker de cola (background, no bloquea el servidor HTTP) ---
 async function processJob(job: {
   userId: string
@@ -60,10 +76,10 @@ async function processJob(job: {
   companyId: string | null
   analysisId: string
 }): Promise<void> {
-  // Cargar el análisis para conocer user_id y si es plan Platino.
+  // Cargar el análisis para conocer user_id, si es plan Platino y los metadatos de cifrado.
   const { data: analysis, error: loadError } = await supabase
     .from('analyses')
-    .select('user_id, status, file_type, file_name')
+    .select('user_id, status, file_type, file_name, storage_path, encryption_key_iv, encryption_key_base64')
     .eq('id', job.analysisId)
     .single()
 
@@ -74,12 +90,24 @@ async function processJob(job: {
 
   const userId = analysis.user_id as string
   const isPlatino = analysis.status === 'awaiting_payment'
+  const storagePath = analysis.storage_path as string | null
+  const encryptionKeyIv = analysis.encryption_key_iv as string | null
+  const encryptionKeyBase64 = analysis.encryption_key_base64 as string | null
 
   await analysisRepo.updateStatus(job.analysisId, userId, 'processing')
 
   try {
-    // Descargar el archivo desde Supabase (anti-SSRF, con timeout y límite de tamaño).
-    const buffer = await fetchFileFromSupabase(job.filePath)
+    // Descargar el archivo cifrado desde Supabase Storage (anti-SSRF, con timeout).
+    const encryptedBuffer = await fetchFileFromSupabase(job.filePath)
+
+    // Descifrar con AES-256-GCM si hay metadatos de cifrado.
+    let buffer: Buffer
+    if (encryptionKeyIv && encryptionKeyBase64) {
+      buffer = decryptFileAES256GCM(encryptedBuffer, encryptionKeyBase64, encryptionKeyIv)
+    } else {
+      // Fallback: archivo sin cifrar (retrocompatibilidad con análisis previos).
+      buffer = encryptedBuffer
+    }
 
     const result = await pipeline.run(buffer, job.fileType, {
       userId,
@@ -112,9 +140,18 @@ async function processJob(job: {
 
     await analysisRepo.storeResults(job.analysisId, userId, result as unknown as Parameters<typeof analysisRepo.storeResults>[2], isPlatino)
 
+    // Eliminar el archivo cifrado de Storage tras el procesamiento exitoso.
+    if (storagePath) {
+      await supabase.storage.from('analysis-files').remove([storagePath])
+      await supabase
+        .from('analyses')
+        .update({ file_deleted_at: new Date().toISOString() })
+        .eq('id', job.analysisId)
+    }
+
     server.log.info(
       { analysisId: job.analysisId, userId, anomaliesCount: anomalies.length, recoverableAmount },
-      'Análisis completado por worker',
+      'Análisis completado por worker y archivo eliminado de Storage',
     )
   } catch (error) {
     server.log.error({ err: error, analysisId: job.analysisId }, 'Error procesando análisis en worker')
