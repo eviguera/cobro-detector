@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { createServiceClient } from '../infrastructure/adapters/supabase-client.js'
+import { createUserClient } from '../infrastructure/adapters/supabase-user-client.js'
+import { extractBearerToken } from '../security/supabase-jwt.js'
 import { requireAuth, requireSelfOr403 } from '../security/supabase-jwt.js'
 import { queue } from '../infrastructure/queue-connection.js'
 import type { QueueJob } from '../domain/ports/queue.port.js'
@@ -20,7 +22,10 @@ export async function analyzeRoutes(app: FastifyInstance) {
     const okAuth = await requireAuth(request, reply)
     if (!okAuth) return reply
 
-    const { data, error } = await supabase
+    const token = extractBearerToken(request)!
+    const userSupabase = createUserClient(token)
+
+    const { data, error } = await userSupabase
       .from('analyses')
       .select('*')
       .eq('id', id)
@@ -45,7 +50,10 @@ export async function analyzeRoutes(app: FastifyInstance) {
 
     const { analysisId } = parsed.data
 
-    const { data: analysis, error } = await supabase
+    const token = extractBearerToken(request)!
+    const userSupabase = createUserClient(token)
+
+    const { data: analysis, error } = await userSupabase
       .from('analyses')
       .select('*')
       .eq('id', analysisId)
