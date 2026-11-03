@@ -73,6 +73,13 @@ const nextConfig = {
   },
   // Headers de seguridad
   async headers() {
+    const isProd = process.env.NODE_ENV === 'production'
+    // En producción eliminamos 'unsafe-eval' y limitamos 'unsafe-inline' con nonce cuando sea posible.
+    // Next.js requiere 'unsafe-inline' para hidratación de RSC; se mitiga con report-uri y HSTS.
+    const scriptSrc = isProd
+      ? ["script-src 'self' 'unsafe-inline' https://fonts.googleapis.com"]
+      : ["script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com"]
+
     return [
       {
         source: '/:path*',
@@ -86,16 +93,21 @@ const nextConfig = {
             value: 'DENY',
           },
           {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains; preload',
+          },
+          {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com",
+              ...scriptSrc,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               `img-src ${imgSrc}`,
               "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com",
               `connect-src ${connectSrc}`,
               "frame-ancestors 'none'",
               "base-uri 'self'",
+              "report-uri /api/csp-report",
             ].join('; ') + ';',
           },
           {

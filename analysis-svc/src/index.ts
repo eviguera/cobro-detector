@@ -140,22 +140,28 @@ async function processJob(job: {
 
     await analysisRepo.storeResults(job.analysisId, userId, result as unknown as Parameters<typeof analysisRepo.storeResults>[2], isPlatino)
 
-    // Eliminar el archivo cifrado de Storage tras el procesamiento exitoso.
-    if (storagePath) {
-      await supabase.storage.from('analysis-files').remove([storagePath])
-      await supabase
-        .from('analyses')
-        .update({ file_deleted_at: new Date().toISOString() })
-        .eq('id', job.analysisId)
-    }
-
     server.log.info(
       { analysisId: job.analysisId, userId, anomaliesCount: anomalies.length, recoverableAmount },
-      'Análisis completado por worker y archivo eliminado de Storage',
+      'Análisis completado por worker',
     )
   } catch (error) {
     server.log.error({ err: error, analysisId: job.analysisId }, 'Error procesando análisis en worker')
     await analysisRepo.markError(job.analysisId, userId)
+  } finally {
+    // Eliminar el archivo cifrado de Storage SIEMPRE, incluso si falla el procesamiento.
+    // Evita archivos huérfanos de estados de cuenta bancarios expuestos en el bucket.
+    if (storagePath) {
+      try {
+        await supabase.storage.from('analysis-files').remove([storagePath])
+        await supabase
+          .from('analyses')
+          .update({ file_deleted_at: new Date().toISOString() })
+          .eq('id', job.analysisId)
+        server.log.info({ analysisId: job.analysisId, storagePath }, 'Archivo cifrado eliminado de Storage')
+      } catch (cleanupError) {
+        server.log.error({ err: cleanupError, analysisId: job.analysisId, storagePath }, 'Error limpiando archivo de Storage')
+      }
+    }
   }
 }
 
