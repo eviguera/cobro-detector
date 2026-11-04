@@ -6,6 +6,7 @@ import { formatCLP, getAnomalyTypeLabel, getSeverityLabel } from '@/lib/utils'
 import { escapeXml } from '@/lib/security'
 import { SEVERITY } from '@/lib/constants'
 import { generateWordDocument, generatePDFDocument } from '@/lib/document-generator'
+import { Button } from '@/components/ui/button'
 import type { Analysis, DetectedAnomaly, ParsedTransaction } from '@/domain'
 
 interface Props {
@@ -300,14 +301,15 @@ ${cobroCards}
         <option value="pdf">PDF</option>
         <option value="docx">Word (DOCX)</option>
       </select>
-      <button
+      <Button
         onClick={handleDownload}
         disabled={loading}
-        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
+        variant="default"
+        size="default"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
         Descargar reporte
-      </button>
+      </Button>
     </div>
   )
 }

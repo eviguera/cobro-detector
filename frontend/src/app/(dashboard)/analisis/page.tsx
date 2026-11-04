@@ -1,13 +1,17 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, RotateCcw, CreditCard, ShieldAlert, Lock } from 'lucide-react'
+import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, RotateCcw, CreditCard, ShieldAlert, Lock, Activity } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { formatCLP } from '@/lib/utils'
 import Link from 'next/link'
 
 import { SecurityBadge } from '@/components/security-badge'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Skeleton } from '@/components/skeleton'
 import { createClient } from '@/lib/supabase/client'
 import { submitAnalysis, NoCreditsError, AnalysisFailedError } from '@/application/submit-analysis'
 import type { AnalysisRunResponse } from '@/domain'
@@ -526,6 +530,15 @@ export default function AnalisisPage() {
         </p>
 
         <div className="mb-8" role="status" aria-live="polite" aria-label="Progreso del análisis">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3 h-3 text-blue-500 animate-pulse-subtle" />
+              <span className="text-xs font-semibold text-gray-900 dark:text-gray-50">Procesando análisis</span>
+            </div>
+            <span className="text-xs font-mono text-blue-600 dark:text-blue-400">
+              {Math.round(progress)}%
+            </span>
+          </div>
           <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-700 ease-out"
@@ -544,6 +557,10 @@ export default function AnalisisPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm space-y-0.5" aria-live="polite" aria-label="Paso actual del análisis">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="w-4 h-4 text-blue-500 animate-spin" />
+            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">Procesando archivo…</span>
+          </div>
           {ANALYSIS_STEPS.map((s, i) => {
             const isCompleted = i < currentAnalysisStep
             const isActive = i === currentAnalysisStep
@@ -552,7 +569,7 @@ export default function AnalisisPage() {
             return (
               <div
                 key={s.label}
-                className={`flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm transition-all duration-300 ${
+                className={`flex items-center gap-3 py-2 px-3 rounded-lg text-sm transition-all duration-300 ${
                   isCompleted ? 'text-emerald-600 dark:text-emerald-400' :
                   isActive ? 'text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 font-medium' :
                   'text-gray-400 dark:text-gray-400'
@@ -698,51 +715,53 @@ export default function AnalisisPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 stagger-children">
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
-          <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
-            Anomalías detectadas
-          </p>
-          <p className={`text-3xl font-display font-bold ${
+      <Card className="mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children">
+          <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+              Anomalías detectadas
+            </p>
+            <p className={`text-3xl font-display font-bold ${
+              (result.anomaliesCount ?? 0) > 0
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-emerald-600 dark:text-emerald-400'
+            }`}>
+              <span className="tabular-nums">{result.anomaliesCount}</span>
+            </p>
+          </div>
+          <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+              Monto recuperable
+            </p>
+            <p className="text-2xl font-display font-bold text-gray-900 dark:text-gray-100">
+              <span className="tabular-nums">{formatCLP(result.recoverableAmount ?? 0)}</span>
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">estimado</p>
+          </div>
+          <div className={`rounded-2xl p-5 ${
             (result.anomaliesCount ?? 0) > 0
-              ? 'text-red-600 dark:text-red-400'
-              : 'text-emerald-600 dark:text-emerald-400'
+              ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40'
+              : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40'
           }`}>
-            <span className="tabular-nums">{result.anomaliesCount}</span>
-          </p>
+            <p className={`text-xs font-medium uppercase tracking-wider mb-1.5 ${
+              (result.anomaliesCount ?? 0) > 0
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-blue-600 dark:text-blue-400'
+            }`}>
+              Siguiente paso
+            </p>
+            <p className={`text-sm font-semibold ${
+              (result.anomaliesCount ?? 0) > 0
+                ? 'text-emerald-900 dark:text-emerald-100'
+                : 'text-blue-900 dark:text-blue-100'
+            }`}>
+              {(result.anomaliesCount ?? 0) > 0
+                ? 'Descarga el reporte y ve al banco'
+                : 'No encontramos cobros injustificados'}
+            </p>
+          </div>
         </div>
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
-          <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
-            Monto recuperable
-          </p>
-          <p className="text-2xl font-display font-bold text-gray-900 dark:text-gray-100">
-            <span className="tabular-nums">{formatCLP(result.recoverableAmount ?? 0)}</span>
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">estimado</p>
-        </div>
-        <div className={`rounded-2xl p-5 ${
-          (result.anomaliesCount ?? 0) > 0
-            ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40'
-            : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40'
-        }`}>
-          <p className={`text-xs font-medium uppercase tracking-wider mb-1.5 ${
-            (result.anomaliesCount ?? 0) > 0
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : 'text-blue-600 dark:text-blue-400'
-          }`}>
-            Siguiente paso
-          </p>
-          <p className={`text-sm font-semibold ${
-            (result.anomaliesCount ?? 0) > 0
-              ? 'text-emerald-900 dark:text-emerald-100'
-              : 'text-blue-900 dark:text-blue-100'
-          }`}>
-            {(result.anomaliesCount ?? 0) > 0
-              ? 'Descarga el reporte y ve al banco'
-              : 'No encontramos cobros injustificados'}
-          </p>
-        </div>
-      </div>
+      </Card>
 
       {result.summary && (
         <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-5 mb-6">
@@ -771,7 +790,7 @@ export default function AnalisisPage() {
           onClick={resetForm}
           className="px-6 py-3.5 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw className="w-3.5 h-3.5" />
           Nuevo análisis
         </button>
       </div>

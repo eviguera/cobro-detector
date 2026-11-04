@@ -6,6 +6,9 @@ import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
 import type { DetectedAnomaly, ParsedTransaction, Analysis } from '@/domain'
 import { AnomalyCard } from '@/components/anomaly-card'
 import { SecurityBadge } from '@/components/security-badge'
+import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableHeaderCell, TableRow, TableCell } from '@/components/ui/table'
 
 import DownloadReportButton from './download-report-button'
 import PaywallButton from './paywall-button'
@@ -249,20 +252,26 @@ export default async function AnalysisDetailPage({ params }: Props) {
           { label: 'Monto recuperable', value: formatCLP(analysis.recoverable_amount), sub: 'estimado', color: 'text-green-700', lg: true },
           { label: 'Estado', value: getStatusLabel(analysis.status), sub: analysis.status === 'completed' ? 'Listo para reclamar' : '', color: 'text-blue-600' },
         ].map(m => (
-          <div key={m.label} className="bg-white rounded-xl border border-gray-200 p-5">
+          <Card key={m.label} className="p-5">
             <p className="text-xs text-gray-400 mb-1">{m.label}</p>
             <p className={`font-bold ${m.lg ? 'text-xl' : 'text-2xl'} ${m.color || 'text-foreground'}`}>{m.value}</p>
             {m.sub && <p className="text-xs text-gray-400 mt-0.5">{m.sub}</p>}
-          </div>
+          </Card>
         ))}
       </div>
 
       {/* AI Summary */}
       {analysis.ai_summary && (
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 mb-6">
-          <p className="text-xs font-semibold text-blue-600 mb-2 uppercase tracking-wide">Análisis IA · Resumen ejecutivo</p>
-          <p className="text-sm text-blue-900 leading-relaxed">{analysis.ai_summary}</p>
-        </div>
+        <Card className="p-5 mb-6">
+          <CardHeader>
+            <CardTitle className="text-xs font-semibold text-blue-600 mb-2 uppercase tracking-wide">
+              Análisis IA · Resumen ejecutivo
+            </CardTitle>
+          </CardHeader>
+          <div className="p-0">
+            <p className="text-sm text-blue-900 leading-relaxed">{analysis.ai_summary}</p>
+          </div>
+        </Card>
       )}
 
       {/* Anomalies */}
@@ -298,67 +307,64 @@ export default async function AnalysisDetailPage({ params }: Props) {
 
       {/* Transactions table */}
       {transactions.length > 0 && (
-          <div className="bg-card rounded-xl border border-border">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <h2 className="font-semibold text-foreground text-sm">
-              Transacciones
-              <span className="ml-2 text-sm font-normal text-muted-foreground">({transactions.length})</span>
-            </h2>
-            <div className="flex items-center gap-3 text-xs text-gray-400">
-              <span className="flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 text-red-500" /> Marcada como anomalía
-              </span>
+        <Card className="mb-8">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-3 h-3 text-red-500" />
+              <span className="text-xs font-medium text-muted-foreground">Marcada como anomalía</span>
             </div>
           </div>
 
-          <div className="overflow-x-auto max-h-96 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-muted border-b border-border">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground">Fecha</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground">Descripción</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground">Monto</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHeaderCell>Fecha</TableHeaderCell>
+                  <TableHeaderCell>Descripción</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Monto</TableHeaderCell>
+                  <TableHeaderCell className="text-center">Estado</TableHeaderCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {transactions.map(tx => {
                   const isFlagged = flaggedIds.has(tx.id)
                   return (
-                    <tr key={tx.id} className={isFlagged ? 'bg-red-50' : 'hover:bg-muted'}>
-                      <td className="px-6 py-3 text-muted-foreground text-xs whitespace-nowrap">{tx.date}</td>
-                      <td className="px-6 py-3 text-foreground max-w-xs truncate">
+                    <TableRow key={tx.id} className={isFlagged ? 'bg-red-50' : ''}>
+                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{tx.date}</TableCell>
+                      <TableCell className="text-foreground max-w-xs truncate flex items-center gap-1.5">
                         {tx.description}
                         {isFlagged && (
-                          <AlertTriangle className="inline w-3 h-3 text-red-400 ml-1.5" />
+                          <AlertTriangle className="w-3 h-3 text-red-400" />
                         )}
-                      </td>
-                      <td className={`px-6 py-3 text-right font-mono text-xs whitespace-nowrap ${
+                      </TableCell>
+                      <TableCell className={`text-right font-mono text-xs whitespace-nowrap ${
                         tx.amount < 0 ? 'text-red-600' : 'text-green-600'
                       }`}>
                         {tx.amount < 0 ? '-' : '+'}{formatCLP(Math.abs(tx.amount))}
-                      </td>
-                      <td className="px-6 py-3 text-center">
+                      </TableCell>
+                      <TableCell className="text-center">
                         {isFlagged ? (
                           <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Revisar</span>
                         ) : (
                           <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">OK</span>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* CMF info */}
-      <div className="mt-6 p-4 bg-muted/50 rounded-xl border border-border text-xs text-muted-foreground">
+      <Card className="p-5">
         <p className="font-medium text-foreground mb-1">¿El banco no responde? Puedes escalar a la CMF</p>
-        <p>La Comisión para el Mercado Financiero (CMF) es el regulador bancario en Chile. Puedes presentar un reclamo en <strong>cmfchile.cl</strong> si el banco no resuelve tu caso en 10 días hábiles.</p>
-      </div>
+        <p className="text-sm text-muted-foreground">
+          La Comisión para el Mercado Financiero (CMF) es el regulador bancario en Chile. Puedes presentar un reclamo en <strong className="text-foreground">cmfchile.cl</strong> si el banco no resuelve tu caso en 10 días hábiles.
+        </p>
+      </Card>
     </div>
   )
 }
