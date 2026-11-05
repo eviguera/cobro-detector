@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Share2, Users, Gift, Clipboard, Check } from 'lucide-react'
+import { ArrowLeft, Share2, Users, Gift, Check } from 'lucide-react'
+import { CopyReferralButton } from './copy-referral-button'
 
 export default async function ReferidosPage() {
   const supabase = await createClient()
@@ -63,22 +64,7 @@ export default async function ReferidosPage() {
           <code className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3 text-sm font-mono text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 select-all">
             {referralUrl}
           </code>
-          <button
-            className="flex items-center gap-1.5 px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-            onClick={async (e) => {
-              const btn = e.currentTarget
-              await navigator.clipboard.writeText(referralUrl)
-              btn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copiado'
-              btn.classList.add('bg-emerald-600')
-              setTimeout(() => {
-                btn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copiar'
-                btn.classList.remove('bg-emerald-600')
-              }, 2000)
-            }}
-          >
-            <Clipboard className="w-4 h-4" />
-            Copiar
-          </button>
+          <CopyReferralButton referralUrl={referralUrl} />
         </div>
       </div>
 
