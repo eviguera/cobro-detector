@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import { X, ChevronRight, ChevronLeft, Check } from 'lucide-react'
 
 interface TourStep {
@@ -119,14 +120,18 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
   const [cardHeight, setCardHeight] = useState(CARD_FALLBACK_HEIGHT)
   const cardRef = useRef<HTMLDivElement>(null)
   const scrolledForStep = useRef(false)
+  const pathname = usePathname()
 
+  // El tour es de bienvenida al panel: solo se abre solo en /dashboard para no
+  // tapar el contenido de páginas como /historial en la primera visita.
   useEffect(() => {
+    if (pathname !== '/dashboard') return
     const done = isOnboardingComplete()
     if (!done) {
       setCurrentStep(0)
       setDismissed(false)
     }
-  }, [])
+  }, [pathname])
 
   const finish = useCallback(() => {
     localStorage.setItem(STORAGE_KEY, 'true')

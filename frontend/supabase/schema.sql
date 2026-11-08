@@ -175,6 +175,15 @@ CREATE TABLE IF NOT EXISTS analyses (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Columnas de cifrado/retención agregadas después de la creación inicial de la
+-- tabla. `CREATE TABLE IF NOT EXISTS` no las agrega en instalaciones que ya
+-- existían, así que se fuerzan de forma idempotente. Sin esto, el flujo de
+-- subida cifrada falla con PGRST204 ("Could not find the 'storage_path' column").
+ALTER TABLE analyses ADD COLUMN IF NOT EXISTS storage_path TEXT;
+ALTER TABLE analyses ADD COLUMN IF NOT EXISTS encryption_key_iv TEXT;
+ALTER TABLE analyses ADD COLUMN IF NOT EXISTS encryption_key_base64 TEXT;
+ALTER TABLE analyses ADD COLUMN IF NOT EXISTS file_deleted_at TIMESTAMPTZ;
+
 -- anomalies
 CREATE TABLE IF NOT EXISTS anomalies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

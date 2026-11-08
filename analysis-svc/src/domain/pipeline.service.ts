@@ -38,7 +38,9 @@ export class PipelineService {
       const dates = transactions.map(tx => tx.date).sort()
       const period = dates.length > 0 ? { start: dates[0], end: dates[dates.length - 1] } : undefined
 
-      const totalRecoverable = allAnomalies.reduce((sum, a) => sum + a.recoverableAmount, 0)
+      // Los montos recuperables siempre son positivos: el monto del cargo es un
+      // "recuperable" aunque venga con signo negativo desde el cartola del banco.
+      const totalRecoverable = allAnomalies.reduce((sum, a) => sum + Math.abs(a.recoverableAmount), 0)
 
       return {
         anomalies: allAnomalies,
@@ -75,7 +77,7 @@ export class PipelineService {
       const group = grouped[key]
       if (group.length > 1) {
         const [description, amountStr] = key.split('|')
-        const amount = Number(amountStr)
+        const amount = Math.abs(Number(amountStr))
         anomalies.push({
           type: 'duplicate_commission',
           severity: 'high',
@@ -107,9 +109,9 @@ export class PipelineService {
           type: 'unknown_charge',
           severity: 'medium',
           title: `Posible cargo etiquetado: "${matched}"`,
-          description: `"${tx.description}" el ${tx.date} por $${(tx.amount ?? 0).toLocaleString('es-CL')}`,
+          description: `"${tx.description}" el ${tx.date} por $${Math.abs(tx.amount ?? 0).toLocaleString('es-CL')}`,
           detail: `Cargo con etiqueta sospechosa: "${matched}"`,
-          recoverableAmount: tx.amount ?? 0,
+          recoverableAmount: Math.abs(tx.amount ?? 0),
           transactionRefs: [tx.id ?? ''],
         })
       }
@@ -122,13 +124,16 @@ export class PipelineService {
     const union = new Map<string, DetectedAnomaly>()
 
     for (const anomaly of anomalies) {
-      const key = `${anomaly.type}|${anomaly.title}|${anomaly.recoverableAmount}`
+      // Normaliza a positivo antes de deduplicar: así un mismo cargo detectado
+      // por reglas y por la IA (con signos distintos) cae en la misma clave.
+      const recoverableAmount = Math.abs(anomaly.recoverableAmount)
+      const key = `${anomaly.type}|${anomaly.title}|${recoverableAmount}`
       if (union.has(key)) {
         const existing = union.get(key)!
-        existing.recoverableAmount += anomaly.recoverableAmount
+        existing.recoverableAmount += recoverableAmount
         existing.transactionRefs = [...new Set([...existing.transactionRefs, ...anomaly.transactionRefs])]
       } else {
-        union.set(key, { ...anomaly, transactionRefs: [...anomaly.transactionRefs] })
+        union.set(key, { ...anomaly, recoverableAmount, transactionRefs: [...anomaly.transactionRefs] })
       }
     }
 

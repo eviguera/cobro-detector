@@ -65,7 +65,7 @@ describe('PipelineService', () => {
       const dups = result.anomalies.filter(a => a.type === 'duplicate_commission')
       expect(dups).toHaveLength(1)
       expect(dups[0].severity).toBe('high')
-      expect(dups[0].recoverableAmount).toBe(-3000)
+      expect(dups[0].recoverableAmount).toBe(3000)
       expect(dups[0].transactionRefs).toEqual(['tx-1', 'tx-2'])
     })
 
@@ -82,8 +82,8 @@ describe('PipelineService', () => {
 
       const labeled = result.anomalies.filter(a => a.type === 'unknown_charge')
       expect(labeled).toHaveLength(2)
-      expect(labeled[0].recoverableAmount).toBe(-25000)
-      expect(labeled[1].recoverableAmount).toBe(-9900)
+      expect(labeled[0].recoverableAmount).toBe(25000)
+      expect(labeled[1].recoverableAmount).toBe(9900)
     })
 
     it('deduplicates identical anomalies from rules and AI', async () => {
@@ -111,7 +111,7 @@ describe('PipelineService', () => {
 
       const dups = result.anomalies.filter(a => a.type === 'duplicate_commission')
       expect(dups).toHaveLength(1)
-      expect(dups[0].recoverableAmount).toBe(-10000)
+      expect(dups[0].recoverableAmount).toBe(10000)
       expect(dups[0].transactionRefs).toEqual(['tx-1', 'tx-2'])
     })
 
@@ -192,8 +192,8 @@ describe('PipelineService', () => {
 
       const result = await pipeline.run(Buffer.from(''), 'csv')
 
-      // duplicate_commission: -2000 * (2-1) = -2000, unknown_charge: -15000
-      expect(result.totalRecoverable).toBe(-17000)
+      // duplicate_commission: 2000 * (2-1) = 2000, unknown_charge: 15000
+      expect(result.totalRecoverable).toBe(17000)
     })
 
     it('handles unknown error (non-Error throw)', async () => {

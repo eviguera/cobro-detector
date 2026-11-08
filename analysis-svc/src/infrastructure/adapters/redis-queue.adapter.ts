@@ -2,6 +2,7 @@ import { Redis } from 'ioredis'
 import type { AnalysisQueue, QueueJob } from '../../domain/ports/queue.port.js'
 
 const QUEUE_KEY = 'analysis:queue'
+const BLOCK_TIMEOUT_SECONDS = 5
 
 export class RedisAnalysisQueue implements AnalysisQueue {
   private readonly redis: Redis
@@ -15,7 +16,9 @@ export class RedisAnalysisQueue implements AnalysisQueue {
   }
 
   async dequeue(): Promise<QueueJob | null> {
-    const result = await this.redis.blpop(QUEUE_KEY, 0)
+    // Timeout acotado (en vez de 0) para que el bucle pueda reaccionar a
+    // señales de apagado y a errores de conexión sin quedar bloqueado.
+    const result = await this.redis.blpop(QUEUE_KEY, BLOCK_TIMEOUT_SECONDS)
     if (!result) return null
     const [, value] = result
     return JSON.parse(value) as QueueJob

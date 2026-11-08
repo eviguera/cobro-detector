@@ -1,3 +1,15 @@
+# Supabase corre en el host (supabase start), no dentro de esta red de Compose.
+# Dentro de un contenedor 127.0.0.1 apunta al propio contenedor, así que hay que
+# usar host.docker.internal para alcanzar el Supabase del host.
+# Sobreescribir con DOCKER_SUPABASE_URL si se usa un Supabase remoto.
+x-supabase-host-env: &supabase-host-env
+  SUPABASE_URL: ${DOCKER_SUPABASE_URL:-http://host.docker.internal:54321}
+  NEXT_PUBLIC_SUPABASE_URL: ${DOCKER_SUPABASE_URL:-http://host.docker.internal:54321}
+
+x-docker-host: &docker-host
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
 services:
   redis:
     image: redis:7-alpine
@@ -13,6 +25,9 @@ services:
       - "3004:3004"
     env_file:
       - .env
+    environment:
+      <<: *supabase-host-env
+    <<: *docker-host
     depends_on:
       - analysis-svc
       - payment-svc
@@ -25,6 +40,9 @@ services:
       - "3001:3001"
     env_file:
       - .env
+    environment:
+      <<: *supabase-host-env
+    <<: *docker-host
     depends_on:
       - redis
 
@@ -34,6 +52,9 @@ services:
       - "3002:3002"
     env_file:
       - .env
+    environment:
+      <<: *supabase-host-env
+    <<: *docker-host
 
   notification-svc:
     build: ./notification-svc
@@ -41,6 +62,9 @@ services:
       - "3003:3003"
     env_file:
       - .env
+    environment:
+      <<: *supabase-host-env
+    <<: *docker-host
 
   admin-svc:
     build: ./admin-svc
@@ -48,6 +72,9 @@ services:
       - "3005:3005"
     env_file:
       - .env
+    environment:
+      <<: *supabase-host-env
+    <<: *docker-host
 
 volumes:
   redis_data:

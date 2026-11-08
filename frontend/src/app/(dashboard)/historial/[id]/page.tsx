@@ -7,7 +7,6 @@ import type { DetectedAnomaly, ParsedTransaction, Analysis } from '@/domain'
 import { AnomalyCard } from '@/components/anomaly-card'
 import { SecurityBadge } from '@/components/security-badge'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableHeaderCell, TableRow, TableCell } from '@/components/ui/table'
 
 import DownloadReportButton from './download-report-button'

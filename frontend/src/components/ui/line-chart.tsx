@@ -22,7 +22,6 @@ export function LineChart({
   if (!data || data.length === 0) return null
 
   const maxValue = Math.max(...data.map((d) => d.value))
-  const padding = 24
 
   return (
     <div className={cn("w-full", className)}>

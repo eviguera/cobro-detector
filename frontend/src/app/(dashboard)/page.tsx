@@ -1,6 +1,3 @@
-"use client"
-
-import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
 import { redirect } from "next/navigation"
@@ -8,29 +5,22 @@ import {
   FileSearch,
   TrendingDown,
   CheckCircle2,
-  ArrowUpRight,
-  ArrowDownRight,
   Plus,
   BarChart3,
-  Activity,
   Sparkles,
   Banknote,
   CalendarDays,
   Building2,
   Percent,
   Brain,
-  Shield,
-  Clock,
 } from "lucide-react"
 import { formatCLP, formatDate } from "@/lib/utils"
 import type { Analysis, Credits } from "@/types/database.types"
 import { DashboardClient } from "./dashboard/dashboard-client"
-import { SavingsChart } from "@/components/savings-chart"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatCardGrid } from "@/components/ui/stat-card-grid"
 import { LineChart } from "@/components/ui/line-chart"
 import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 
 function getDayLabel(date: Date, today: Date): string {
   const diff = today.getTime() - date.getTime()
@@ -136,7 +126,6 @@ export default async function DashboardPage() {
     ).length ?? 0
     dailyAnalyses.push({ date: dateStr, count, dateObj: d })
   }
-  const maxDailyCount = Math.max(...dailyAnalyses.map((d) => d.count), 1)
 
   return (
     <div className="animate-fade-in-up space-y-6">
@@ -246,7 +235,7 @@ export default async function DashboardPage() {
               </span>
             </div>
             <LineChart
-              data={dailyAnalyses.map((d, i) => ({
+              data={dailyAnalyses.map((d) => ({
                 name: getWeekdayLabel(d.dateObj),
                 value: d.count,
               }))}

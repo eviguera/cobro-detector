@@ -4,16 +4,11 @@ import { createServiceClient } from '../infrastructure/adapters/supabase-client.
 import { createUserClient } from '../infrastructure/adapters/supabase-user-client.js'
 import { extractBearerToken } from '../security/supabase-jwt.js'
 import { requireAuth, requireSelfOr403 } from '../security/supabase-jwt.js'
+import { InvalidFileUrlError, resolveAllowedFileUrl } from '../security/supabase-url.js'
 import { queue } from '../infrastructure/queue-connection.js'
 import type { QueueJob } from '../domain/ports/queue.port.js'
 
 const supabase = createServiceClient()
-
-// Hosts permitidos para descargar archivos (anti-SSRF).
-function isAllowedSupabaseHost(hostname: string): boolean {
-  const allowed = ['supabase.co', 'supabase.in', 'supabase.storage.googleapis.com']
-  return allowed.some(domain => hostname.endsWith(domain))
-}
 
 const analyzeSchema = z.object({
   analysisId: z.string().uuid(),
@@ -83,18 +78,18 @@ export async function analyzeRoutes(app: FastifyInstance) {
     const encryptionKeyIv = analysis.encryption_key_iv as string | null
     const encryptionKeyBase64 = analysis.encryption_key_base64 as string | null
 
-    // HARDENED (2026-11): anti-SSRF — validar que fileUrl apunte a Supabase Storage
+    // HARDENED (2026-11): anti-SSRF — validar que fileUrl apunte al Supabase
     // del proyecto y no a una URL externa controlada por el usuario.
+    // La misma validación se aplica en el worker, con la diferencia de que aquí
+    // se resuelve la URL alcanzable desde el contenedor (ver supabase-url.ts).
+    let resolvedFileUrl: string
     try {
-      const fileUrlObj = new URL(fileUrl)
-      if (fileUrlObj.protocol !== 'https:') {
-        return reply.status(400).send({ error: 'File URL must use HTTPS' })
-      }
-      if (!isAllowedSupabaseHost(fileUrlObj.hostname)) {
-        return reply.status(400).send({ error: 'File URL host not allowed' })
-      }
-    } catch {
-      return reply.status(400).send({ error: 'Invalid file URL' })
+      resolvedFileUrl = resolveAllowedFileUrl(fileUrl).toString()
+    } catch (error) {
+      const message = error instanceof InvalidFileUrlError
+        ? error.message
+        : 'URL de archivo inválida'
+      return reply.status(400).send({ error: message })
     }
 
     // HARDENED (2026-11): el análisis se ejecuta de forma asíncrona mediante
@@ -104,7 +99,7 @@ export async function analyzeRoutes(app: FastifyInstance) {
     const job: QueueJob = {
       userId,
       fileName,
-      filePath: fileUrl,
+      filePath: resolvedFileUrl,
       fileType,
       companyId: (analysis.company_id as string | null) ?? null,
       analysisId,

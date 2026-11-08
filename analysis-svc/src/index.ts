@@ -11,7 +11,7 @@ import { CircuitBreakerAiAdapter } from './infrastructure/adapters/circuit-break
 import { SupabaseAnalysisRepository } from './infrastructure/adapters/supabase-analysis.repository.js'
 import { PipelineService } from './domain/pipeline.service.js'
 import { RunAnalysisUseCase } from './application/run-analysis.use-case.js'
-import { queue } from './infrastructure/queue-connection.js'
+import { queue, workerQueue } from './infrastructure/queue-connection.js'
 import { fetchFileFromSupabase } from './security/safe-fetch.js'
 
 // HARDENED (2026-11): Sentry para monitoreo de errores en backend.
@@ -169,7 +169,7 @@ async function startQueueWorker(): Promise<void> {
   server.log.info('Iniciando worker de cola de análisis (Redis)')
   while (true) {
     try {
-      const job = await queue.dequeue()
+      const job = await workerQueue.dequeue()
       if (!job) continue
       await processJob(job)
     } catch (err) {
