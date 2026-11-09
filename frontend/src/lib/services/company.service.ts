@@ -4,6 +4,11 @@ import type { Company } from '@/types/database.types'
 
 type SupabaseClientType = SupabaseClient<Database>
 
+// Workaround del bug de inferencia de @supabase/ssr: las tablas resuelven a
+// `never`. Este servicio es legacy y no se usa en el flujo principal.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const loose = (client: SupabaseClientType) => client as any
+
 interface CreateCompanyData {
   company_name: string
   business_name?: string
@@ -29,7 +34,8 @@ export async function getCompanies(
   supabase: SupabaseClientType,
   userId: string
 ) {
-  const { data, error } = await supabase
+  const db = loose(supabase)
+  const { data, error } = await db
     .from('companies')
     .select('*')
     .eq('accountant_id', userId)
@@ -45,7 +51,8 @@ export async function getCompanyById(
   companyId: string,
   userId: string
 ) {
-  const { data, error } = await supabase
+  const db = loose(supabase)
+  const { data, error } = await db
     .from('companies')
     .select(`
       *,
@@ -67,7 +74,8 @@ export async function createCompany(
   userId: string,
   data: CreateCompanyData
 ) {
-  const { data: company, error } = await supabase
+  const db = loose(supabase)
+  const { data: company, error } = await db
     .from('companies')
     .insert({
       accountant_id: userId,
@@ -85,7 +93,7 @@ export async function createCompany(
   if (error) throw error
   
   // Crear créditos para la empresa (1 análisis gratis)
-  const { error: creditError } = await supabase
+  const { error: creditError } = await db
     .from('credits')
     .insert({
       user_id: userId,
@@ -105,7 +113,8 @@ export async function updateCompany(
   userId: string,
   data: UpdateCompanyData
 ) {
-  const { data: company, error } = await supabase
+  const db = loose(supabase)
+  const { data: company, error } = await db
     .from('companies')
     .update(data)
     .eq('id', companyId)
@@ -122,7 +131,8 @@ export async function deleteCompany(
   companyId: string,
   userId: string
 ): Promise<void> {
-  const { error } = await supabase
+  const db = loose(supabase)
+  const { error } = await db
     .from('companies')
     .update({ is_active: false })
     .eq('id', companyId)

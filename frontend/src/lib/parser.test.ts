@@ -13,13 +13,13 @@ jest.mock('./analyzer', () => ({
 
 describe('Parser - parseExcelFile', () => {
   it('should handle invalid input', async () => {
-    const result = await parseExcelFile(Buffer.from('invalid'))
+    const result = await parseExcelFile(new Uint8Array(Buffer.from('invalid')).buffer)
     // Debería retornar array (vacío o con datos parseados)
     expect(Array.isArray(result)).toBe(true)
   })
 
   it('should return ParsedTransaction array', async () => {
-    const result = await parseExcelFile(Buffer.from('test'))
+    const result = await parseExcelFile(new Uint8Array(Buffer.from('test')).buffer)
     expect(result).toBeDefined()
     if (result.length > 0) {
       expect(result[0]).toHaveProperty('id')

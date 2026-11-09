@@ -36,17 +36,7 @@ import type { AnalysisRunResponse } from '@/domain'
 
 type Step = 'upload' | 'analyzing' | 'done'
 
-interface AnomalyResult {
-  type: string
-  severity: string
-  title: string
-  description: string
-  detail: string
-  recoverableAmount: number
-}
-
 interface AnalysisResult extends AnalysisRunResponse {
-  anomalies?: AnomalyResult[]
   awaitingPayment?: boolean
   paymentAmount?: number
   syncError?: string
