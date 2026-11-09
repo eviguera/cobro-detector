@@ -7,6 +7,7 @@
  */
 
 import { ANOMALY_TYPES, SEVERITY } from './constants'
+import { bankClaimChannel } from './claim-channels'
 
 export type Severity = 'high' | 'medium' | 'low'
 
@@ -267,8 +268,7 @@ function buildActionPlan(findings: Finding[], bank: string | null): ActionStep[]
     },
     {
       title: `Presenta el reclamo en ${bank ?? 'tu banco'}`,
-      description:
-        'Hazlo por escrito en sucursal, web o ejecutivo de cuenta. Pide número de caso y guárdalo.',
+      description: `Hazlo por escrito en ${bankClaimChannel(bank)}. Pide número de caso y guárdalo.`,
       tone: 'warning',
     },
   ]

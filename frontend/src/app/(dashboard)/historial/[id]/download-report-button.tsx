@@ -8,6 +8,7 @@ import { SEVERITY } from '@/lib/constants'
 import { generateWordDocument, generatePDFDocument } from '@/lib/document-generator'
 import { Button } from '@/components/ui/button'
 import { trackEvent } from '@/lib/product-events'
+import { bankClaimChannel } from '@/lib/claim-channels'
 import { useReportSelection } from '@/components/analysis/report-selection'
 import { anomalyKey } from '@/lib/finding-key'
 import type { Analysis, DetectedAnomaly, ParsedTransaction } from '@/domain'
@@ -100,6 +101,7 @@ export default function DownloadReportButton({
     const totalRecoverable = formatCLP(analysis.recoverable_amount)
     const date = new Date(analysis.created_at).toLocaleDateString('es-CL')
     const today = new Date().toLocaleDateString('es-CL')
+    const bankChannel = bankClaimChannel(analysis.bank)
 
     const txMap = new Map<string, ParsedTransaction>()
     transactions.forEach(tx => txMap.set(tx.id, tx))
@@ -237,7 +239,7 @@ ${cobroCards}
   <h3>Instrucciones para reclamar en el banco</h3>
   <ol>
     <li><strong>Imprime este reporte</strong> o guárdalo como PDF desde tu navegador (Ctrl+P → Guardar como PDF)</li>
-    <li><strong>Dirígete a una sucursal</strong> del banco o contacta a tu ejecutivo de cuenta</li>
+    <li><strong>Presenta el reclamo</strong> en ${bankChannel}</li>
     <li><strong>Presenta el reporte</strong> completo. Cada cobro injustificado está listado con su ID, fecha, monto y motivo de reclamo</li>
     <li><strong>Guarda el comprobante</strong> del reclamo. El banco tiene <strong>10 días hábiles</strong> para responder por ley</li>
     <li><strong>Si no responden o rechazan</strong> tu reclamo, presenta un caso en <strong>cmfchile.cl</strong> o llamá al <strong>800 700 100</strong></li>

@@ -16,6 +16,7 @@ import type { Finding, FindingGroup, Severity } from '@/lib/analysis-insights'
 import { FindingFeedback } from './finding-feedback'
 import { useReportSelection } from './report-selection'
 import { findingKey } from '@/lib/finding-key'
+import { bankClaimChannel } from '@/lib/claim-channels'
 import { cn } from '@/lib/utils'
 
 interface FindingsExplorerProps {
@@ -23,6 +24,8 @@ interface FindingsExplorerProps {
   groups: FindingGroup[]
   /** Si se entrega, cada hallazgo puede reportarse como falso positivo. */
   analysisId?: string
+  /** Banco del análisis para indicar el canal de reclamo correcto. */
+  bank?: string | null
 }
 
 type SeverityFilter = 'all' | Severity
@@ -50,7 +53,7 @@ const SEVERITY_BADGE: Record<Severity, string> = {
   low: 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/15 dark:text-brand-300',
 }
 
-export function FindingsExplorer({ findings, groups, analysisId }: FindingsExplorerProps) {
+export function FindingsExplorer({ findings, groups, analysisId, bank }: FindingsExplorerProps) {
   const selection = useReportSelection()
   const [query, setQuery] = useState('')
   const [severity, setSeverity] = useState<SeverityFilter>('all')
@@ -324,7 +327,8 @@ export function FindingsExplorer({ findings, groups, analysisId }: FindingsExplo
                           </p>
                           <p className="mt-1 text-xs leading-relaxed text-foreground">
                             {CLAIM_INSTRUCTIONS[finding.type] ??
-                              'Presenta este reporte en el banco y solicita el reverso del cargo.'}
+                              'Presenta este reporte en el banco y solicita el reverso del cargo.'}{' '}
+                            Canal: {bankClaimChannel(bank)}.
                           </p>
                         </div>
                         <div className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 py-1.5">

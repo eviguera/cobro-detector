@@ -329,7 +329,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
 
         <TabsContent value="hallazgos">
           {insights.findings.length > 0 ? (
-            <FindingsExplorer findings={insights.findings} groups={insights.groups} analysisId={analysis.id} />
+            <FindingsExplorer findings={insights.findings} groups={insights.groups} analysisId={analysis.id} bank={analysis.bank} />
           ) : (
             <div className="flex flex-col items-center rounded-2xl border border-success-200 bg-success-50/60 px-6 py-12 text-center dark:border-success-500/25 dark:bg-success-500/5">
               <CheckCircle2 className="h-8 w-8 text-success-600 dark:text-success-500" aria-hidden="true" />
