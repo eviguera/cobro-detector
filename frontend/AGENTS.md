@@ -44,9 +44,15 @@ npm run build         # Build de producción
 - **Configuración**: `opencode.json` con plugin `superpowers` + `.mcp.json`.
 - **Deploy**: Vercel desde `frontend/` (rootDirectory configurado). Framework: nextjs.
 - **Tailwind CSS** con `darkMode: ['class']`, variables CSS para temas. Fuentes: Archivo, Bricolage Grotesque, JetBrains Mono.
-- **IA**: Groq SDK (`groq-sdk`) con Llama 3.1 8B para detección de anomalías (del lado del microservicio analysis-svc).
+- **Design system v2 ("ledger")**: tokens semánticos en `src/app/globals.css` (`--background`, `--card`, `--border`, `--success-*`, `--warning-*`, `--danger-*`). Regla de PR: **no usar `text-gray-300/400/500` para texto**; usar `text-muted-foreground`, `text-foreground`, `text-success-*`, etc. Objetivo: 0 violaciones `color-contrast` en axe (WCAG 2.2 AA).
+- **Librerías open-source integradas** (todas >10k estrellas en GitHub): `recharts` (gráficos), `@radix-ui/react-tabs` + `@radix-ui/react-tooltip` + `@radix-ui/react-dialog` (interacción accesible), `cmdk` (command palette ⌘K). `lucide-react`, `sonner`, `next-themes`, `tailwind-merge` ya estaban.
+- **Componentes de análisis**: `src/lib/analysis-insights.ts` normaliza hallazgos (camelCase/snake_case), calcula confianza, prioridad, grupos y plan de acción. UI en `src/components/analysis/` (`findings-explorer`, `priority-gauge`, `recovery-plan`, `type-breakdown`, `transactions-table`). No duplicar esta lógica en páginas.
+- **IA**: Groq SDK (`groq-sdk`) con Llama 3.1 8B para detección de anomalías (del lado del microservicio analysis-svc). **La IA es una capa opcional**: si falla, el pipeline sigue con reglas determinísticas y resumen local (`buildDeterministicSummary`). No volver a hacer que un fallo de IA tumbe el análisis.
+- **Benchmark**: `analysis-svc/benchmarks/` + `npm run benchmark` (precision/recall/F1 por caso; `--strict` falla bajo 90%).
+- **Motor de reglas**: `analysis-svc/src/domain/anomaly-rules.ts`. Reglas de precisión: comisión de crédito repetida, cobro duplicado (mismo comercio + monto, ventana ≤10 días), intereses en cuotas sin interés, cargos genéricos y etiquetas del CSV. Cada hallazgo incluye `confidence` (0–100), `evidence` y `recommendedAction`. `mergeAnomalies` evita doble conteo: una transacción recuperable se reclama una sola vez.
 - **Parseo de archivos**: CSV, Excel (`exceljs`), y PDF (`pdf-parse`) de estados de cuenta (del lado de analysis-svc).
-- **Límite de subida**: `10mb` vía `next.config.js` `serverActions.bodySizeLimit`.
+- **Límite de subida**: `10mb` vía `next.config.js` `serverActions.bodySizeLimit`. El bucket `analysis-files` solo acepta `text/csv`, `application/pdf`, `application/vnd.ms-excel` y `.xlsx`; el adapter debe declarar el MIME original aunque el contenido vaya cifrado.
+- **Cifrado**: AES-256-GCM en el navegador (Web Crypto). El tag de autenticación viene concatenado al ciphertext; analysis-svc debe separar los últimos 16 bytes y usar `decipher.setAuthTag()`.
 
 ## Quirks de TypeScript
 
@@ -71,7 +77,8 @@ npm run build         # Build de producción
 
 El skill `cobro-detector-db` (`.agents/skills/cobro-detector-db/SKILL.md`) es la referencia completa del schema. Resumen ejecutivo:
 
-- **Schema consolidado**: `supabase/schema.sql` — 12 tablas, 30+ índices, RLS (12 tablas), 38 políticas, 8 triggers, 3 constraints, 2 vistas `security_invoker`.
+- **Schema consolidado**: `supabase/schema.sql` — 15 tablas, 30+ índices, RLS en todas las tablas de usuario, 8 triggers, 3 constraints, 2 vistas `security_invoker`.
+- **Feedback, telemetría y reclamo**: `anomaly_feedback` guarda el feedback por hallazgo (falsos positivos); `product_events` guarda eventos del embudo (`analysis_started`, `analysis_completed`, `analysis_failed`, `report_downloaded`, `claim_status_changed`); `claim_tracking` guarda el estado del reclamo (`draft|sent|responded|escalated`). Todas con RLS `auth.uid() = user_id`.
 - **Schema `internal`**: privado para funciones SECURITY DEFINER (`verify_api_key`, `consume_credit`, `can_access_company`). Wrappers públicos en `public`.
 - Aplicar `supabase/schema.sql` en SQL Editor de Supabase para instalaciones nuevas. Es idempotente (`IF NOT EXISTS` / `CREATE OR REPLACE` / bloques `DO`).
 - **Nunca usar `apply_migration`** para cambios iterativos. Usar `execute_sql` (MCP). Luego correr advisors.
@@ -107,12 +114,22 @@ El skill `cobro-detector-db` (`.agents/skills/cobro-detector-db/SKILL.md`) es la
 
 ### Media prioridad
 - ~~Generar CSV de 3.000 transacciones para testing de detección masiva~~ **Completado**
-- ~~E2E tests: flujo autenticado (login + upload + análisis)~~ **Requiere reescritura**
-- Procesamiento asíncrono con cola de mensajes (microservicios)
+- ~~E2E tests: flujo autenticado (login + upload + análisis)~~ **Completado** (`npm run test:e2e`)
+- ~~Procesamiento asíncrono con cola de mensajes (microservicios)~~ **Completado** (Redis + worker)
 - Upgrade a Next.js 15
-- Deduplicación de anomalías detectadas por múltiples reglas
-- Agregar health checks entre microservicios
+- ~~Deduplicación de anomalías detectadas por múltiples reglas~~ **Completado** (`mergeAnomalies` + anti doble conteo)
+- ~~Agregar health checks entre microservicios~~ **Completado** (`GET /health` en analysis-svc)
+
+### Completado en la iteración de producto (2026-11)
+- Rediseño visual "ledger" en landing, login, panel, análisis, historial, detalle, precios y métricas.
+- Onboarding ya no bloquea el primer pantallazo: se abre desde "Guía rápida" en el sidebar.
+- `⌘K` command palette para navegación.
+- Detalle v2: monto → prioridad/confianza → hallazgos con evidencia → plan de reclamo → movimientos.
+- Motor de análisis con precisión, confianza, evidencia y resumen determinístico.
+- Accesibilidad: 0 violaciones axe (WCAG 2.2 AA) en `/`, `/login`, `/dashboard`, `/historial`, `/historial/[id]`, `/analisis`, `/precios`, `/dashboard/analytics`.
+- Verificación E2E real con una cartola de prueba: 10 movimientos → 4 hallazgos → $113.500 recuperables.
 
 ### Baja prioridad
 - Configurar Sentry para monitoreo de errores
 - Agregar más casos de prueba E2E (PDF, Excel con distintos bancos)
+- Medir precisión del motor con un set etiquetado por banco (precision/recall)

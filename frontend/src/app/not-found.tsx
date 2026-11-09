@@ -1,15 +1,35 @@
 import Link from 'next/link'
+import { ArrowRight, FileSearch, Home, Shield } from 'lucide-react'
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-6xl font-bold text-gray-200 mb-4">404</p>
-        <h1 className="text-xl font-semibold text-gray-900 mb-2">Página no encontrada</h1>
-        <p className="text-gray-500 mb-6">El análisis que buscas no existe o no tienes acceso.</p>
-        <Link href="/dashboard" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-          Volver al dashboard
-        </Link>
+    <div className="flex min-h-screen items-center justify-center bg-background px-5">
+      <div className="w-full max-w-md text-center">
+        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
+          <Shield className="h-6 w-6" aria-hidden="true" />
+        </div>
+        <p className="font-mono text-6xl font-semibold tracking-tight text-muted-foreground/40">404</p>
+        <h1 className="mt-3 text-xl font-semibold tracking-tight">Página no encontrada</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          El análisis que buscas no existe, fue eliminado o no tienes acceso a él.
+        </p>
+        <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Home className="h-4 w-4" aria-hidden="true" />
+            Ir al panel
+          </Link>
+          <Link
+            href="/historial"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+          >
+            <FileSearch className="h-4 w-4" aria-hidden="true" />
+            Ver historial
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </div>
       </div>
     </div>
   )

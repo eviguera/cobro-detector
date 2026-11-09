@@ -44,20 +44,20 @@ export default async function BlogPostPage({ params }: PageProps) {
       <article className="max-w-3xl mx-auto px-4 py-12 lg:py-20">
         <Link
           href="/blog"
-          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mb-8 transition-colors"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground dark:hover:text-gray-300 mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Volver al blog
         </Link>
 
         <header className="mb-10">
-          <h1 className="text-3xl lg:text-4xl font-display font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">
+          <h1 className="text-3xl lg:text-4xl font-display font-bold text-foreground mb-4 leading-tight">
             {post.title}
           </h1>
-          <p className="text-lg text-gray-500 dark:text-gray-400 mb-6">
+          <p className="text-lg text-muted-foreground mb-6">
             {post.description}
           </p>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400 border-b border-gray-200 dark:border-gray-800 pb-6">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground border-b border-gray-200 dark:border-gray-800 pb-6">
             <span className="flex items-center gap-1.5">
               <Calendar className="w-4 h-4" />
               {new Date(post.date).toLocaleDateString('es-CL', {
@@ -84,14 +84,14 @@ export default async function BlogPostPage({ params }: PageProps) {
 
             if (trimmed.startsWith('# ')) {
               return (
-                <h1 key={i} className="text-3xl font-display font-bold text-gray-900 dark:text-gray-100 mt-8 mb-4">
+                <h1 key={i} className="text-3xl font-display font-bold text-foreground mt-8 mb-4">
                   {trimmed.replace('# ', '')}
                 </h1>
               )
             }
             if (trimmed.startsWith('## ')) {
               return (
-                <h2 key={i} className="text-2xl font-display font-semibold text-gray-900 dark:text-gray-100 mt-6 mb-3">
+                <h2 key={i} className="text-2xl font-display font-semibold text-foreground mt-6 mb-3">
                   {trimmed.replace('## ', '')}
                 </h2>
               )
@@ -108,21 +108,21 @@ export default async function BlogPostPage({ params }: PageProps) {
             }
             if (trimmed.startsWith('- ')) {
               return (
-                <li key={i} className="text-gray-700 dark:text-gray-300 leading-relaxed ml-6 list-disc">
+                <li key={i} className="text-foreground leading-relaxed ml-6 list-disc">
                   {trimmed.replace('- ', '')}
                 </li>
               )
             }
             if (trimmed.startsWith('> ')) {
               return (
-                <blockquote key={i} className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 dark:bg-blue-950/20 rounded-r-lg text-gray-700 dark:text-gray-300 italic">
+                <blockquote key={i} className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 dark:bg-blue-950/20 rounded-r-lg text-foreground italic">
                   {trimmed.replace('> ', '')}
                 </blockquote>
               )
             }
             if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
               return (
-                <p key={i} className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4 font-semibold">
+                <p key={i} className="text-foreground leading-relaxed mb-4 font-semibold">
                   {trimmed.replace(/^\*\*|\*\*$/g, '')}
                 </p>
               )
@@ -132,7 +132,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             }
 
             return (
-              <p key={i} className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4">
+              <p key={i} className="text-foreground leading-relaxed mb-4">
                 {trimmed}
               </p>
             )
@@ -141,10 +141,10 @@ export default async function BlogPostPage({ params }: PageProps) {
 
         <footer className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
           <div className="bg-blue-50 dark:bg-blue-950/20 rounded-2xl p-6 text-center">
-            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            <p className="text-lg font-semibold text-foreground mb-2">
               ¿Quieres detectar cobros injustificados en tu estado de cuenta?
             </p>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-muted-foreground mb-4">
               Sube tu estado de cuenta y nuestra IA encontrará comisiones duplicadas, errores y cargos no reconocidos.
             </p>
             <Link

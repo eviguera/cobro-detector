@@ -23,10 +23,10 @@ export default function BlogPage() {
     <div className="min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0f]">
       <div className="max-w-4xl mx-auto px-4 py-16 lg:py-24">
         <div className="text-center mb-16">
-          <h1 className="text-4xl lg:text-5xl font-display font-bold text-gray-900 dark:text-gray-100 mb-4">
+          <h1 className="text-4xl lg:text-5xl font-display font-bold text-foreground mb-4">
             Blog de CobroDetector
           </h1>
-          <p className="text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Guías, casos reales y educación financiera para detectar y reclamar cobros injustificados en estados de cuenta bancarios.
           </p>
           <div className="mt-6 flex items-center justify-center gap-2">
@@ -39,7 +39,7 @@ export default function BlogPage() {
         {tags.length > 0 && (
           <div className="flex flex-wrap justify-center gap-2 mb-12">
             {tags.map((tag) => (
-              <span key={tag} className="px-3 py-1 text-xs font-medium bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full border border-gray-200 dark:border-gray-700">
+              <span key={tag} className="px-3 py-1 text-xs font-medium bg-white dark:bg-gray-800 text-muted-foreground rounded-full border border-gray-200 dark:border-gray-700">
                 {tag}
               </span>
             ))}
@@ -48,7 +48,7 @@ export default function BlogPage() {
 
         {posts.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-gray-500">Pronto publicaremos artículos. ¡Vuelve a visitarnos!</p>
+            <p className="text-muted-foreground">Pronto publicaremos artículos. ¡Vuelve a visitarnos!</p>
           </div>
         ) : (
           <div className="grid gap-8">
@@ -60,13 +60,13 @@ export default function BlogPage() {
               >
                 <div className="flex flex-col lg:flex-row lg:items-start lg:gap-8">
                   <div className="flex-1">
-                    <h2 className="text-xl lg:text-2xl font-display font-bold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    <h2 className="text-xl lg:text-2xl font-display font-bold text-foreground mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {post.title}
                     </h2>
-                    <p className="text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
+                    <p className="text-muted-foreground leading-relaxed mb-4">
                       {post.description}
                     </p>
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <Calendar className="w-4 h-4" />
                         {new Date(post.date).toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' })}

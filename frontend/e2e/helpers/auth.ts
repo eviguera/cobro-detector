@@ -13,7 +13,7 @@ export function getTestCredentials() {
 
 export async function login(page: Page, email: string, password: string): Promise<boolean> {
   await page.goto('/login', { timeout: 10000 })
-  await expect(page.getByText('Bienvenido de vuelta')).toBeVisible()
+  await expect(page.getByText('Ingresa a tu cuenta')).toBeVisible()
 
   const emailInput = page.locator('input[type="email"]').first()
   const passwordInput = page.locator('input[type="password"]').first()

@@ -1,9 +1,12 @@
+import type { Metadata } from 'next'
 import { XCircle, ArrowLeft, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 
 interface Props {
   searchParams: { order?: string }
 }
+
+export const metadata: Metadata = { title: 'Pago fallido' }
 
 export default function PagoFallidoPage({ searchParams: _searchParams }: Props) {
   return (

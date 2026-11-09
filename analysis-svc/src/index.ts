@@ -62,9 +62,20 @@ function decryptFileAES256GCM(
 ): Buffer {
   const key = Buffer.from(keyBase64, 'base64')
   const iv = Buffer.from(ivBase64, 'base64')
+
+  // Web Crypto (AES-GCM) concatena el tag de autenticación de 16 bytes al
+  // final del ciphertext. Node lo espera separado con setAuthTag(); sin esto
+  // el descifrado falla con "Unsupported state or unable to authenticate data".
+  const TAG_LENGTH = 16
+  if (encrypted.length <= TAG_LENGTH) {
+    throw new Error('Archivo cifrado inválido: contenido demasiado corto')
+  }
+  const ciphertext = encrypted.subarray(0, encrypted.length - TAG_LENGTH)
+  const authTag = encrypted.subarray(encrypted.length - TAG_LENGTH)
+
   const decipher = crypto.createDecipheriv(ENC_ALGORITHM, key, iv)
-  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
-  return decrypted
+  decipher.setAuthTag(authTag)
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()])
 }
 
 // --- Worker de cola (background, no bloquea el servidor HTTP) ---

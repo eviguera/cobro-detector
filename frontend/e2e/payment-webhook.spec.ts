@@ -13,7 +13,7 @@ test.describe('Flujo de pago (MercadoPago webhook y créditos)', () => {
       return;
     }
     await page.goto('/login', { timeout: 10000 });
-    await expect(page.getByText('Bienvenido de vuelta')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Ingresa a tu cuenta')).toBeVisible({ timeout: 10000 });
 
     const emailInput = page.locator('input[type="email"]').first();
     const passwordInput = page.locator('input[type="password"]').first();

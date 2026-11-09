@@ -2,6 +2,12 @@ import type { ParsedTransaction, DetectedAnomaly } from './analysis-result.entit
 import type { AnalysisResult } from './analysis-result.entity'
 import type { AiProvider } from './ports/ai-provider.port'
 import type { FileParser } from './ports/parser.port'
+import {
+  buildDeterministicSummary,
+  detectRuleAnomalies,
+  mergeAnomalies,
+  normalizeAiAnomalies,
+} from './anomaly-rules'
 
 export interface PipelineOptions {
   userId?: string
@@ -22,25 +28,55 @@ export class PipelineService {
   ): Promise<AnalysisResult> {
     try {
       const transactions = await this.parser.parseTransactions(buffer, fileType)
+
+      // Un archivo del que no se pudo extraer ni un movimiento no es una
+      // cartola "limpia": es un formato no soportado. Devolver 0 hallazgos
+      // haría creer al usuario que el banco no le cobró de más.
+      if (transactions.length === 0) {
+        return {
+          anomalies: [],
+          totalTransactions: 0,
+          totalRecoverable: 0,
+          success: false,
+          error:
+            'No pudimos detectar movimientos en el archivo. Verifica que sea la cartola original del banco (PDF, Excel o CSV) e inténtalo de nuevo.',
+        }
+      }
+
       const bank = this.parser.detectBank(transactions)
 
-      const aiResult = await this.aiProvider.analyze(transactions, bank)
+      // La IA es una capa adicional, no un requisito: si falla o se degrada,
+      // el análisis determinístico sigue siendo válido y el usuario recibe
+      // resultados en vez de un error.
+      let aiAnomalies: DetectedAnomaly[] = []
+      let aiSummary = ''
 
-      const ruleAnomalies = this.detectAnomaliesRules(transactions)
-      const labeledAnomalies = this.detectLabeledAnomalies(transactions)
+      try {
+        const aiResult = await this.aiProvider.analyze(transactions, bank)
+        aiAnomalies = normalizeAiAnomalies(aiResult.anomalies, transactions)
+        aiSummary = aiResult.summary?.trim() ?? ''
+      } catch (error) {
+        console.error(
+          'AI provider failed; continuing with deterministic rules:',
+          error instanceof Error ? error.message : String(error),
+        )
+      }
 
-      const allAnomalies = this.deduplicateAnomalies([
-        ...ruleAnomalies,
-        ...labeledAnomalies,
-        ...aiResult.anomalies as unknown as DetectedAnomaly[],
-      ])
+      const ruleAnomalies = detectRuleAnomalies(transactions)
+      const allAnomalies = mergeAnomalies(ruleAnomalies, aiAnomalies)
 
-      const dates = transactions.map(tx => tx.date).sort()
+      const dates = transactions.map((tx) => tx.date).filter(Boolean).sort()
       const period = dates.length > 0 ? { start: dates[0], end: dates[dates.length - 1] } : undefined
 
-      // Los montos recuperables siempre son positivos: el monto del cargo es un
-      // "recuperable" aunque venga con signo negativo desde el cartola del banco.
-      const totalRecoverable = allAnomalies.reduce((sum, a) => sum + Math.abs(a.recoverableAmount), 0)
+      // Los montos recuperables siempre son positivos y ya vienen sin doble
+      // conteo desde mergeAnomalies.
+      const totalRecoverable = allAnomalies.reduce(
+        (sum, anomaly) => sum + Math.abs(anomaly.recoverableAmount),
+        0,
+      )
+
+      const summaryIsUseful =
+        aiSummary.length >= 30 && !/no se pudo completar/i.test(aiSummary)
 
       return {
         anomalies: allAnomalies,
@@ -48,7 +84,9 @@ export class PipelineService {
         totalRecoverable,
         period,
         bank,
-        aiSummary: aiResult.summary || undefined,
+        aiSummary: summaryIsUseful
+          ? aiSummary
+          : buildDeterministicSummary(allAnomalies, transactions.length, bank),
         transactions,
       }
     } catch (error) {
@@ -61,82 +99,5 @@ export class PipelineService {
         error: errorMsg,
       }
     }
-  }
-
-  private detectAnomaliesRules(transactions: ParsedTransaction[]): DetectedAnomaly[] {
-    const anomalies: DetectedAnomaly[] = []
-    const grouped: Record<string, ParsedTransaction[]> = {}
-
-    for (const tx of transactions) {
-      const key = `${tx.description}|${tx.amount}`
-      if (!grouped[key]) grouped[key] = []
-      grouped[key].push(tx)
-    }
-
-    for (const key of Object.keys(grouped)) {
-      const group = grouped[key]
-      if (group.length > 1) {
-        const [description, amountStr] = key.split('|')
-        const amount = Math.abs(Number(amountStr))
-        anomalies.push({
-          type: 'duplicate_commission',
-          severity: 'high',
-          title: 'Comisión duplicada',
-          description: `Se detectó "${description}" ${group.length} veces por $${amount.toLocaleString('es-CL')} cada una`,
-          detail: `Cobro duplicado o múltiple de "${description}"`,
-          recoverableAmount: amount * (group.length - 1),
-          transactionRefs: group.map(tx => tx.id ?? ''),
-        })
-      }
-    }
-
-    return anomalies
-  }
-
-  private detectLabeledAnomalies(transactions: ParsedTransaction[]): DetectedAnomaly[] {
-    const anomalies: DetectedAnomaly[] = []
-    const knownLabels = [
-      'comisión', 'comision', 'mantención', 'mantencion',
-      'administración', 'administracion', 'seguro',
-      'cargo fijo', 'anualidad', 'suscripción', 'suscripcion',
-    ]
-
-    for (const tx of transactions) {
-      const desc = (tx.description ?? '').toLowerCase()
-      const matched = knownLabels.find(l => desc.includes(l))
-      if (matched) {
-        anomalies.push({
-          type: 'unknown_charge',
-          severity: 'medium',
-          title: `Posible cargo etiquetado: "${matched}"`,
-          description: `"${tx.description}" el ${tx.date} por $${Math.abs(tx.amount ?? 0).toLocaleString('es-CL')}`,
-          detail: `Cargo con etiqueta sospechosa: "${matched}"`,
-          recoverableAmount: Math.abs(tx.amount ?? 0),
-          transactionRefs: [tx.id ?? ''],
-        })
-      }
-    }
-
-    return anomalies
-  }
-
-  private deduplicateAnomalies(anomalies: DetectedAnomaly[]): DetectedAnomaly[] {
-    const union = new Map<string, DetectedAnomaly>()
-
-    for (const anomaly of anomalies) {
-      // Normaliza a positivo antes de deduplicar: así un mismo cargo detectado
-      // por reglas y por la IA (con signos distintos) cae en la misma clave.
-      const recoverableAmount = Math.abs(anomaly.recoverableAmount)
-      const key = `${anomaly.type}|${anomaly.title}|${recoverableAmount}`
-      if (union.has(key)) {
-        const existing = union.get(key)!
-        existing.recoverableAmount += recoverableAmount
-        existing.transactionRefs = [...new Set([...existing.transactionRefs, ...anomaly.transactionRefs])]
-      } else {
-        union.set(key, { ...anomaly, recoverableAmount, transactionRefs: [...anomaly.transactionRefs] })
-      }
-    }
-
-    return Array.from(union.values())
   }
 }

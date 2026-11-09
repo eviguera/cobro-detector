@@ -762,6 +762,14 @@ export interface ParsedTransaction {
   motivoReclamo?: string
 }
 
+export interface AnomalyEvidence {
+  period?: string
+  merchant?: string
+  count?: number
+  dates?: string[]
+  amounts?: number[]
+}
+
 export interface DetectedAnomaly {
   type: string
   severity: 'high' | 'medium' | 'low'
@@ -770,6 +778,10 @@ export interface DetectedAnomaly {
   detail?: string
   recoverableAmount: number
   transactionRefs: string[]
+  /** 0–100: respaldo de la detección con evidencia concreta. */
+  confidence?: number
+  evidence?: AnomalyEvidence
+  recommendedAction?: string
 }
 
 export interface Plan {

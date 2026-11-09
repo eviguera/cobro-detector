@@ -7,6 +7,7 @@ import { escapeXml } from '@/lib/security'
 import { SEVERITY } from '@/lib/constants'
 import { generateWordDocument, generatePDFDocument } from '@/lib/document-generator'
 import { Button } from '@/components/ui/button'
+import { trackEvent } from '@/lib/product-events'
 import type { Analysis, DetectedAnomaly, ParsedTransaction } from '@/domain'
 
 interface Props {
@@ -21,7 +22,7 @@ function buildTransactionTable(anomaly: DetectedAnomaly, txMap: Map<string, Pars
     .filter((t): t is ParsedTransaction => !!t)
 
   if (txs.length === 0) {
-    return `<p style="font-size:11px;color:#6b7280;margin-top:8px;">(No se encontraron las transacciones en los datos originales. Usá los IDs de referencia para identificarlas en tu estado de cuenta.)</p>`
+    return `<p style="font-size:11px;color:#6b7280;margin-top:8px;">(No se encontraron las transacciones en los datos originales. Usa los IDs de referencia para identificarlas en tu estado de cuenta.)</p>`
   }
 
   const isSingleCharge = anomaly.type === 'unknown_charge' || (anomaly.type === 'incorrect_charge' && txs.length === 1)
@@ -66,21 +67,21 @@ function buildTransactionTable(anomaly: DetectedAnomaly, txMap: Map<string, Pars
 function getClaimInstructions(type: string): string {
   switch (type) {
     case 'duplicate_commission':
-      return 'Presentá este reporte en sucursal o por ejecutivo de cuenta. Solicitá el reverso de la comisión duplicada citando los IDs y montos listados. Citá la Ley del Consumidor Art. 3. El banco tiene 10 días hábiles para responder.'
+      return 'Presenta este reporte en sucursal o a tu ejecutivo de cuenta. Solicita el reverso de la comisión duplicada citando los IDs y montos listados. Cita la Ley del Consumidor Art. 3. El banco tiene 10 días hábiles para responder.'
     case 'installment_error':
-      return 'Solicitá el recálculo de las cuotas. Mostrá el comprobante original de la venta en cuotas sin interés junto con las transacciones marcadas en este reporte. Si el banco no corrige, reclamá en la CMF.'
+      return 'Solicita el recálculo de las cuotas. Muestra el comprobante original de la venta en cuotas sin interés junto con las transacciones marcadas en este reporte. Si el banco no corrige, reclama en la CMF.'
     case 'unknown_charge':
-      return 'Solicitá al banco el detalle por escrito de este cargo. Si no pueden justificarlo en 10 días hábiles, exigí el reverso inmediato. Podés escalar a la CMF (cmfchile.cl) si no hay respuesta.'
+      return 'Solicita al banco el detalle por escrito de este cargo. Si no pueden justificarlo en 10 días hábiles, exige el reverso inmediato. Puedes escalar a la CMF (cmfchile.cl) si no hay respuesta.'
     case 'incorrect_charge':
-      return 'Revisá el detalle del cobro y compáralo con tus registros. Si no corresponde, presentá este reporte en el banco solicitando el reverso del cargo con los datos aquí indicados.'
+      return 'Revisa el detalle del cobro y compáralo con tus registros. Si no corresponde, presenta este reporte en el banco solicitando el reverso del cargo con los datos aquí indicados.'
     default:
-      return 'Presentá este reporte en sucursal o por ejecutivo. Solicitá el reverso del cobro injustificado. El banco tiene 10 días hábiles para responder.'
+      return 'Presenta este reporte en sucursal o a tu ejecutivo. Solicita el reverso del cobro injustificado. El banco tiene 10 días hábiles para responder.'
   }
 }
 
 export default function DownloadReportButton({ analysis, anomalies, transactions }: Props) {
   const [loading, setLoading] = useState(false)
-  const [format, setFormat] = useState<'pdf' | 'docx' | 'html'>('html')
+  const [format, setFormat] = useState<'pdf' | 'docx' | 'html'>('pdf')
 
   const generateHTML = () => {
     const totalRecoverable = formatCLP(analysis.recoverable_amount)
@@ -222,16 +223,16 @@ ${cobroCards}
 <div class="instructions">
   <h3>Instrucciones para reclamar en el banco</h3>
   <ol>
-    <li><strong>Imprimí este reporte</strong> o guardalo como PDF desde tu navegador (Ctrl+P → Guardar como PDF)</li>
-    <li><strong>Dirigite a una sucursal</strong> del banco o contactá a tu ejecutivo de cuenta</li>
-    <li><strong>Presentá el reporte</strong> completo. Cada cobro injustificado está listado con su ID, fecha, monto y motivo de reclamo</li>
-    <li><strong>Guardá el comprobante</strong> del reclamo. El banco tiene <strong>10 días hábiles</strong> para responder por ley</li>
-    <li><strong>Si no responden o rechazan</strong> tu reclamo, presentá un caso en <strong>cmfchile.cl</strong> o llamá al <strong>800 700 100</strong></li>
+    <li><strong>Imprime este reporte</strong> o guárdalo como PDF desde tu navegador (Ctrl+P → Guardar como PDF)</li>
+    <li><strong>Dirígete a una sucursal</strong> del banco o contacta a tu ejecutivo de cuenta</li>
+    <li><strong>Presenta el reporte</strong> completo. Cada cobro injustificado está listado con su ID, fecha, monto y motivo de reclamo</li>
+    <li><strong>Guarda el comprobante</strong> del reclamo. El banco tiene <strong>10 días hábiles</strong> para responder por ley</li>
+    <li><strong>Si no responden o rechazan</strong> tu reclamo, presenta un caso en <strong>cmfchile.cl</strong> o llamá al <strong>800 700 100</strong></li>
   </ol>
 </div>
 
 <div class="cmf-box">
-  <p><strong>¿El banco no responde?</strong> La Comisión para el Mercado Financiero (CMF) es el regulador bancario en Chile. Podés presentar un reclamo en cmfchile.cl adjuntando este reporte como evidencia.</p>
+  <p><strong>¿El banco no responde?</strong> La Comisión para el Mercado Financiero (CMF) es el regulador bancario en Chile. Puedes presentar un reclamo en cmfchile.cl adjuntando este reporte como evidencia.</p>
 </div>
 
 <div class="footer">
@@ -284,31 +285,31 @@ ${cobroCards}
         a.click()
         URL.revokeObjectURL(url)
       }
+      void trackEvent('report_downloaded', { analysis_id: analysis.id, format })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-2">
+      <label htmlFor="report-format" className="sr-only">
+        Formato del reporte
+      </label>
       <select
+        id="report-format"
         value={format}
-        onChange={e => setFormat(e.target.value as 'pdf' | 'docx' | 'html')}
+        onChange={(event) => setFormat(event.target.value as 'pdf' | 'docx' | 'html')}
         disabled={loading}
-        className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+        className="h-10 min-w-0 rounded-xl border border-input bg-card px-3 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-60"
       >
-        <option value="html">HTML (imprimir)</option>
         <option value="pdf">PDF</option>
         <option value="docx">Word (DOCX)</option>
+        <option value="html">HTML</option>
       </select>
-      <Button
-        onClick={handleDownload}
-        disabled={loading}
-        variant="default"
-        size="default"
-      >
-        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-        Descargar reporte
+      <Button onClick={handleDownload} disabled={loading} variant="default" size="default">
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileDown className="h-4 w-4" aria-hidden="true" />}
+        Descargar carta
       </Button>
     </div>
   )

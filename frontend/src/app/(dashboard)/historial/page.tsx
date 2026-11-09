@@ -1,9 +1,22 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { FileSearch, Plus, AlertTriangle, CheckCircle2, FileText, CalendarDays, Search, ChevronLeft, ChevronRight, CreditCard } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  FileSearch,
+  FileText,
+  Plus,
+  Search,
+} from 'lucide-react'
 import { formatCLP, formatDate } from '@/lib/utils'
+import { filterValidAnalyses, sumAnomalies, sumRecoverable } from '@/lib/analysis-metrics'
 import type { Analysis } from '@/domain'
+import { PageHeader } from '@/components/ui/page-header'
 import FilterBar from './filter-bar'
 import DeleteAnalysisButton from './delete-button'
 
@@ -38,8 +51,6 @@ function getPeriodoDates(periodo?: string): { desde?: string; hasta?: string } |
 
 async function getAnalysesData(userId: string, desde?: string, hasta?: string, q?: string) {
   const supabase = await createClient()
-  // Solo columnas de listado: `raw_data` puede traer miles de transacciones
-  // y no se necesita para pintar la tabla.
   let query = supabase
     .from('analyses')
     .select('id, user_id, file_name, bank, status, total_transactions, anomalies_count, recoverable_amount, created_at, period_start, period_end')
@@ -56,43 +67,45 @@ async function getAnalysesData(userId: string, desde?: string, hasta?: string, q
 
 type StatusTone = 'success' | 'warning' | 'info' | 'danger' | 'muted'
 
-function getStatusMeta(status: string): { label: string; tone: StatusTone; hint: string } {
+function getStatusMeta(status: string): { label: string; tone: StatusTone } {
   switch (status) {
     case 'completed':
-      return { label: 'Completado', tone: 'success', hint: 'Ver reporte' }
+      return { label: 'Completado', tone: 'success' }
     case 'awaiting_payment':
-      return { label: 'Pendiente de pago', tone: 'warning', hint: 'Pagar 20%' }
+      return { label: 'Por pagar', tone: 'warning' }
     case 'processing':
     case 'pending':
-      return { label: 'Procesando', tone: 'info', hint: 'Ver progreso' }
+      return { label: 'Procesando', tone: 'info' }
     case 'error':
     case 'failed':
-      return { label: 'Error', tone: 'danger', hint: 'Reintentar' }
+      return { label: 'Error', tone: 'danger' }
     default:
-      return { label: status, tone: 'muted', hint: 'Ver detalle' }
+      return { label: status, tone: 'muted' }
   }
 }
 
 const toneClasses: Record<StatusTone, string> = {
-  success: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400',
-  warning: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  info: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  danger: 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  muted: 'bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400',
+  success: 'bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-500',
+  warning: 'bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-500',
+  info: 'bg-accent text-accent-foreground',
+  danger: 'bg-danger-50 text-danger-700 dark:bg-danger-500/10 dark:text-danger-500',
+  muted: 'bg-secondary text-muted-foreground',
 }
 
 function StatusIcon({ status }: { status: string }) {
-  if (status === 'completed') return <CheckCircle2 className="w-3 h-3" />
-  if (status === 'awaiting_payment') return <CreditCard className="w-3 h-3" />
+  if (status === 'completed') return <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+  if (status === 'awaiting_payment') return <CreditCard className="h-3 w-3" aria-hidden="true" />
   if (status === 'processing' || status === 'pending') {
-    return <div className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+    return <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
   }
-  return <AlertTriangle className="w-3 h-3" />
+  return <AlertTriangle className="h-3 w-3" aria-hidden="true" />
 }
 
 interface Props {
   searchParams: { periodo?: string; q?: string; page?: string }
 }
+
+export const metadata: Metadata = { title: 'Historial de análisis' }
 
 export default async function HistorialPage({ searchParams }: Props) {
   const periodo = searchParams.periodo ?? 'todas'
@@ -107,13 +120,12 @@ export default async function HistorialPage({ searchParams }: Props) {
   const { analyses: allAnalyses, error } = await getAnalysesData(user.id, dateRange?.desde, dateRange?.hasta, q || undefined)
   const analyses = allAnalyses ?? []
 
-  // Los análisis fallidos no representan dinero recuperable.
-  const totalRecoverable = analyses
-    .filter(a => a.status !== 'failed' && a.status !== 'error')
-    .reduce((sum, a) => sum + (a.recoverable_amount ?? 0), 0)
-  const totalAnomalies = analyses.reduce((sum, a) => sum + (a.anomalies_count ?? 0), 0)
-  const completedCount = analyses.filter(a => a.status === 'completed').length
-  const pendingPayment = analyses.filter(a => a.status === 'awaiting_payment').length
+  // Un análisis fallido no representa dinero recuperable ni anomalías reales.
+  const validAnalyses = filterValidAnalyses(analyses)
+  const totalRecoverable = sumRecoverable(validAnalyses)
+  const totalAnomalies = sumAnomalies(validAnalyses)
+  const completedCount = analyses.filter((a) => a.status === 'completed').length
+  const pendingPayment = analyses.filter((a) => a.status === 'awaiting_payment').length
 
   const totalPages = Math.max(1, Math.ceil(analyses.length / PAGE_SIZE))
   const currentPage = Math.min(Math.max(1, Number.isFinite(requestedPage) ? requestedPage : 1), totalPages)
@@ -130,214 +142,210 @@ export default async function HistorialPage({ searchParams }: Props) {
   }
 
   return (
-    <div className="animate-fade-in-up space-y-8">
-      <header className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse-subtle" />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-blue-600 dark:text-blue-400">
-                Historial
-              </span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-display font-bold text-gray-900 dark:text-gray-50 tracking-tight">
-              Mis análisis
-            </h1>
-            <p className="mt-1.5 text-sm text-gray-400 dark:text-gray-500">
-              {analyses.length} análisis · {completedCount} completados
-              {pendingPayment > 0 ? ` · ${pendingPayment} por pagar` : ''} · {formatCLP(totalRecoverable)} recuperable
-            </p>
-          </div>
+    <div className="animate-fade-in space-y-6">
+      <PageHeader
+        eyebrow="Historial"
+        title="Mis cartolas"
+        description={
+          <span>
+            {analyses.length} cartola{analyses.length !== 1 ? 's' : ''} · {completedCount} completada{completedCount !== 1 ? 's' : ''}
+            {pendingPayment > 0 ? ` · ${pendingPayment} por pagar` : ''} · {formatCLP(totalRecoverable)} recuperable
+          </span>
+        }
+        actions={
           <Link
             href="/analisis"
-            className="group inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:-translate-y-px hover:shadow-md"
           >
-            <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" />
+            <Plus className="h-4 w-4" aria-hidden="true" />
             Nuevo análisis
           </Link>
-        </div>
+        }
+      />
 
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          <form action="/historial" method="get" className="relative flex-1 max-w-md" role="search">
-            {periodo !== 'todas' && <input type="hidden" name="periodo" value={periodo} />}
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-            <input
-              type="search"
-              name="q"
-              defaultValue={q}
-              placeholder="Buscar por nombre de archivo..."
-              aria-label="Buscar análisis por nombre de archivo"
-              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-24 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700/50 dark:bg-gray-900/60 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-blue-600"
-            />
-            <button
-              type="submit"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        {[
+          { label: 'Cartolas', value: String(analyses.length), sub: 'subidas' },
+          { label: 'Hallazgos', value: String(totalAnomalies), sub: 'en análisis válidos', danger: totalAnomalies > 0 },
+          { label: 'Recuperable', value: formatCLP(totalRecoverable), sub: 'estimado' },
+        ].map((metric) => (
+          <div key={metric.label} className="rounded-2xl border border-border bg-card p-3 sm:p-4">
+            <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:text-2xs">{metric.label}</p>
+            <p
+              className={`num-display mt-2 break-words font-semibold tracking-tight ${
+                metric.label === 'Recuperable' ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'
+              } ${metric.danger ? 'text-danger-600 dark:text-danger-500' : 'text-foreground'}`}
             >
-              Buscar
-            </button>
-          </form>
-          <div className="flex items-center gap-2">
-            <FilterBar current={periodo as 'todas' | 'semana' | 'mes' | 'ano'} q={q} />
-            {q && (
-              <Link
-                href={buildHref({ q: undefined, page: undefined })}
-                className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                Limpiar búsqueda
-              </Link>
-            )}
+              {metric.value}
+            </p>
+            <p className="mt-1 hidden text-[10px] text-muted-foreground sm:block">{metric.sub}</p>
           </div>
-        </div>
-      </header>
+        ))}
+      </div>
 
-      {error && (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800/40 dark:bg-red-900/20">
-          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <form action="/historial" method="get" className="relative max-w-md flex-1" role="search">
+          {periodo !== 'todas' ? <input type="hidden" name="periodo" value={periodo} /> : null}
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder="Buscar por nombre de archivo…"
+            aria-label="Buscar análisis por nombre de archivo"
+            className="h-10 w-full rounded-xl border border-input bg-card pl-10 pr-24 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+          />
+          <button
+            type="submit"
+            className="absolute right-1.5 top-1/2 h-7 -translate-y-1/2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/92"
+          >
+            Buscar
+          </button>
+        </form>
+        <div className="flex items-center gap-2">
+          <FilterBar current={periodo as 'todas' | 'semana' | 'mes' | 'ano'} q={q} />
+          {q ? (
+            <Link href={buildHref({ q: undefined, page: undefined })} className="text-xs font-medium text-muted-foreground hover:text-foreground">
+              Limpiar
+            </Link>
+          ) : null}
+        </div>
+      </div>
+
+      {error ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-danger-200 bg-danger-50 p-4 dark:border-danger-500/25 dark:bg-danger-500/10">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger-600 dark:text-danger-500" aria-hidden="true" />
           <div>
-            <p className="text-sm font-semibold text-red-800 dark:text-red-200">No pudimos cargar tu historial</p>
-            <p className="mt-0.5 text-xs text-red-700 dark:text-red-300">
+            <p className="text-sm font-semibold text-danger-700 dark:text-danger-500">No pudimos cargar tu historial</p>
+            <p className="mt-0.5 text-xs text-danger-700/80 dark:text-danger-500/80">
               Revisa tu conexión e intenta de nuevo. Tus análisis no se perdieron.
             </p>
           </div>
         </div>
-      )}
-
-      {analyses.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 stagger-children">
-          {[
-            { label: 'Total análisis', value: String(analyses.length), sub: 'realizados' },
-            { label: 'Anomalías', value: String(totalAnomalies), sub: 'detectadas', danger: totalAnomalies > 0 },
-            { label: 'Recuperable', value: formatCLP(totalRecoverable), sub: 'estimado', large: true },
-          ].map((m, i) => (
-            <div key={m.label} className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-100 dark:border-gray-800/40 p-4 shadow-sm" style={{ animationDelay: `${i * 80}ms` }}>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">{m.label}</p>
-              <p className={`font-display font-bold text-gray-900 dark:text-gray-100 tracking-tight tabular-nums ${m.large ? 'text-lg' : 'text-xl'} ${m.danger ? 'text-red-600 dark:text-red-400' : ''}`}>
-                {m.value}
-              </p>
-              <p className="text-[10px] text-gray-400 dark:text-gray-400 mt-0.5">{m.sub}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      ) : null}
 
       {analyses.length === 0 ? (
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 text-center py-20 px-6 shadow-sm">
-          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 flex items-center justify-center shadow-inner">
-            <FileSearch className="w-7 h-7 text-gray-400 dark:text-gray-400" />
-          </div>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/60 px-6 py-16 text-center">
+          <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-secondary/60 text-muted-foreground">
+            <FileSearch className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <h2 className="font-display text-base font-semibold text-foreground">
             {q
               ? 'Sin resultados para tu búsqueda'
               : periodo !== 'todas'
-                ? 'Sin análisis en este período'
-                : 'No tienes análisis aún'}
-          </h3>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mb-8 max-w-xs mx-auto leading-relaxed">
+                ? 'Sin cartolas en este período'
+                : 'Aún no has analizado ninguna cartola'}
+          </h2>
+          <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {q
-              ? `No encontramos archivos que coincidan con “${q}”. Prueba con otro término.`
+              ? `No encontramos cartolas que coincidan con «${q}». Revisa el nombre del archivo o quita el filtro.`
               : periodo !== 'todas'
-                ? 'No se encontraron análisis en el período seleccionado. Prueba con otro filtro.'
-                : 'Sube tu estado de cuenta para comenzar a detectar cobros incorrectos'}
+                ? 'Prueba con otro período o quita el filtro.'
+                : 'Sube tu primera cartola y en menos de 3 minutos sabrás si tu banco te cobró de más.'}
           </p>
-          {q || periodo !== 'todas' ? (
-            <Link
-              href="/historial"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30"
-            >
-              Ver todos los análisis
-            </Link>
-          ) : (
-            <Link
-              href="/analisis"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30"
-            >
-              <Plus className="w-4 h-4" />
-              Nuevo análisis
-            </Link>
-          )}
+          <Link
+            href={q || periodo !== 'todas' ? '/historial' : '/analisis'}
+            className="mt-6 inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+          >
+            {q || periodo !== 'todas' ? (
+              'Ver todas las cartolas'
+            ) : (
+              <>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Subir mi primera cartola
+              </>
+            )}
+          </Link>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-sm overflow-hidden">
-          <div className="hidden sm:grid grid-cols-[1fr_100px_90px_110px_120px_50px] gap-4 px-6 py-3 bg-gray-50/50 dark:bg-gray-800/20 border-b border-gray-100 dark:border-gray-800/30">
-            <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Archivo</span>
-            <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-right">Transacciones</span>
-            <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-right">Anomalías</span>
-            <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-right">Recuperable</span>
-            <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-center">Estado</span>
-            <span />
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="hidden border-b border-border bg-secondary/40 px-5 py-2.5 sm:grid sm:grid-cols-[minmax(0,1fr)_90px_90px_120px_110px_40px] sm:gap-4">
+            {['Archivo', 'Movimientos', 'Hallazgos', 'Recuperable', 'Estado', ''].map((label, index) => (
+              <span
+                key={`${label}-${index}`}
+                className={`eyebrow ${index >= 1 && index <= 3 ? 'text-right' : index === 4 ? 'text-center' : ''}`}
+              >
+                {label}
+              </span>
+            ))}
           </div>
 
-          <div className="divide-y divide-gray-50 dark:divide-gray-800/20">
-            {pageAnalyses.map((analysis, i) => {
+          <div className="divide-y divide-border/70">
+            {pageAnalyses.map((analysis) => {
               const meta = getStatusMeta(analysis.status)
-              const href = `/historial/${analysis.id}`
+              const isInvalid = analysis.status === 'error' || analysis.status === 'failed'
+              const hasFindings = !isInvalid && (analysis.anomalies_count ?? 0) > 0
 
               return (
                 <div
                   key={analysis.id}
-                  className="group relative flex flex-col sm:grid sm:grid-cols-[1fr_100px_90px_110px_120px_50px] gap-3 sm:gap-4 px-5 sm:px-6 py-4 transition-all duration-200 hover:bg-gray-50/50 dark:hover:bg-gray-800/20"
-                  style={{ animationDelay: `${i * 50}ms` }}
+                  className="group relative flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-secondary/30 sm:grid sm:grid-cols-[minmax(0,1fr)_90px_90px_120px_110px_40px] sm:items-center sm:gap-4 sm:px-5"
                 >
-                  {/* Enlace que cubre la fila sin anidar el botón de borrado */}
-                  <Link href={href} className="absolute inset-0 z-0" aria-label={`Ver análisis ${analysis.file_name}`} />
+                  <Link href={`/historial/${analysis.id}`} className="absolute inset-0 z-0" aria-label={`Ver análisis ${analysis.file_name}`} />
 
-                  <div className="pointer-events-none relative z-10 flex items-center gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-                      analysis.status === 'completed'
-                        ? 'bg-emerald-50 dark:bg-emerald-900/20 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/30'
-                        : analysis.status === 'processing'
-                          ? 'bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30'
+                  <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-3">
+                    <span
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                        analysis.status === 'completed'
+                          ? 'bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-500'
                           : analysis.status === 'awaiting_payment'
-                            ? 'bg-amber-50 dark:bg-amber-900/20 group-hover:bg-amber-100 dark:group-hover:bg-amber-900/30'
-                            : 'bg-gray-50 dark:bg-gray-800/50'
-                    }`}>
-                      <FileText className={`w-[18px] h-[18px] ${
-                        analysis.status === 'completed' ? 'text-emerald-500' :
-                        analysis.status === 'processing' ? 'text-blue-500' :
-                        analysis.status === 'awaiting_payment' ? 'text-amber-500' : 'text-gray-400'
-                      }`} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                            ? 'bg-warning-50 text-warning-600 dark:bg-warning-500/10 dark:text-warning-500'
+                            : analysis.status === 'processing'
+                              ? 'bg-accent text-accent-foreground'
+                              : 'bg-secondary text-muted-foreground'
+                      }`}
+                    >
+                      <FileText className="h-[18px] w-[18px]" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-foreground transition-colors group-hover:text-primary">
                         {analysis.file_name}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
-                        <span className="truncate">{analysis.bank ?? 'Banco no detectado'}</span>
-                        <span className="text-gray-400 dark:text-gray-400">·</span>
-                        <span className="whitespace-nowrap">{formatDate(analysis.created_at)}</span>
-                      </div>
-                      {analysis.period_start && (
-                        <p className="text-[10px] text-gray-400 dark:text-gray-400 mt-0.5 sm:hidden flex items-center gap-1">
-                          <CalendarDays className="w-3 h-3" />
-                          {formatDate(analysis.period_start)} – {formatDate(analysis.period_end!)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="pointer-events-none relative z-10 hidden sm:flex items-center justify-end">
-                    <span className="text-sm tabular-nums text-gray-700 dark:text-gray-300 font-mono">{analysis.total_transactions}</span>
-                  </div>
-
-                  <div className="pointer-events-none relative z-10 flex items-center justify-between sm:justify-end">
-                    <span className="text-[11px] text-gray-400 dark:text-gray-500 sm:hidden font-medium">Anomalías</span>
-                    <span className={`text-sm font-semibold tabular-nums ${
-                      analysis.anomalies_count > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
-                    }`}>
-                      {analysis.anomalies_count}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                        {analysis.bank ?? 'Banco no detectado'} · {formatDate(analysis.created_at)}
+                      </span>
                     </span>
                   </div>
 
-                  <div className="pointer-events-none relative z-10 flex items-center justify-between sm:justify-end">
-                    <span className="text-[11px] text-gray-400 dark:text-gray-500 sm:hidden font-medium">Recuperable</span>
-                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
-                      {formatCLP(analysis.recoverable_amount)}
+                  <div className="pointer-events-none relative z-10 flex items-center justify-between gap-3 sm:hidden">
+                    <span className="num text-xs text-muted-foreground">
+                      {isInvalid ? 'Sin datos' : `${analysis.anomalies_count ?? 0} hallazgos · ${formatCLP(analysis.recoverable_amount ?? 0)}`}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-[10px] font-semibold ${toneClasses[meta.tone]}`}>
+                      <StatusIcon status={analysis.status} />
+                      {meta.label}
                     </span>
                   </div>
 
-                  <div className="pointer-events-none relative z-10 flex items-center justify-between sm:justify-center">
-                    <span className="text-[11px] text-gray-400 dark:text-gray-500 sm:hidden font-medium">Estado</span>
-                    <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg whitespace-nowrap ${toneClasses[meta.tone]}`}>
+                  <div className="pointer-events-none relative z-10 hidden justify-end sm:flex">
+                    <span className="num text-xs text-muted-foreground">{analysis.total_transactions}</span>
+                  </div>
+
+                  <div className="pointer-events-none relative z-10 hidden items-center justify-end sm:flex">
+                    <span className="text-[11px] text-muted-foreground sm:hidden">Hallazgos</span>
+                    <span
+                      className={`num text-sm font-semibold ${
+                        isInvalid
+                          ? 'text-muted-foreground'
+                          : hasFindings
+                            ? 'text-danger-600 dark:text-danger-500'
+                            : 'text-success-600 dark:text-success-500'
+                      }`}
+                    >
+                      {isInvalid ? '—' : analysis.anomalies_count ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="pointer-events-none relative z-10 hidden items-center justify-end sm:flex">
+                    <span className="text-[11px] text-muted-foreground sm:hidden">Recuperable</span>
+                    <span className="num text-sm font-semibold text-foreground">
+                      {isInvalid ? '—' : formatCLP(analysis.recoverable_amount ?? 0)}
+                    </span>
+                  </div>
+
+                  <div className="pointer-events-none relative z-10 hidden items-center justify-center sm:flex">
+                    <span className="text-[11px] text-muted-foreground sm:hidden">Estado</span>
+                    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-[10px] font-semibold ${toneClasses[meta.tone]}`}>
                       <StatusIcon status={analysis.status} />
                       {meta.label}
                     </span>
@@ -346,54 +354,36 @@ export default async function HistorialPage({ searchParams }: Props) {
                   <div className="relative z-20 flex items-center justify-end sm:justify-center">
                     <DeleteAnalysisButton id={analysis.id} fileName={analysis.file_name} />
                   </div>
-
-                  {meta.hint && (
-                    <span className="pointer-events-none relative z-10 text-[10px] text-gray-400 dark:text-gray-500 sm:hidden">
-                      {meta.hint} →
-                    </span>
-                  )}
                 </div>
               )
             })}
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-5 py-3 dark:border-gray-800/30 sm:px-6">
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                Página {currentPage} de {totalPages}
-              </p>
+          {totalPages > 1 ? (
+            <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+              <p className="text-xs text-muted-foreground">Página {currentPage} de {totalPages}</p>
               <div className="flex items-center gap-2">
                 {currentPage > 1 ? (
-                  <Link
-                    href={buildHref({ page: String(currentPage - 1) })}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800/50"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                    Anterior
+                  <Link href={buildHref({ page: String(currentPage - 1) })} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-secondary">
+                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" /> Anterior
                   </Link>
                 ) : (
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-gray-100 px-3 py-1.5 text-xs font-medium text-gray-300 dark:border-gray-800 dark:text-gray-600">
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                    Anterior
+                  <span className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-3 text-xs font-medium text-muted-foreground/50">
+                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" /> Anterior
                   </span>
                 )}
                 {currentPage < totalPages ? (
-                  <Link
-                    href={buildHref({ page: String(currentPage + 1) })}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800/50"
-                  >
-                    Siguiente
-                    <ChevronRight className="w-3.5 h-3.5" />
+                  <Link href={buildHref({ page: String(currentPage + 1) })} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-secondary">
+                    Siguiente <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </Link>
                 ) : (
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-gray-100 px-3 py-1.5 text-xs font-medium text-gray-300 dark:border-gray-800 dark:text-gray-600">
-                    Siguiente
-                    <ChevronRight className="w-3.5 h-3.5" />
+                  <span className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-3 text-xs font-medium text-muted-foreground/50">
+                    Siguiente <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>
                 )}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>

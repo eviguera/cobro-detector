@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { usePathname } from 'next/navigation'
 import { X, ChevronRight, ChevronLeft, Check } from 'lucide-react'
 
 interface TourStep {
@@ -120,18 +119,19 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
   const [cardHeight, setCardHeight] = useState(CARD_FALLBACK_HEIGHT)
   const cardRef = useRef<HTMLDivElement>(null)
   const scrolledForStep = useRef(false)
-  const pathname = usePathname()
 
-  // El tour es de bienvenida al panel: solo se abre solo en /dashboard para no
-  // tapar el contenido de páginas como /historial en la primera visita.
+  // No abrimos el tour automáticamente: bloquear el primer pantallazo con un
+  // modal reduce la percepción de valor. Se inicia desde "Guía rápida" en el
+  // menú lateral (evento custom) y se recuerda si ya se completó.
   useEffect(() => {
-    if (pathname !== '/dashboard') return
-    const done = isOnboardingComplete()
-    if (!done) {
+    const start = () => {
       setCurrentStep(0)
       setDismissed(false)
+      scrolledForStep.current = false
     }
-  }, [pathname])
+    window.addEventListener('cobrodetector:start-tour', start)
+    return () => window.removeEventListener('cobrodetector:start-tour', start)
+  }, [])
 
   const finish = useCallback(() => {
     localStorage.setItem(STORAGE_KEY, 'true')
@@ -205,7 +205,25 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
   useEffect(() => {
     if (currentStep < 0) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') finish()
+      if (event.key === 'Escape') {
+        finish()
+        return
+      }
+      // Focus trap: el fondo no debe ser tabulable mientras el tour está abierto.
+      if (event.key !== 'Tab' || !cardRef.current) return
+      const focusable = cardRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
@@ -249,10 +267,11 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
       <div
         ref={cardRef}
         role="dialog"
+        aria-modal="true"
         aria-labelledby="onboarding-title"
         aria-describedby="onboarding-description"
         tabIndex={-1}
-        className="fixed z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 outline-none max-h-[calc(100vh-2rem)] overflow-y-auto"
+        className="fixed z-50 bg-card rounded-2xl shadow-lg border border-border p-6 outline-none max-h-[calc(100vh-2rem)] overflow-y-auto"
         style={
           position
             ? { top: position.top, left: position.left, width: position.width }
@@ -266,22 +285,22 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
       >
         <button
           onClick={skip}
-          className="absolute top-3 right-3 p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="absolute top-3 right-3 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           aria-label="Cerrar tour"
         >
           <X className="w-4 h-4" />
         </button>
 
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-semibold text-primary bg-accent px-2 py-0.5 rounded-full">
             Paso {currentStep + 1} de {TOUR_STEPS.length}
           </span>
         </div>
 
-        <h3 id="onboarding-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <h3 id="onboarding-title" className="text-lg font-semibold text-foreground mb-2">
           {step.title}
         </h3>
-        <p id="onboarding-description" className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-5">
+        <p id="onboarding-description" className="text-sm text-muted-foreground leading-relaxed mb-5">
           {step.description}
         </p>
 
@@ -292,10 +311,10 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
                 key={i}
                 className={`w-2 h-2 rounded-full transition-all ${
                   i === currentStep
-                    ? 'bg-blue-500 scale-125'
+                    ? 'bg-primary scale-125'
                     : i < currentStep
-                      ? 'bg-blue-300 dark:bg-blue-700'
-                      : 'bg-gray-300 dark:bg-gray-600'
+                      ? 'bg-primary/40'
+                      : 'bg-border'
                 }`}
               />
             ))}
@@ -305,7 +324,7 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
             {!isFirst && (
               <button
                 onClick={prev}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Atrás
@@ -314,7 +333,7 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
             {isLast ? (
               <button
                 onClick={finish}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm"
               >
                 <Check className="w-4 h-4" />
                 Comenzar
@@ -322,7 +341,7 @@ export function OnboardingTour({ children }: OnboardingTourProps) {
             ) : (
               <button
                 onClick={next}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm"
               >
                 Siguiente
                 <ChevronRight className="w-4 h-4" />

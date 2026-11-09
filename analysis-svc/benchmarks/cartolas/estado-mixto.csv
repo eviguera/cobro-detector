@@ -1,0 +1,8 @@
+id_transaccion,fecha,descripcion,monto,tipo_anomalia,id_transaccion_referencia,motivo_reclamo
+L1,04/03/2026,COMPRA RIPLEY,-30000,COBRO_DOBLE,L2,Cobro duplicado en el mismo día
+L2,04/03/2026,COMPRA RIPLEY,-30000,,,
+X1,06/03/2026,CARGO SERVICIO DIGITAL,-7500,COBRO_INCORRECTO,,Cargo no reconocido por el cliente
+C1,07/03/2026,COMISION CREDITO BCI,-5000,,,
+C2,07/03/2026,COMISION CREDITO BCI,-5000,,,
+P1,09/03/2026,COMPRA JUMBO,-21000,,,
+P2,10/03/2026,COMPRA SHELL COMBUSTIBLE,-19000,,,

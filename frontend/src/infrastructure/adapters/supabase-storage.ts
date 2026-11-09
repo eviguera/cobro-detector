@@ -14,6 +14,30 @@ export interface UploadResult {
 }
 
 /**
+ * El bucket `analysis-files` tiene una allowlist de MIME types. El contenido
+ * se cifra antes de subir, pero Supabase igual valida el `contentType`: hay que
+ * declarar el tipo original del archivo, no `application/octet-stream`.
+ */
+function resolveUploadContentType(file: File): string {
+  const allowed = [
+    'text/csv',
+    'application/pdf',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ]
+  if (allowed.includes(file.type)) return file.type
+
+  const name = file.name.toLowerCase()
+  if (name.endsWith('.csv')) return 'text/csv'
+  if (name.endsWith('.pdf')) return 'application/pdf'
+  if (name.endsWith('.xls')) return 'application/vnd.ms-excel'
+  if (name.endsWith('.xlsx')) {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  }
+  return 'application/pdf'
+}
+
+/**
  * Cifra el archivo con AES-256-GCM ANTES de subirlo a Supabase Storage.
  * Devuelve la ruta de almacenamiento, URL firmada, IV y clave de cifrado
  * (ambos en base64 para poder pasarse al backend).
@@ -34,7 +58,7 @@ export async function uploadFileToStorage(
     .storage
     .from('analysis-files')
     .upload(storagePath, encrypted, {
-      contentType: 'application/octet-stream',
+      contentType: resolveUploadContentType(file),
       upsert: false,
       cacheControl: '3600',
     })

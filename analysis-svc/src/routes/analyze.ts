@@ -11,7 +11,7 @@ import type { QueueJob } from '../domain/ports/queue.port.js'
 const supabase = createServiceClient()
 
 const analyzeSchema = z.object({
-  analysisId: z.string().uuid(),
+  analysisId: z.uuid(),
 })
 
 export async function analyzeRoutes(app: FastifyInstance) {

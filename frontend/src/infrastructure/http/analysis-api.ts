@@ -81,6 +81,7 @@ function mapAnalysisToResponse(analysis: Analysis): AnalysisRunResponse {
     recoverableAmount: analysis.recoverable_amount,
     summary: analysis.ai_summary ?? '',
     bank: analysis.bank ?? '',
+    anomalies: (analysis.anomalies ?? []) as unknown as AnalysisRunResponse['anomalies'],
     awaitingPayment,
     paymentAmount: awaitingPayment ? Math.round(analysis.recoverable_amount * 0.2) : undefined,
   }

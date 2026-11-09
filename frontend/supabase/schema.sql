@@ -883,3 +883,134 @@ BEGIN
       EXECUTE FUNCTION ensure_referral_code();
   END IF;
 END $$;
+
+-- ============================================================
+-- SECTION 14: FEEDBACK DE HALLAZGOS
+-- Permite que el usuario marque un hallazgo como "no corresponde".
+-- Es la señal que alimenta la calibración de precisión del motor.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.anomaly_feedback (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  analysis_id uuid NOT NULL REFERENCES public.analyses(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  anomaly_key text NOT NULL,
+  anomaly_type text,
+  severity text,
+  reason text NOT NULL DEFAULT 'not_applicable',
+  comment text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, analysis_id, anomaly_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_anomaly_feedback_analysis
+  ON public.anomaly_feedback(analysis_id);
+CREATE INDEX IF NOT EXISTS idx_anomaly_feedback_user
+  ON public.anomaly_feedback(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_anomaly_feedback_type
+  ON public.anomaly_feedback(anomaly_type, reason);
+
+ALTER TABLE public.anomaly_feedback ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own anomaly feedback" ON public.anomaly_feedback;
+CREATE POLICY "Users can view own anomaly feedback"
+  ON public.anomaly_feedback FOR SELECT
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert own anomaly feedback" ON public.anomaly_feedback;
+CREATE POLICY "Users can insert own anomaly feedback"
+  ON public.anomaly_feedback FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update own anomaly feedback" ON public.anomaly_feedback;
+CREATE POLICY "Users can update own anomaly feedback"
+  ON public.anomaly_feedback FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete own anomaly feedback" ON public.anomaly_feedback;
+CREATE POLICY "Users can delete own anomaly feedback"
+  ON public.anomaly_feedback FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- ============================================================
+-- SECTION 15: EVENTOS DE PRODUCTO (embudo de activación)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.product_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  event_type text NOT NULL,
+  metadata jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_events_user_time
+  ON public.product_events(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_product_events_type_time
+  ON public.product_events(event_type, created_at DESC);
+
+ALTER TABLE public.product_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can insert own product events" ON public.product_events;
+CREATE POLICY "Users can insert own product events"
+  ON public.product_events FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can view own product events" ON public.product_events;
+CREATE POLICY "Users can view own product events"
+  ON public.product_events FOR SELECT
+  USING (auth.uid() = user_id);
+
+-- Los eventos son inmutables para el usuario.
+DROP POLICY IF EXISTS "Users can update own product events" ON public.product_events;
+DROP POLICY IF EXISTS "Users can delete own product events" ON public.product_events;
+
+-- ============================================================
+-- SECTION 16: SEGUIMIENTO DEL RECLAMO
+-- Un registro por análisis: borrador → enviado → respondido / escalado CMF.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.claim_tracking (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  analysis_id uuid NOT NULL UNIQUE REFERENCES public.analyses(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  status text NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'sent', 'responded', 'escalated')),
+  sent_at timestamptz,
+  response_at timestamptz,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_claim_tracking_user
+  ON public.claim_tracking(user_id, updated_at DESC);
+
+ALTER TABLE public.claim_tracking ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own claim tracking" ON public.claim_tracking;
+CREATE POLICY "Users can view own claim tracking"
+  ON public.claim_tracking FOR SELECT
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert own claim tracking" ON public.claim_tracking;
+CREATE POLICY "Users can insert own claim tracking"
+  ON public.claim_tracking FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update own claim tracking" ON public.claim_tracking;
+CREATE POLICY "Users can update own claim tracking"
+  ON public.claim_tracking FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete own claim tracking" ON public.claim_tracking;
+CREATE POLICY "Users can delete own claim tracking"
+  ON public.claim_tracking FOR DELETE
+  USING (auth.uid() = user_id);
+
+DROP TRIGGER IF EXISTS claim_tracking_updated_at ON public.claim_tracking;
+CREATE TRIGGER claim_tracking_updated_at
+  BEFORE UPDATE ON public.claim_tracking
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();

@@ -1,47 +1,60 @@
-export function Skeleton({ className = '' }: { className?: string }) {
+import { cn } from '@/lib/utils'
+
+/**
+ * Skeletons reutilizables. Se usan en loading.tsx de cada ruta para evitar
+ * saltos de layout mientras el server component resuelve datos.
+ */
+export function Skeleton({ className }: { className?: string }) {
   return (
-    <div className={`animate-shimmer bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 dark:from-gray-800 dark:via-gray-700/50 dark:to-gray-800 rounded-xl ${className}`} />
+    <div
+      aria-hidden="true"
+      className={cn('animate-pulse rounded-lg bg-muted', className)}
+    />
   )
 }
 
 export function StatCardSkeleton() {
   return (
-    <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm relative overflow-hidden">
-      <div className="absolute top-0 left-5 right-5 h-0.5 bg-gray-200 dark:bg-gray-700 rounded-full" />
-      <Skeleton className="w-20 h-3 mb-3" />
-      <Skeleton className="w-32 h-8 mb-2" />
-      <Skeleton className="w-24 h-3" />
+    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex items-start justify-between">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-9 w-9 rounded-xl" />
+      </div>
+      <Skeleton className="mt-5 h-8 w-32" />
+      <Skeleton className="mt-3 h-3 w-40" />
     </div>
   )
 }
 
 export function TableRowSkeleton() {
   return (
-    <div className="flex items-center gap-4 px-6 py-4">
-      <Skeleton className="w-10 h-10 rounded-xl flex-shrink-0" />
-      <div className="flex-1 space-y-2">
-        <Skeleton className="w-48 h-4" />
-        <Skeleton className="w-32 h-3" />
+    <div className="flex items-center gap-4 border-b border-border px-5 py-4 last:border-0">
+      <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <Skeleton className="h-3 w-2/5" />
+        <Skeleton className="h-2.5 w-1/4" />
       </div>
-      <div className="hidden sm:flex items-center gap-6">
-        <Skeleton className="w-16 h-8" />
-        <Skeleton className="w-24 h-8" />
-        <Skeleton className="w-20 h-6 rounded-lg" />
-      </div>
+      <Skeleton className="h-3 w-16" />
     </div>
   )
 }
 
-export function AnomalyCardSkeleton() {
+export function ChartSkeleton({ className }: { className?: string }) {
   return (
-    <div className="rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 bg-white dark:bg-gray-900/60">
-      <div className="flex items-start justify-between mb-3">
-        <Skeleton className="w-32 h-6 rounded-full" />
-        <Skeleton className="w-24 h-6" />
-      </div>
-      <Skeleton className="w-3/4 h-5 mb-2" />
-      <Skeleton className="w-full h-4 mb-1" />
-      <Skeleton className="w-2/3 h-4" />
+    <div className={cn('rounded-2xl border border-border bg-card p-6', className)}>
+      <Skeleton className="h-3 w-28" />
+      <Skeleton className="mt-3 h-7 w-40" />
+      <Skeleton className="mt-6 h-40 w-full" />
+    </div>
+  )
+}
+
+export function PageHeaderSkeleton() {
+  return (
+    <div className="space-y-3">
+      <Skeleton className="h-3 w-24" />
+      <Skeleton className="h-9 w-64 max-w-full" />
+      <Skeleton className="h-3 w-80 max-w-full" />
     </div>
   )
 }

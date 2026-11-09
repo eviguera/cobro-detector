@@ -72,7 +72,7 @@ export default function DeleteAnalysisButton({ id, fileName }: Props) {
           type="button"
           onClick={handleCancel}
           aria-label="Cancelar eliminación"
-          className="rounded-lg px-1.5 py-1 text-[10px] font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+          className="rounded-lg px-1.5 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-gray-100 hover:text-muted-foreground dark:hover:bg-gray-800 dark:hover:text-gray-300"
         >
           Cancelar
         </button>
@@ -87,7 +87,7 @@ export default function DeleteAnalysisButton({ id, fileName }: Props) {
       disabled={loading}
       aria-label={`Eliminar análisis ${fileName}`}
       title="Eliminar análisis"
-      className="rounded-lg p-1.5 text-gray-400 transition-all duration-200 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400 disabled:opacity-60"
+      className="rounded-lg p-1.5 text-muted-foreground transition-all duration-200 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400 disabled:opacity-60"
     >
       {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
     </button>
