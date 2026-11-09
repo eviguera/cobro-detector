@@ -549,6 +549,7 @@ export default function LandingPage() {
               <a href="#como-funciona" className="hover:text-foreground">Cómo funciona</a>
               <a href="#precios" className="hover:text-foreground">Precios</a>
               <a href="#faq" className="hover:text-foreground">Preguntas</a>
+              <Link href="/seguridad" className="hover:text-foreground">Seguridad</Link>
               <Link href="/login" className="hover:text-foreground">Iniciar sesión</Link>
             </nav>
           </div>

@@ -530,6 +530,14 @@ export default function AnalisisPage() {
                   </span>
                 ))}
               </div>
+              <a
+                href="/cartola-ejemplo.csv"
+                download
+                className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-semibold text-primary hover:underline"
+              >
+                <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                Descargar cartola de ejemplo
+              </a>
             </div>
           </div>
 
@@ -541,7 +549,10 @@ export default function AnalisisPage() {
               </div>
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                 Tu archivo se cifra antes de salir del navegador y se elimina automáticamente
-                al terminar el análisis. No guardamos el contenido original.
+                al terminar el análisis. No guardamos el contenido original.{' '}
+                <Link href="/seguridad" className="font-medium text-primary hover:underline">
+                  Ver cómo cuidamos tus datos
+                </Link>
               </p>
               <div className="mt-4">
                 <SecurityBadge variant="detailed" />

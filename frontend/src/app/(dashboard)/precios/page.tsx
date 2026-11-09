@@ -13,6 +13,7 @@ import {
 } from '@/lib/plans'
 import { cn } from '@/lib/cn'
 import { BuyButton } from './buy-button'
+import { PlatinoCalculator } from './platino-calculator'
 import { Card } from '@/components/ui/card'
 
 const FAQ = [
@@ -155,6 +156,8 @@ export default async function PreciosPage() {
         <ShieldCheck className="h-3.5 w-3.5" />
         Pago seguro con Mercado Pago. Los créditos no vencen.
       </p>
+
+      <PlatinoCalculator />
 
       {/* FAQ */}
       <div className="mx-auto mt-12 max-w-4xl">

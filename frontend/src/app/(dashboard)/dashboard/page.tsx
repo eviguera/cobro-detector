@@ -21,6 +21,7 @@ import { buildAnalysisMetrics, filterValidAnalyses } from "@/lib/analysis-metric
 import type { Analysis, Credits, Profile } from "@/types/database.types"
 import { DashboardClient } from "./dashboard-client"
 import { ActivityChart, RecoveryChart } from "@/components/dashboard-charts"
+import { ActivationChecklist } from "@/components/dashboard/activation-checklist"
 import { StatCard } from "@/components/ui/stat-card"
 import { Card } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
@@ -182,7 +183,11 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-3">
+            <p className="mt-5 border-t border-background/10 pt-3 text-[10px] leading-relaxed text-background/55">
+              Estimación basada en la evidencia de tus análisis. El banco valida cada caso con su propio registro.
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3">
               <Link
                 href="/historial"
                 className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[13px] font-semibold text-[#0d1220] transition-transform hover:-translate-y-px"
@@ -224,19 +229,11 @@ export default async function DashboardPage() {
                   : "Cada hallazgo incluye evidencia y una recomendación concreta para el banco."}
           </p>
 
-          <div className="mt-5 rounded-xl border border-border bg-secondary/40 p-3.5">
-            <div className="flex items-baseline justify-between">
-              <span className="eyebrow">Créditos</span>
-              <span className="num text-xs text-muted-foreground">{creditUsage}% usado</span>
-            </div>
-            <p className="num-display mt-2 text-2xl font-semibold">
-              {creditsLeft}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">de {credits?.total ?? 0}</span>
-            </p>
-            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-border">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${creditUsage}%` }} aria-hidden="true" />
-            </div>
-          </div>
+          <ActivationChecklist
+            hasAnalyses={metrics.analyses > 0}
+            hasFindings={completedWithAnomalies > 0}
+            latestAnalysisId={latestWithFindings?.id ?? recentAnalyses[0]?.id ?? null}
+          />
 
           <div className="mt-5 flex flex-col gap-2">
             {pendingPayment ? (

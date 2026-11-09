@@ -45,6 +45,7 @@ El rediseño v2 dejó una base sólida (0 violaciones axe, flujo E2E real, motor
 - ✅ Health check con Supabase + Redis; Groq pasa a “not_configured” porque es opcional.
 - ✅ Precisión: comercios cortos (UBER/SHELL) ya no se marcan como cargos genéricos; archivos sin movimientos fallan con mensaje claro en vez de mostrar “0 hallazgos”.
 - ✅ Verificación: 65 Vitest + 37 Jest, build frontend/backend, axe 0 en 7 rutas, E2E local-smoke + analysis-async verdes.
+- ✅ Fase 1 (parcial): página `/seguridad`, checklist de activación en el panel, cartola de ejemplo descargable y calculadora del Plan Platino.
 
 ### Deuda crítica visible
 
