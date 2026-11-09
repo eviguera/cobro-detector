@@ -48,6 +48,7 @@ El rediseño v2 dejó una base sólida (0 violaciones axe, flujo E2E real, motor
 - ✅ Fase 1 (parcial): página `/seguridad`, checklist de activación en el panel, cartola de ejemplo descargable y calculadora del Plan Platino.
 - ✅ Deploy: se corrigió el Root Directory del proyecto Vercel `cobro-detector` a `frontend` (estaba en `.` y el build fallaba en 0 ms).
 - ✅ Fase 3 (parcial): selección de hallazgos para la carta, descarga filtrada, evidencia en PDF/DOCX y recordatorio `.ics` a 10 días hábiles.
+- ✅ Recordatorio automático por email: `POST /v1/claim-reminders/run` en notification-svc, protegido con `x-cron-secret`; envía una sola vez a los 10 días hábiles y marca `reminder_sent_at`.
 
 ### Deuda crítica visible
 

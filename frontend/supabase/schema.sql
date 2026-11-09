@@ -1014,3 +1014,11 @@ DROP TRIGGER IF EXISTS claim_tracking_updated_at ON public.claim_tracking;
 CREATE TRIGGER claim_tracking_updated_at
   BEFORE UPDATE ON public.claim_tracking
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Recordatorio enviado (idempotencia del job de emails).
+ALTER TABLE public.claim_tracking
+  ADD COLUMN IF NOT EXISTS reminder_sent_at timestamptz;
+
+CREATE INDEX IF NOT EXISTS idx_claim_tracking_reminder_due
+  ON public.claim_tracking(status, sent_at)
+  WHERE reminder_sent_at IS NULL;

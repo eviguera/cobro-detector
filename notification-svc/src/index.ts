@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit'
 import * as Sentry from '@sentry/node'
 import { healthRoutes } from './routes/health.js'
 import { notificationRoutes } from './routes/notifications.js'
+import { claimReminderRoutes } from './routes/claim-reminders.js'
 
 // HARDENED (2026-11): Sentry para monitoreo de errores en backend.
 // Solo se activa si SENTRY_DSN está configurado (variable de entorno).
@@ -41,6 +42,7 @@ await server.register(rateLimit, {
 
 await server.register(healthRoutes)
 await server.register(notificationRoutes)
+await server.register(claimReminderRoutes)
 
 const port = Number(process.env.PORT) || 3003
 

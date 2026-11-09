@@ -460,6 +460,7 @@ export interface Database {
           sent_at: string | null
           response_at: string | null
           notes: string | null
+          reminder_sent_at: string | null
           created_at: string
           updated_at: string
         }
@@ -471,6 +472,7 @@ export interface Database {
           sent_at?: string | null
           response_at?: string | null
           notes?: string | null
+          reminder_sent_at?: string | null
         }
         Update: {
           analysis_id?: string
