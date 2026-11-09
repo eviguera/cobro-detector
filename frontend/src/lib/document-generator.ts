@@ -20,6 +20,20 @@ const getPdfLib = async () => {
   return pdfLibModule
 }
 
+function evidenceLine(anomaly: DetectedAnomaly): string {
+  const evidence = anomaly.evidence
+  if (evidence) {
+    return [
+      evidence.period ? `Período ${evidence.period}` : '',
+      evidence.count ? `${evidence.count} cobros` : '',
+      evidence.dates?.length ? `Fechas ${evidence.dates.slice(0, 4).join(', ')}` : '',
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  }
+  return anomaly.detail ?? ''
+}
+
 interface LetterData {
   analysis: Analysis
   anomalies: DetectedAnomaly[]
@@ -144,7 +158,11 @@ async function generateComplaintLetter(data: LetterData): Promise<Document> {
                       children: [new Paragraph({ children: [new TextRun(escapeXml(anomaly.type.replace('_', ' ').toUpperCase()))] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph(escapeXml(anomaly.title || '')), new Paragraph({ children: [new TextRun({ text: escapeXml(anomaly.description || ''), size: 8 })] })],
+                      children: [
+                        new Paragraph(escapeXml(anomaly.title || '')),
+                        new Paragraph({ children: [new TextRun({ text: escapeXml(anomaly.description || ''), size: 8 })] }),
+                        new Paragraph({ children: [new TextRun({ text: escapeXml(evidenceLine(anomaly)), size: 8, italics: true })] }),
+                      ],
                     }),
                     new TableCell({
                       children: [new Paragraph({ children: [new TextRun(formatCLP(anomaly.recoverableAmount))] })],
@@ -301,6 +319,11 @@ export async function generatePDFDocument(data: LetterData): Promise<Uint8Array>
 
     currentPage.drawText(`  ${escapeXml(anomaly.description || '')}`, {
       x: 50, y: yPosition, size: 9, font, maxWidth: 495,
+    })
+    yPosition -= 12
+
+    currentPage.drawText(`  Evidencia: ${escapeXml(evidenceLine(anomaly) || 'Ver detalle en el reporte')}`, {
+      x: 50, y: yPosition, size: 8, font, maxWidth: 495,
     })
     yPosition -= 12
 

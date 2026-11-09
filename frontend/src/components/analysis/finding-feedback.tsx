@@ -5,6 +5,7 @@ import { CheckCircle2, Flag, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import type { Finding, Severity } from '@/lib/analysis-insights'
+import { findingKey } from '@/lib/finding-key'
 
 const REASONS = [
   { value: 'not_applicable', label: 'El cobro sí corresponde' },
@@ -13,11 +14,6 @@ const REASONS = [
   { value: 'already_charged', label: 'Ya me lo devolvieron' },
   { value: 'other', label: 'Otro motivo' },
 ] as const
-
-function feedbackKey(finding: Finding): string {
-  const ref = finding.transactionRefs[0] ?? 'sin-ref'
-  return `${finding.type}|${finding.title}|${finding.amount}|${ref}`.slice(0, 240)
-}
 
 interface FindingFeedbackProps {
   analysisId: string
@@ -35,7 +31,7 @@ export function FindingFeedback({ analysisId, finding, severity }: FindingFeedba
   const [comment, setComment] = useState('')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
-  const fieldId = feedbackKey(finding).replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60)
+  const fieldId = findingKey(finding).replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60)
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -57,7 +53,7 @@ export function FindingFeedback({ analysisId, finding, severity }: FindingFeedba
         {
           analysis_id: analysisId,
           user_id: user.id,
-          anomaly_key: feedbackKey(finding),
+          anomaly_key: findingKey(finding),
           anomaly_type: finding.type,
           severity,
           reason,

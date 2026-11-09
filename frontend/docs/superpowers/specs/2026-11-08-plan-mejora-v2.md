@@ -47,6 +47,7 @@ El rediseño v2 dejó una base sólida (0 violaciones axe, flujo E2E real, motor
 - ✅ Verificación: 65 Vitest + 37 Jest, build frontend/backend, axe 0 en 7 rutas, E2E local-smoke + analysis-async verdes.
 - ✅ Fase 1 (parcial): página `/seguridad`, checklist de activación en el panel, cartola de ejemplo descargable y calculadora del Plan Platino.
 - ✅ Deploy: se corrigió el Root Directory del proyecto Vercel `cobro-detector` a `frontend` (estaba en `.` y el build fallaba en 0 ms).
+- ✅ Fase 3 (parcial): selección de hallazgos para la carta, descarga filtrada, evidencia en PDF/DOCX y recordatorio `.ics` a 10 días hábiles.
 
 ### Deuda crítica visible
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { CheckCircle2, Clock3, Landmark, Loader2, Scale, Send } from 'lucide-react'
+import { CalendarPlus, CheckCircle2, Clock3, Landmark, Loader2, Scale, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { trackEvent } from '@/lib/product-events'
@@ -19,6 +19,7 @@ export interface ClaimRow {
 interface ClaimTrackerProps {
   analysisId: string
   initial: ClaimRow | null
+  title?: string
 }
 
 const STEPS: Array<{ value: ClaimStatus; label: string; icon: typeof Send }> = [
@@ -27,6 +28,47 @@ const STEPS: Array<{ value: ClaimStatus; label: string; icon: typeof Send }> = [
   { value: 'responded', label: 'Respuesta recibida', icon: Landmark },
   { value: 'escalated', label: 'Escalada a la CMF', icon: Scale },
 ]
+
+function addBusinessDays(date: Date, days: number): Date {
+  const result = new Date(date)
+  let added = 0
+  while (added < days) {
+    result.setDate(result.getDate() + 1)
+    const day = result.getDay()
+    if (day !== 0 && day !== 6) added++
+  }
+  return result
+}
+
+function toIcsDate(date: Date): string {
+  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`
+}
+
+function downloadReminder(title: string, sentAt: string | null): void {
+  const start = sentAt ? new Date(sentAt) : new Date()
+  const deadline = addBusinessDays(start, 10)
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//CobroDetector//Reclamo//ES',
+    'BEGIN:VEVENT',
+    `UID:${Date.now()}@cobrodetector.cl`,
+    `DTSTAMP:${toIcsDate(new Date())}T090000Z`,
+    `DTSTART;VALUE=DATE:${toIcsDate(deadline)}`,
+    `DTEND;VALUE=DATE:${toIcsDate(addBusinessDays(deadline, 1))}`,
+    `SUMMARY:${title.replace(/[,;]/g, ' ')}`,
+    'DESCRIPTION:El banco tiene 10 días hábiles para responder. Si no responde\, escala el caso a la CMF (cmfchile.cl).',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ]
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = 'recordatorio-reclamo.ics'
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 function businessDaysSince(date: string | null): number {
   if (!date) return 0
@@ -44,7 +86,7 @@ function businessDaysSince(date: string | null): number {
   return count
 }
 
-export function ClaimTracker({ analysisId, initial }: ClaimTrackerProps) {
+export function ClaimTracker({ analysisId, initial, title = 'Reclamo CobroDetector' }: ClaimTrackerProps) {
   const [status, setStatus] = useState<ClaimStatus>(initial?.status ?? 'draft')
   const [sentAt, setSentAt] = useState<string | null>(initial?.sent_at ?? null)
   const [responseAt, setResponseAt] = useState<string | null>(initial?.response_at ?? null)
@@ -186,6 +228,14 @@ export function ClaimTracker({ analysisId, initial }: ClaimTrackerProps) {
             >
               <Scale className="h-3.5 w-3.5" aria-hidden="true" />
               Escalar a la CMF
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadReminder(`${title} · reclamo banco`, sentAt)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+            >
+              <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" />
+              Recordatorio 10 días
             </button>
           </>
         ) : null}

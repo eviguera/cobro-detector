@@ -14,6 +14,8 @@ import { formatCLP } from '@/lib/utils'
 import { ANOMALY_TYPES, SEVERITY } from '@/lib/constants'
 import type { Finding, FindingGroup, Severity } from '@/lib/analysis-insights'
 import { FindingFeedback } from './finding-feedback'
+import { useReportSelection } from './report-selection'
+import { findingKey } from '@/lib/finding-key'
 import { cn } from '@/lib/utils'
 
 interface FindingsExplorerProps {
@@ -49,6 +51,7 @@ const SEVERITY_BADGE: Record<Severity, string> = {
 }
 
 export function FindingsExplorer({ findings, groups, analysisId }: FindingsExplorerProps) {
+  const selection = useReportSelection()
   const [query, setQuery] = useState('')
   const [severity, setSeverity] = useState<SeverityFilter>('all')
   const [sort, setSort] = useState<SortKey>('severity')
@@ -146,6 +149,30 @@ export function FindingsExplorer({ findings, groups, analysisId }: FindingsExplo
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-secondary/30 px-3 py-2">
+        <p className="text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">{selection.selectedCount}</span> de{' '}
+          {selection.totalCount} incluidos en la carta
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={selection.selectAll}
+            className="text-[11px] font-semibold text-primary hover:underline"
+          >
+            Incluir todos
+          </button>
+          <span className="text-border" aria-hidden="true">|</span>
+          <button
+            type="button"
+            onClick={selection.selectNone}
+            className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+          >
+            Quitar todos
+          </button>
+        </div>
+      </div>
+
       {/* Resumen por categoría: funciona como filtro rápido y como lectura del hallazgo */}
       {groups.length > 1 && (
         <div className="flex flex-wrap gap-2" role="list" aria-label="Resumen por tipo de cobro">
@@ -196,12 +223,14 @@ export function FindingsExplorer({ findings, groups, analysisId }: FindingsExplo
             const isOpen = openIndex === index
             const panelId = `finding-panel-${index}`
             const severityInfo = SEVERITY[finding.severity]
+            const key = findingKey(finding)
+            const selected = selection.isSelected(key)
 
             return (
               <li key={`${finding.type}-${finding.title}-${index}`} className="print-block">
                 <article
                   className={cn(
-                    'overflow-hidden rounded-2xl border bg-card shadow-card transition-colors',
+                    'relative overflow-hidden rounded-2xl border bg-card shadow-card transition-colors',
                     finding.severity === 'high'
                       ? 'border-danger-200/70 dark:border-danger-500/25'
                       : finding.severity === 'medium'
@@ -209,12 +238,25 @@ export function FindingsExplorer({ findings, groups, analysisId }: FindingsExplo
                         : 'border-border'
                   )}
                 >
+                  <label
+                    className="absolute left-3 top-4 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border border-border bg-card"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => selection.toggle(key)}
+                      className="h-3.5 w-3.5 accent-primary"
+                      aria-label={`Incluir "${finding.title}" en la carta`}
+                    />
+                  </label>
+
                   <button
                     type="button"
                     onClick={() => setOpenIndex(isOpen ? null : index)}
                     aria-expanded={isOpen}
                     aria-controls={panelId}
-                    className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-muted/40 sm:p-5"
+                    className="flex w-full items-start gap-3 p-4 pl-12 text-left transition-colors hover:bg-muted/40 sm:p-5 sm:pl-12"
                   >
                     <span
                       aria-hidden="true"

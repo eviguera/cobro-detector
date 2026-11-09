@@ -8,6 +8,8 @@ import { SEVERITY } from '@/lib/constants'
 import { generateWordDocument, generatePDFDocument } from '@/lib/document-generator'
 import { Button } from '@/components/ui/button'
 import { trackEvent } from '@/lib/product-events'
+import { useReportSelection } from '@/components/analysis/report-selection'
+import { anomalyKey } from '@/lib/finding-key'
 import type { Analysis, DetectedAnomaly, ParsedTransaction } from '@/domain'
 
 interface Props {
@@ -79,7 +81,18 @@ function getClaimInstructions(type: string): string {
   }
 }
 
-export default function DownloadReportButton({ analysis, anomalies, transactions }: Props) {
+export default function DownloadReportButton({
+  analysis: baseAnalysis,
+  anomalies: allAnomalies,
+  transactions,
+}: Props) {
+  const selection = useReportSelection()
+  const anomalies = allAnomalies.filter((anomaly) => selection.isSelected(anomalyKey(anomaly)))
+  const selectedTotal = anomalies.reduce(
+    (sum, anomaly) => sum + Math.abs(anomaly.recoverableAmount),
+    0
+  )
+  const analysis = { ...baseAnalysis, recoverable_amount: selectedTotal }
   const [loading, setLoading] = useState(false)
   const [format, setFormat] = useState<'pdf' | 'docx' | 'html'>('pdf')
 
@@ -307,9 +320,14 @@ ${cobroCards}
         <option value="docx">Word (DOCX)</option>
         <option value="html">HTML</option>
       </select>
-      <Button onClick={handleDownload} disabled={loading} variant="default" size="default">
+      <Button
+        onClick={handleDownload}
+        disabled={loading || anomalies.length === 0}
+        variant="default"
+        size="default"
+      >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileDown className="h-4 w-4" aria-hidden="true" />}
-        Descargar carta
+        Descargar carta ({anomalies.length})
       </Button>
     </div>
   )

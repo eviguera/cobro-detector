@@ -26,6 +26,8 @@ import { FindingsExplorer } from '@/components/analysis/findings-explorer'
 import { RecoveryPlan } from '@/components/analysis/recovery-plan'
 import { TypeBreakdown } from '@/components/analysis/type-breakdown'
 import { ClaimTracker, type ClaimRow } from '@/components/analysis/claim-tracker'
+import { ReportSelectionProvider } from '@/components/analysis/report-selection'
+import { findingKey } from '@/lib/finding-key'
 import { TransactionsTable } from '@/components/analysis/transactions-table'
 
 import DownloadReportButton from './download-report-button'
@@ -72,6 +74,8 @@ export default async function AnalysisDetailPage({ params }: Props) {
     bank: analysis.bank,
     hasAiSummary: Boolean(analysis.ai_summary),
   })
+
+  const anomalyKeys = insights.findings.map(findingKey)
 
   const reportUnlocked =
     analysis.status === 'completed' ||
@@ -176,7 +180,8 @@ export default async function AnalysisDetailPage({ params }: Props) {
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <ReportSelectionProvider analysisId={analysis.id} keys={anomalyKeys}>
+      <div className="animate-fade-in space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Link href="/historial" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
@@ -310,7 +315,11 @@ export default async function AnalysisDetailPage({ params }: Props) {
             <TypeBreakdown groups={insights.groups} />
           </div>
 
-          <ClaimTracker analysisId={analysis.id} initial={claim} />
+          <ClaimTracker
+            analysisId={analysis.id}
+            initial={claim}
+            title={`${analysis.file_name} · ${analysis.bank ?? 'Banco'}`}
+          />
 
           <div className="flex items-start gap-2.5 rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
             <Building2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -371,6 +380,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
           No almacenamos el contenido original de la cartola, solo los datos del análisis.
         </p>
       </details>
-    </div>
+      </div>
+    </ReportSelectionProvider>
   )
 }
