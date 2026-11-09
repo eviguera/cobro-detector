@@ -42,7 +42,7 @@ npm run build         # Build de producción
   - No hay cliente separado para middleware; `src/middleware.ts` usa `createServerClient` directamente.
 - **Middleware** (`src/middleware.ts`): solo protege rutas de página (`/dashboard`, `/analisis`, `/historial`, `/precios`). Sin API routes.
 - **Configuración**: `opencode.json` con plugin `superpowers` + `.mcp.json`.
-- **Deploy**: Vercel desde `frontend/` (rootDirectory configurado). Framework: nextjs.
+- **Deploy**: Vercel proyecto `cobro-detector` con **Root Directory = `frontend`**, framework `nextjs`, build `npm run build`, output `.next`. El `vercel.json` de la raíz debe reflejar lo mismo; si el proyecto vuelve a root `.`, el build falla en 0 ms porque el `package.json` raíz no tiene build.
 - **Tailwind CSS** con `darkMode: ['class']`, variables CSS para temas. Fuentes: Archivo, Bricolage Grotesque, JetBrains Mono.
 - **Design system v2 ("ledger")**: tokens semánticos en `src/app/globals.css` (`--background`, `--card`, `--border`, `--success-*`, `--warning-*`, `--danger-*`). Regla de PR: **no usar `text-gray-300/400/500` para texto**; usar `text-muted-foreground`, `text-foreground`, `text-success-*`, etc. Objetivo: 0 violaciones `color-contrast` en axe (WCAG 2.2 AA).
 - **Librerías open-source integradas** (todas >10k estrellas en GitHub): `recharts` (gráficos), `@radix-ui/react-tabs` + `@radix-ui/react-tooltip` + `@radix-ui/react-dialog` (interacción accesible), `cmdk` (command palette ⌘K). `lucide-react`, `sonner`, `next-themes`, `tailwind-merge` ya estaban.
