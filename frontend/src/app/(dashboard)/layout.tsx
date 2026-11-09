@@ -40,40 +40,40 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userInitial={(profile?.full_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
       />
 
-      <aside className="fixed z-30 hidden h-full w-64 flex-col border-r border-border bg-card/85 backdrop-blur-xl lg:flex">
+      <aside className="sidebar-dark fixed z-30 hidden h-full w-64 flex-col border-r border-border bg-background lg:flex">
         <div className="border-b border-border p-5">
           <Link href="/dashboard" className="group flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary shadow-sm transition-transform duration-300 group-hover:scale-105">
               <Shield className="h-4 w-4 text-primary-foreground" aria-hidden="true" />
             </div>
             <div>
-              <span className="block text-sm font-semibold tracking-tight text-foreground">CobroDetector</span>
-              <p className="text-2xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Panel</p>
+              <span className="block font-display text-lg leading-none tracking-tight text-foreground">CobroDetector</span>
+              <p className="mt-1 font-mono text-[9px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Auditoría de cartolas</p>
             </div>
           </Link>
         </div>
 
-        <div className="mx-3 mt-4 rounded-2xl border border-brand-200/70 bg-brand-50/70 p-4 dark:border-brand-500/20 dark:bg-brand-500/10">
-          <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700 dark:text-brand-300">
+        <div className="mx-3 mt-5 rounded-xl border border-border bg-card/60 p-4">
+          <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Créditos
           </p>
           <div className="mt-1 flex items-end justify-between">
-            <p className="font-display text-3xl font-semibold tabular-nums text-brand-700 dark:text-brand-200">
+            <p className="font-display text-4xl tabular-nums text-foreground">
               {creditsLeft}
             </p>
-            <p className="pb-1 text-2xs text-brand-700/70 dark:text-brand-300/70">de {credits?.total ?? 0}</p>
+            <p className="pb-1 font-mono text-[10px] text-muted-foreground">de {credits?.total ?? 0}</p>
           </div>
           {creditsLeft === 0 ? (
             <Link
               href="/precios"
-              className="mt-2 inline-flex items-center gap-1 text-2xs font-semibold text-brand-700 hover:underline dark:text-brand-300"
+              className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
             >
               <Sparkles className="h-3 w-3" aria-hidden="true" />
               Comprar créditos
               <ChevronRight className="h-3 w-3" aria-hidden="true" />
             </Link>
           ) : (
-            <p className="mt-2 text-2xs text-brand-700/70 dark:text-brand-300/70">
+            <p className="mt-2 font-mono text-[10px] text-muted-foreground">
               Disponibles para analizar
             </p>
           )}
@@ -81,7 +81,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
         <SidebarNav />
 
-        <div className="mt-2 px-3">
+        <div className="mt-auto px-3">
           <CommandMenuTrigger />
         </div>
 
@@ -89,9 +89,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <ThemeToggle />
         </div>
 
-        <div className="border-t border-border p-4">
+        <div className="mt-2 border-t border-border p-4">
           <div className="mb-3 flex items-center gap-3 px-1">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-600">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <span className="text-sm font-bold text-white">
                 {(profile?.full_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
               </span>

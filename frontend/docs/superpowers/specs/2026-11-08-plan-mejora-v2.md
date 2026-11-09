@@ -50,6 +50,7 @@ El rediseño v2 dejó una base sólida (0 violaciones axe, flujo E2E real, motor
 - ✅ Fase 3 (parcial): selección de hallazgos para la carta, descarga filtrada, evidencia en PDF/DOCX y recordatorio `.ics` a 10 días hábiles.
 - ✅ Recordatorio automático por email: `POST /v1/claim-reminders/run` en notification-svc, protegido con `x-cron-secret`; envía una sola vez a los 10 días hábiles y marca `reminder_sent_at`.
 - ✅ Canales de reclamo por banco (Santander, BCI, Chile, Estado, Itaú, Scotiabank, Security, Falabella, Ripley) en el plan y en la carta.
+- ✅ Pase visual "expediente editorial": Instrument Serif + Archivo + JetBrains, papel cálido, tinta profunda, sidebar oscuro, sellos y tabs editoriales. axe sigue en 0.
 
 ### Deuda crítica visible
 

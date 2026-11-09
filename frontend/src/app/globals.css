@@ -15,26 +15,32 @@
 
 @layer base {
   :root {
-    --background: 45 24% 97%;
-    --foreground: 220 14% 9%;
-    --card: 0 0% 100%;
-    --card-foreground: 220 14% 9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 14% 9%;
-    --primary: 226 76% 48%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 45 14% 94%;
-    --secondary-foreground: 220 14% 12%;
-    --muted: 45 14% 94%;
-    --muted-foreground: 220 7% 42%;
-    --accent: 226 76% 96%;
-    --accent-foreground: 226 76% 34%;
-    --destructive: 0 72% 47%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 42 13% 88%;
-    --input: 42 13% 86%;
-    --ring: 226 76% 48%;
-    --radius: 0.875rem;
+    --background: 40 32% 95%;
+    --foreground: 222 38% 11%;
+    --card: 42 40% 98%;
+    --card-foreground: 222 38% 11%;
+    --popover: 42 40% 98%;
+    --popover-foreground: 222 38% 11%;
+    --primary: 226 66% 38%;
+    --primary-foreground: 42 40% 98%;
+    --secondary: 38 24% 90%;
+    --secondary-foreground: 222 32% 15%;
+    --muted: 38 24% 90%;
+    --muted-foreground: 220 9% 36%;
+    --accent: 226 52% 92%;
+    --accent-foreground: 226 66% 30%;
+    --destructive: 0 65% 42%;
+    --destructive-foreground: 42 40% 98%;
+    --border: 36 18% 82%;
+    --input: 36 18% 79%;
+    --ring: 226 66% 38%;
+    --radius: 0.75rem;
+
+    /* Tinta, papel y reglas del "expediente" */
+    --paper: 40 32% 95%;
+    --ink: 222 38% 11%;
+    --rule: 36 18% 82%;
+    --stamp: 0 65% 42%;
 
     /* Marca */
     --brand-50: #eef3ff;
@@ -81,10 +87,10 @@
     --surface-raised: 0 0% 100%;
 
     /* Tipografía — los nombres deben coincidir con tailwind.config.ts */
-    --font-bricolage: 'Bricolage Grotesque';
+    --font-instrument: 'Instrument Serif';
     --font-archivo: 'Archivo';
     --font-jetbrains: 'JetBrains Mono';
-    --font-display: var(--font-bricolage), system-ui, sans-serif;
+    --font-display: var(--font-instrument), Georgia, serif;
     --font-body: var(--font-archivo), system-ui, sans-serif;
     --font-mono: var(--font-jetbrains), 'SF Mono', monospace;
 
@@ -170,6 +176,9 @@
 
   body {
     @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(hsl(var(--ink) / 0.028) 0.65px, transparent 0.65px);
+    background-size: 4px 4px;
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -178,8 +187,8 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    letter-spacing: -0.025em;
-    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-weight: 400;
   }
 
   .font-mono, .tabular-nums {
@@ -195,6 +204,26 @@
    ========================================================================== */
 
 @layer components {
+  /* Superficie oscura del sidebar: reutiliza los mismos tokens para que
+     SidebarNav/ThemeToggle/LogoutButton no necesiten variantes propias. */
+  .sidebar-dark {
+    --background: 222 38% 9%;
+    --foreground: 40 26% 94%;
+    --card: 222 30% 13%;
+    --card-foreground: 40 26% 94%;
+    --muted: 222 20% 17%;
+    --muted-foreground: 40 12% 68%;
+    --secondary: 222 20% 17%;
+    --secondary-foreground: 40 26% 94%;
+    --border: 222 16% 22%;
+    --input: 222 16% 24%;
+    --accent: 224 40% 20%;
+    --accent-foreground: 40 26% 94%;
+    --primary: 224 78% 68%;
+    --primary-foreground: 222 38% 9%;
+    --ring: 224 78% 68%;
+  }
+
   /* Etiqueta superior de sección: mono, mayúsculas, tracking amplio. */
   .eyebrow {
     @apply font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground;
@@ -213,6 +242,52 @@
   .surface-muted {
     @apply rounded-2xl border border-border bg-secondary/60;
     box-shadow: var(--shadow-inset-line);
+  }
+
+  /* Expediente: papel con borde de tinta y sombra profunda pero contenida. */
+  .dossier {
+    @apply rounded-xl border border-border bg-card;
+    box-shadow:
+      0 1px 0 hsl(var(--ink) / 0.04),
+      0 24px 48px -32px hsl(var(--ink) / 0.35);
+  }
+
+  .dossier-rule {
+    border-top: 1px solid hsl(var(--rule) / 0.9);
+  }
+
+  /* Sello editorial: se usa con moderación en el hero y el expediente. */
+  .stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1.5px solid currentColor;
+    border-radius: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transform: rotate(-2.5deg);
+    opacity: 0.85;
+  }
+
+  .section-index {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .ruled {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 27px,
+      hsl(var(--rule) / 0.55) 28px
+    );
   }
 
   /* Cifras: siempre mono + tabular para que las columnas no bailen. */

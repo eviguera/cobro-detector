@@ -105,7 +105,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-archivo)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-bricolage)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-instrument)', 'Georgia', 'serif'],
         mono: ['var(--font-jetbrains)', 'SF Mono', 'monospace'],
       },
       fontSize: {

@@ -204,10 +204,11 @@ export default async function AnalysisDetailPage({ params }: Props) {
 
       {/* Monto + prioridad */}
       <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 sm:p-7">
+        <div className="dossier relative overflow-hidden p-6 pl-7 sm:p-7 sm:pl-8">
+          <span className={`absolute inset-y-0 left-0 w-1 ${insights.priority === 'alta' ? 'bg-danger-500' : insights.priority === 'media' ? 'bg-warning-500' : 'bg-success-500'}`} aria-hidden="true" />
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="eyebrow">Monto recuperable</p>
+              <div className="flex items-center justify-between gap-3"><p className="eyebrow">Monto recuperable</p>{insights.priority === 'alta' ? <span className="stamp text-danger-600 dark:text-danger-500">Prioridad alta</span> : null}</div>
               <p className="num-display mt-2 text-[2.5rem] font-semibold leading-none tracking-tight text-foreground sm:text-[2.9rem]">
                 {formatCLP(insights.recoverable)}
               </p>
@@ -256,7 +257,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="dossier p-6">
           <PriorityGauge
             confidence={insights.confidence}
             confidenceLabel={insights.confidenceLabel}

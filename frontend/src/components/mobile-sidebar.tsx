@@ -83,7 +83,7 @@ export function MobileSidebar({ creditsLeft, creditsTotal, userName, userEmail, 
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-card/90 px-3 backdrop-blur-xl lg:hidden">
+      <header className="sidebar-dark fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur-xl lg:hidden">
         <button
           ref={triggerRef}
           onClick={() => setOpen(true)}

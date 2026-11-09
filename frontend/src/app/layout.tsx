@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Archivo, Bricolage_Grotesque, JetBrains_Mono } from 'next/font/google'
+import { Archivo, Instrument_Serif, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from 'next-themes'
@@ -12,10 +12,12 @@ const archivo = Archivo({
   variable: '--font-archivo',
 })
 
-const bricolage = Bricolage_Grotesque({
+const instrument = Instrument_Serif({
   subsets: ['latin'],
+  weight: '400',
+  style: ['normal', 'italic'],
   display: 'swap',
-  variable: '--font-bricolage',
+  variable: '--font-instrument',
 })
 
 const jetbrains = JetBrains_Mono({
@@ -67,8 +69,8 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f6f7fb' },
-    { media: '(prefers-color-scheme: dark)', color: '#0a0b10' },
+    { media: '(prefers-color-scheme: light)', color: '#f6f4ee' },
+    { media: '(prefers-color-scheme: dark)', color: '#0c1018' },
   ],
 }
 
@@ -79,7 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="es-CL"
       suppressHydrationWarning
-      className={`${archivo.variable} ${bricolage.variable} ${jetbrains.variable}`}
+      className={`${archivo.variable} ${instrument.variable} ${jetbrains.variable}`}
     >
       <head>
         {supabaseUrl && (

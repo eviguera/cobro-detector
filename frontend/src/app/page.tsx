@@ -96,13 +96,19 @@ export default function LandingPage() {
       </a>
 
       {/* NAV */}
-      <header className="site-header sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-xl">
-        <nav aria-label="Principal" className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
+      <header className="site-header sticky top-0 z-40 border-b border-border/70 bg-background/90 backdrop-blur-xl">
+        <div className="hidden border-b border-border/60 md:block">
+          <div className="mx-auto flex h-7 max-w-6xl items-center justify-between px-6 font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            <span>CobroDetector · Informe financiero</span>
+            <span>Chile · {new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+          </div>
+        </div>
+        <nav aria-label="Principal" className="mx-auto flex h-[68px] max-w-6xl items-center justify-between px-5 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5" aria-label="CobroDetector, inicio">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary shadow-sm">
               <Shield className="h-4 w-4 text-primary-foreground" aria-hidden="true" />
             </span>
-            <span className="font-display text-[15px] font-semibold tracking-tight">CobroDetector</span>
+            <span className="font-display text-xl tracking-tight">CobroDetector</span>
           </Link>
 
           <div className="hidden items-center gap-1 md:flex">
@@ -131,7 +137,7 @@ export default function LandingPage() {
             </Link>
             <Link
               href="/login?mode=signup"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Comenzar
               <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -148,14 +154,14 @@ export default function LandingPage() {
 
           <div className="relative mx-auto grid max-w-6xl gap-12 px-5 pb-16 pt-14 sm:px-6 sm:pt-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:pb-24">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:border-brand-500/25 dark:bg-brand-500/10 dark:text-brand-300">
-                <Banknote className="h-3.5 w-3.5" aria-hidden="true" />
-                Para pymes y emprendedores chilenos
+              <div className="stamp text-primary">
+                <Banknote className="h-3 w-3" aria-hidden="true" />
+                Auditoría de cartolas · Pymes Chile
               </div>
 
-              <h1 className="mt-5 text-balance text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
+              <h1 className="mt-7 max-w-xl text-balance font-display text-[3.2rem] leading-[0.96] tracking-tight sm:text-[4rem] lg:text-[4.6rem]">
                 Tu banco te puede estar cobrando de más.
-                <span className="mt-1 block text-brand-600 dark:text-brand-400">Recupéralo con evidencia.</span>
+                <span className="mt-2 block italic text-primary">Recupéralo con evidencia.</span>
               </h1>
 
               <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
@@ -166,14 +172,14 @@ export default function LandingPage() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Link
                   href="/login?mode=signup"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90"
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90"
                 >
                   Analizar mi estado de cuenta
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
                 <a
                   href="#como-funciona"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-transparent px-6 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-card"
                 >
                   Ver cómo funciona
                 </a>
@@ -193,7 +199,7 @@ export default function LandingPage() {
                   <div key={stat.label}>
                     <dt className="sr-only">{stat.label}</dt>
                     <dd>
-                      <p className="font-display text-2xl font-semibold tracking-tight">{stat.value}</p>
+                      <p className="font-display text-3xl tracking-tight">{stat.value}</p>
                       <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{stat.label}</p>
                     </dd>
                   </div>
@@ -203,9 +209,13 @@ export default function LandingPage() {
             </div>
 
             {/* Mock del reporte */}
-            <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-              <div className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-lift">
-                <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div className="relative mx-auto w-full max-w-md lg:max-w-none lg:rotate-[1.2deg]">
+              <div className="absolute -top-3 left-8 z-10 rounded-t-md bg-primary px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-primary-foreground">
+                Expediente confidencial
+              </div>
+              <div className="dossier relative overflow-hidden rounded-b-xl rounded-t-none">
+                <span className="stamp absolute right-4 top-16 z-10 hidden text-danger-600 sm:inline-flex">Prioridad alta</span>
+                <div className="flex items-center justify-between border-b border-border/80 px-5 py-4">
                   <div className="flex items-center gap-2.5">
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-danger-50 text-danger-600 dark:bg-danger-500/15 dark:text-danger-500">
                       <FileSearch className="h-4 w-4" aria-hidden="true" />
@@ -215,14 +225,11 @@ export default function LandingPage() {
                       <p className="text-2xs text-muted-foreground">Banco Santander · 312 movimientos</p>
                     </div>
                   </div>
-                  <span className="rounded-full border border-warning-200 bg-warning-50 px-2 py-0.5 text-2xs font-semibold text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/15 dark:text-warning-500">
-                    Prioridad alta
-                  </span>
                 </div>
 
                 <div className="p-5">
                   <p className="eyebrow">Monto recuperable estimado</p>
-                  <p className="mt-1 font-display text-4xl font-semibold tracking-tight tabular-nums">$487.300</p>
+                  <p className="mt-1 font-display text-5xl tracking-tight tabular-nums">$487.300</p>
 
                   <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                     {[
@@ -247,7 +254,7 @@ export default function LandingPage() {
                     ].map((finding) => (
                       <div
                         key={finding.title}
-                        className="flex items-center gap-2.5 rounded-xl border border-border px-3 py-2.5"
+                        className="flex items-center gap-2.5 border-b border-border/70 py-2.5 last:border-b-0"
                       >
                         <span className={`h-6 w-1 shrink-0 rounded-full ${
                           finding.tone === 'danger'
@@ -265,9 +272,9 @@ export default function LandingPage() {
                     ))}
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between rounded-xl bg-success-50 px-3 py-2.5 dark:bg-success-500/10">
+                  <div className="mt-4 flex items-center justify-between border-t border-success-600/30 pt-3">
                     <p className="text-xs font-medium text-success-700 dark:text-success-500">Reporte listo para el banco</p>
-                    <span className="rounded-lg bg-success-600 px-2.5 py-1 text-2xs font-semibold text-white">
+                    <span className="rounded-sm bg-success-600 px-2.5 py-1 text-2xs font-semibold text-white">
                       Descargar
                     </span>
                   </div>
@@ -303,17 +310,17 @@ export default function LandingPage() {
 
         {/* CÓMO FUNCIONA */}
         <section id="como-funciona" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="eyebrow text-brand-600 dark:text-brand-400">Cómo funciona</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">De la cartola al reclamo en tres pasos</h2>
+          <div className="max-w-2xl">
+            <p className="section-index">01 / Cómo funciona</p>
+            <h2 className="mt-3 font-display text-4xl tracking-tight sm:text-5xl">De la cartola al reclamo en tres pasos</h2>
             <p className="mt-3 text-muted-foreground">
               Sin planillas, sin revisar 300 movimientos a mano y sin adivinar qué cobro es incorrecto.
             </p>
           </div>
 
-          <ol className="mt-12 grid gap-6 md:grid-cols-3">
+          <ol className="mt-10 grid gap-5 md:grid-cols-3">
             {STEPS.map((step, index) => (
-              <li key={step.title} className="relative rounded-2xl border border-border bg-card p-6 shadow-card">
+              <li key={step.title} className="relative rounded-lg border border-border bg-card p-6">
                 <span className="absolute right-5 top-5 font-mono text-xs font-semibold text-muted-foreground/50">
                   0{index + 1}
                 </span>
@@ -332,8 +339,8 @@ export default function LandingPage() {
           <div className="mx-auto max-w-6xl px-5 sm:px-6">
             <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
               <div>
-                <p className="eyebrow text-brand-600 dark:text-brand-400">Qué detectamos</p>
-                <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+                <p className="section-index">02 / Qué detectamos</p>
+                <h2 className="mt-3 font-display text-4xl tracking-tight sm:text-5xl">
                   Los errores que más plata te cuestan
                 </h2>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -417,9 +424,9 @@ export default function LandingPage() {
 
         {/* PRECIOS */}
         <section id="precios" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="eyebrow text-brand-600 dark:text-brand-400">Precios</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Pago por análisis, sin suscripción</h2>
+          <div className="max-w-2xl">
+            <p className="section-index">03 / Precios</p>
+            <h2 className="mt-3 font-display text-4xl tracking-tight sm:text-5xl">Pago por análisis, sin suscripción</h2>
             <p className="mt-3 text-muted-foreground">Los créditos no vencen. Elige según cuántas cartolas revises.</p>
           </div>
 
@@ -488,16 +495,16 @@ export default function LandingPage() {
         {/* FAQ */}
         <section id="faq" className="border-t border-border bg-surface-muted/40 scroll-mt-20 py-20">
           <div className="mx-auto max-w-3xl px-5 sm:px-6">
-            <div className="text-center">
-              <p className="eyebrow text-brand-600 dark:text-brand-400">Preguntas frecuentes</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight">Lo que suelen preguntarnos</h2>
+            <div className="max-w-2xl">
+              <p className="section-index">04 / Preguntas frecuentes</p>
+              <h2 className="mt-3 font-display text-4xl tracking-tight">Lo que suelen preguntarnos</h2>
             </div>
 
             <div className="mt-8 space-y-3">
               {FAQ.map((item) => (
                 <details
                   key={item.q}
-                  className="group rounded-2xl border border-border bg-card px-5 py-4 shadow-card [&_summary::-webkit-details-marker]:hidden"
+                  className="group rounded-lg border border-border bg-card px-5 py-4 [&_summary::-webkit-details-marker]:hidden"
                 >
                   <summary className="flex cursor-pointer items-center justify-between gap-4 text-sm font-semibold">
                     {item.q}
@@ -515,18 +522,18 @@ export default function LandingPage() {
 
         {/* CTA FINAL */}
         <section className="mx-auto max-w-6xl px-5 py-20 sm:px-6">
-          <div className="relative overflow-hidden rounded-3xl border border-brand-200 bg-brand-50 px-6 py-12 text-center dark:border-brand-500/25 dark:bg-brand-500/10 sm:px-12">
+          <div className="relative overflow-hidden rounded-lg border border-foreground/15 bg-foreground px-6 py-14 text-center text-background sm:px-12">
             <div className="pointer-events-none absolute inset-0 grid-backdrop opacity-40" aria-hidden="true" />
             <div className="relative">
-              <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              <h2 className="mx-auto max-w-2xl font-display text-4xl tracking-tight sm:text-5xl">
                 Descubre en 3 minutos si te están cobrando de más
               </h2>
-              <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground sm:text-base">
+              <p className="mx-auto mt-3 max-w-lg text-sm text-background/65 sm:text-base">
                 Sube tu cartola, revisa los hallazgos y descarga el reporte con la evidencia.
               </p>
               <Link
                 href="/login?mode=signup"
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90"
+                className="mt-7 inline-flex items-center gap-2 rounded-md bg-background px-6 py-3.5 text-sm font-semibold text-foreground transition-all duration-200 hover:-translate-y-0.5"
               >
                 Empezar ahora
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
