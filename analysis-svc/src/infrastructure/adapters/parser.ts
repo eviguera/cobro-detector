@@ -81,7 +81,10 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
     throw new Error('Formato .xls no soportado. Guarda el archivo como .xlsx o CSV.')
   }
 
-  const ExcelJS = await import('exceljs')
+  // exceljs es un paquete CJS: bajo Node ESM el namespace de `import()` expone la
+  // librería en `.default`, no en la raíz (ahí `ExcelJS.Workbook` es undefined).
+  const exceljsNamespace = await import('exceljs')
+  const ExcelJS = exceljsNamespace.default ?? exceljsNamespace
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer as unknown as ArrayBuffer)
 

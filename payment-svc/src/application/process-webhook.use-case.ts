@@ -38,7 +38,13 @@ export class ProcessWebhookUseCase {
     if (!externalRef) throw new Error('Sin referencia externa')
 
     if (externalRef.startsWith('unlock_')) {
-      const analysisId = externalRef.replace('unlock_', '')
+      // Solo un pago APROBADO libera el reporte: MercadoPago también notifica
+      // pending/rejected, y antes cualquiera de esos eventos desbloqueaba.
+      if (paymentStatus.status !== 'approved') {
+        return { received: true, unlock: false, status: paymentStatus.status }
+      }
+      const analysisId = externalRef.slice('unlock_'.length)
+      if (!this.uuidRegex.test(analysisId)) throw new Error('externalRef inválido')
       await this.analysisRepo.markCompleted(analysisId)
       return { received: true, unlock: true, analysisId }
     }
@@ -61,21 +67,30 @@ export class ProcessWebhookUseCase {
   ) {
     const orderStatus = status === 'approved' ? 'paid' : status === 'rejected' ? 'failed' : 'pending'
 
-    // HARDENED (2026-11): solo actualizar si la orden no está ya pagada/fallida.
-    // Evita doble acreditación si llegan webhooks duplicados de MercadoPago.
-    if (order.status === 'paid' || order.status === 'failed') {
+    // Solo 'paid' es terminal. Antes también se descartaba 'failed', así que un
+    // segundo intento aprobado sobre la misma preferencia cobraba sin acreditar.
+    if (order.status === 'paid') {
       return
     }
 
+    if (status === 'approved') {
+      // Cas atómico: la orden pasa a 'paid' y los créditos se acreditan en la
+      // misma transacción. Si la acreditación falla, la excepción sube y la
+      // orden NO queda 'paid' (MercadoPago reintenta).
+      await this.orderRepo.confirmPaid(order.id, {
+        mpPaymentId: String(paymentId),
+        mpStatus: status,
+        mpDetail: statusDetail ?? null,
+      }, order.status)
+      return
+    }
+
+    // Estados no aprobados: no hay créditos que acreditar, basta el CAS.
     await this.orderRepo.updateStatus(order.id, {
       status: orderStatus,
       mp_payment_id: String(paymentId),
       mp_status: status ?? null,
       mp_detail: statusDetail ?? null,
-    })
-
-    if (status === 'approved') {
-      await this.creditRepo.addCredits(order.user_id, order.credits_purchased)
-    }
+    }, order.status)
   }
 }

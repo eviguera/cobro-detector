@@ -45,14 +45,14 @@ export default async function AnalysisDetailPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: analysisData } = await supabase
-    .from('analyses')
-    .select('*')
-    .eq('id', params.id)
-    .eq('user_id', user.id)
-    .single()
+  // La base aplica el paywall: get_analysis_report no devuelve
+  // anomalies/raw_data/ai_summary mientras el reporte esté bloqueado, y nunca
+  // devuelve las llaves de cifrado.
+  const { data: analysisData } = await supabase.rpc('get_analysis_report', {
+    p_analysis_id: params.id,
+  })
 
-  const analysis = analysisData as Analysis | null
+  const analysis = analysisData as unknown as Analysis | null
   if (!analysis) notFound()
 
   const { data: claimData } = await supabase

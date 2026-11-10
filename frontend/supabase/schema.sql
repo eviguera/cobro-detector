@@ -614,7 +614,7 @@ AS $$
 BEGIN
   RETURN internal.consume_credit(auth.uid(), p_company_id);
 END;
-$$ LANGUAGE plpgsql SECURITY INVOKER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- can_access_company (core: SECURITY DEFINER en schema privado)
 CREATE OR REPLACE FUNCTION internal.can_access_company(company_uuid UUID)
@@ -637,7 +637,7 @@ AS $$
 BEGIN
   RETURN internal.can_access_company(company_uuid);
 END;
-$$ LANGUAGE plpgsql SECURITY INVOKER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION cleanup_old_api_logs()
 RETURNS void
@@ -662,13 +662,54 @@ GRANT EXECUTE ON FUNCTION public.verify_api_key(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.consume_credit(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.can_access_company(UUID) TO authenticated;
 
--- Funciones internas (accesibles desde wrappers públicos)
-GRANT EXECUTE ON FUNCTION internal.consume_credit(UUID, UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION internal.verify_api_key(TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION internal.can_access_company(UUID) TO authenticated;
+-- Funciones internas: NUNCA ejecutables por el usuario final (los wrappers
+-- públicos son SECURITY DEFINER y corren como el owner).
+REVOKE EXECUTE ON FUNCTION internal.consume_credit(UUID, UUID) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION internal.verify_api_key(TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION internal.can_access_company(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION internal.consume_credit(UUID, UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION internal.verify_api_key(TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION internal.can_access_company(UUID) TO service_role;
 
 -- handle_new_user es solo para el trigger, no debe ser ejecutable por usuarios
 REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated;
+
+-- Acreditación atómica de créditos (usada por payment-svc al confirmar pagos).
+-- Antes el adapter hacía read-modify-write: dos acreditaciones concurrentes
+-- leían el mismo total y una pisaba a la otra (el usuario pagaba sin recibir
+-- créditos). Esta función incrementa en una sola sentencia y serializa por
+-- usuario con un advisory lock.
+CREATE OR REPLACE FUNCTION public.add_credits(p_user_id UUID, p_amount INTEGER)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF p_amount IS NULL OR p_amount = 0 THEN
+    RETURN;
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_user_id::text, 0));
+
+  UPDATE credits
+     SET total = total + p_amount, updated_at = NOW()
+   WHERE id = (
+     SELECT id FROM credits
+      WHERE user_id = p_user_id AND company_id IS NULL
+      ORDER BY created_at, id
+      LIMIT 1
+   );
+
+  IF NOT FOUND THEN
+    INSERT INTO credits (user_id, company_id, total, used)
+    VALUES (p_user_id, NULL, p_amount, 0);
+  END IF;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.add_credits(UUID, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.add_credits(UUID, INTEGER) TO service_role;
 
 
 -- =============================================
@@ -777,7 +818,7 @@ CREATE TABLE IF NOT EXISTS referrals (
   referrer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   referred_email TEXT,
   referred_user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  referral_code TEXT NOT NULL UNIQUE,
+  referral_code TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   credits_awarded BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -787,6 +828,8 @@ CREATE TABLE IF NOT EXISTS referrals (
 ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX IF NOT EXISTS idx_referrals_referrer_id ON referrals(referrer_id);
+-- Un código puede usarse varias veces; cada invitado es una fila distinta.
+CREATE UNIQUE INDEX IF NOT EXISTS referrals_referred_user_id_key ON referrals(referred_user_id);
 CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(referral_code);
 CREATE INDEX IF NOT EXISTS idx_referrals_status ON referrals(status);
 
@@ -804,6 +847,15 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE;
 CREATE INDEX IF NOT EXISTS idx_profiles_referral_code ON profiles(referral_code) WHERE referral_code IS NOT NULL;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_profiles_is_admin ON profiles(is_admin) WHERE is_admin = true;
+
+-- HARDENED (2026-11): `profiles_update_own` no restringía columnas, así que
+-- cualquier usuario autenticado podía hacer UPDATE profiles SET is_admin=true
+-- sobre su propia fila. admin-svc lee esa columna con service role, por lo que
+-- la escritura del usuario se convertía en escalada a administrador. También
+-- permitía sobrescribir referral_code ajeno. Se limita el UPDATE a las
+-- columnas de perfil que la UI realmente edita.
+REVOKE UPDATE ON public.profiles FROM authenticated, anon;
+GRANT UPDATE (full_name, business_name, business_type, rut, phone) ON public.profiles TO authenticated;
 
 CREATE OR REPLACE FUNCTION generate_referral_code()
 RETURNS TEXT
@@ -831,19 +883,21 @@ SET search_path = 'public'
 AS $$
 DECLARE
   ref_code TEXT;
-  referrer_id UUID;
+  v_referrer_id UUID;
 BEGIN
   ref_code := NEW.raw_user_meta_data ->> 'referral_code';
   IF ref_code IS NOT NULL AND ref_code != '' THEN
-    SELECT id INTO referrer_id FROM profiles WHERE referral_code = ref_code;
-    IF referrer_id IS NOT NULL AND referrer_id != NEW.id THEN
+    SELECT id INTO v_referrer_id FROM profiles WHERE referral_code = ref_code;
+    IF v_referrer_id IS NOT NULL AND v_referrer_id != NEW.id THEN
       INSERT INTO referrals (referrer_id, referred_email, referred_user_id, referral_code, status, completed_at)
-      VALUES (referrer_id, NEW.email, NEW.id, ref_code, 'completed', NOW());
+      VALUES (v_referrer_id, NEW.email, NEW.id, ref_code, 'completed', NOW());
       UPDATE profiles SET referral_code = generate_referral_code()
       WHERE id = NEW.id AND referral_code IS NULL;
-      UPDATE credits SET total = total + 1 WHERE user_id = referrer_id;
+      UPDATE credits SET total = total + 1 WHERE user_id = v_referrer_id;
+      -- Antes: `WHERE referrer_id = referrer_id` (tautología / ambigüedad
+      -- columna-variable): marcaba filas de cualquier referrer.
       UPDATE referrals SET credits_awarded = true
-      WHERE referrer_id = referrer_id AND referred_user_id = NEW.id;
+      WHERE referrals.referrer_id = v_referrer_id AND referrals.referred_user_id = NEW.id;
     END IF;
   END IF;
   RETURN NEW;

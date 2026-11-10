@@ -1,12 +1,12 @@
 import {
   uploadFileToStorage,
   createAnalysisRecord,
-  consumeCredit,
   deleteAnalysisRecord,
   markAnalysisFailed,
   type UploadResult,
 } from '@/infrastructure/adapters/supabase-storage'
 import { runAnalysis } from '@/infrastructure/http/analysis-api'
+import { ApiError } from '@/infrastructure/http/client'
 import type { AnalysisRunResponse } from '@/domain'
 
 export class NoCreditsError extends Error {
@@ -51,15 +51,6 @@ export async function submitAnalysis(params: SubmitAnalysisParams): Promise<Anal
     upload.encryptionKeyBase64,
   )
 
-  if (!isPlatino) {
-    const consumed = await consumeCredit(userId)
-    if (!consumed) {
-      // No dejar un análisis huérfano en el historial cuando no hay créditos.
-      await deleteAnalysisRecord(analysisId, upload.storagePath).catch(() => {})
-      throw new NoCreditsError()
-    }
-  }
-
   try {
     return await runAnalysis(analysisId, {
       storagePath: upload.storagePath,
@@ -67,6 +58,14 @@ export async function submitAnalysis(params: SubmitAnalysisParams): Promise<Anal
       encryptionKeyBase64: upload.encryptionKeyBase64,
     }, signal)
   } catch (error) {
+    // Sin créditos: el backend responde 402 y no encola nada. Limpiamos el
+    // registro y el archivo para no dejar basura en el historial.
+    if (error instanceof ApiError && error.status === 402) {
+      await markAnalysisFailed(analysisId).catch(() => {})
+      await deleteAnalysisRecord(analysisId, upload.storagePath).catch(() => {})
+      throw new NoCreditsError()
+    }
+
     // En un abort (cancelación o timeout) el backend puede seguir procesando:
     // no marcamos error para no pisar un resultado que sí llegue a guardarse.
     const aborted = error instanceof Error && error.name === 'AbortError'

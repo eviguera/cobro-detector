@@ -1,5 +1,8 @@
 import crypto from 'node:crypto'
-import MercadoPagoConfig, { Payment, Preference } from 'mercadopago'
+// mercadopago v3: `MercadoPagoConfig` debe importarse como export nombrado.
+// El default export ya no es la clase bajo interop CJS/ESM (Node ESM devuelve
+// el objeto del módulo), por lo que `new MercadoPagoConfig(...)` fallaba en runtime.
+import { MercadoPagoConfig, Payment, Preference } from 'mercadopago'
 import type { PaymentGateway, PaymentPreference } from '../../domain/ports/payment-gateway.port'
 
 let mpClient: MercadoPagoConfig | null = null

@@ -23,21 +23,14 @@ export class SupabaseCreditRepositoryAdapter implements CreditRepository {
   }
 
   async addCredits(userId: string, amount: number): Promise<void> {
-    const { data: existing } = await this.supabaseService
-      .from('credits')
-      .select('total, used')
-      .eq('user_id', userId)
-      .single()
+    // Acreditación atómica en base (total = total + amount) con lock por
+    // usuario. Antes era read-modify-write: dos acreditaciones concurrentes
+    // se pisaban y el usuario pagaba sin recibir créditos.
+    const { error } = await this.supabaseService.rpc('add_credits', {
+      p_user_id: userId,
+      p_amount: amount,
+    })
 
-    if (existing) {
-      await this.supabaseService
-        .from('credits')
-        .update({ total: (existing.total as number) + amount })
-        .eq('user_id', userId)
-    } else {
-      await this.supabaseService
-        .from('credits')
-        .insert({ user_id: userId, total: amount, used: 0 })
-    }
+    if (error) throw new Error(`Error adding credits: ${error.message}`)
   }
 }

@@ -17,3 +17,6 @@ frontend/.agents/
 opencode.json
 .bash_history-*
 /tmp/
+
+# Supabase CLI local state
+supabase/.temp/

@@ -112,11 +112,13 @@ export async function createAnalysisRecord(
       storage_path: storagePath ?? null,
       encryption_key_iv: encryptionKeyIv ?? null,
       encryption_key_base64: encryptionKeyBase64 ?? null,
-      // `awaiting_payment` marca el plan Platino desde el inicio: analysis-svc
-      // lo lee antes de ejecutar y decide si debe bloquear el reporte.
-      status: isPlatino ? 'awaiting_payment' : 'processing',
+      // El cliente declara el PLAN, no el estado: `status` lo escribe el worker
+      // con service role (el grant de UPDATE por columna está revocado).
+      plan: isPlatino ? 'platino' : 'credits',
     })
-    .select()
+    // Solo se pide `id`: el resto de columnas no son legibles por el cliente
+    // (grants por columna) y pedir la fila completa devolvería 403.
+    .select('id')
     .single()
 
   if (error || !data) {
@@ -150,36 +152,3 @@ export async function markAnalysisFailed(analysisId: string): Promise<void> {
   await supabase.from('analyses').update({ status: 'error' }).eq('id', analysisId)
 }
 
-export async function consumeCredit(userId: string): Promise<boolean> {
-  const supabase = createClient()
-
-  const { data, error } = await supabase.rpc('consume_credit', {
-    p_company_id: null,
-  })
-
-  if (!error) {
-    return data ?? false
-  }
-
-  const { data: credits } = await supabase
-    .from('credits')
-    .select('total, used')
-    .eq('user_id', userId)
-    .is('company_id', null)
-    .single()
-
-  if (!credits) return false
-
-  const left = (credits.total ?? 0) - (credits.used ?? 0)
-  if (left <= 0) return false
-
-  const { data: updated, error: updateError } = await supabase
-    .from('credits')
-    .update({ used: (credits.used ?? 0) + 1 })
-    .eq('user_id', userId)
-    .eq('used', credits.used ?? 0)
-    .is('company_id', null)
-    .select('user_id')
-
-  return !updateError && (updated?.length ?? 0) > 0
-}

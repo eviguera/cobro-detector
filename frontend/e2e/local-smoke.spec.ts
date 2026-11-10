@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test'
 
-const EMAIL = process.env.TEST_EMAIL || 'test-e2e@cobrodetector.com'
-const PASSWORD = process.env.TEST_PASSWORD || 'Test1234!'
+// Sin credenciales en el repo: se inyectan por entorno (local o secrets de CI).
+const EMAIL = process.env.TEST_EMAIL ?? ''
+const PASSWORD = process.env.TEST_PASSWORD ?? ''
+test.skip(!EMAIL || !PASSWORD, 'TEST_EMAIL / TEST_PASSWORD no configurados')
 
 test.use({ baseURL: process.env.E2E_URL || 'http://localhost:3000' })
 
