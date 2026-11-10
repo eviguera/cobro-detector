@@ -65,7 +65,12 @@ vi.mock('../infrastructure/adapters/supabase-client.js', () => {
         select: vi.fn((_columns: string, _options?: any) => {
           const res = resultForTable(table)
           const promise = Promise.resolve(res)
-          return Object.assign(promise, { eq: vi.fn(() => promise), maybeSingle: vi.fn(() => Promise.resolve({ data: { is_admin: true }, error: null })) })
+          return Object.assign(promise, {
+            eq: vi.fn(() => promise),
+            // /health usa query -> select -> limit antes de resolver.
+            limit: vi.fn(() => promise),
+            maybeSingle: vi.fn(() => Promise.resolve({ data: { is_admin: true }, error: null })),
+          })
         }),
       })),
     })),
