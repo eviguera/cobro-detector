@@ -39,8 +39,15 @@ jobs:
         working-directory: ${{ matrix.service }}
 
       - name: Run tests
-        run: npm test
+        # `--if-present`: api-svc todavía no tiene suite de tests. Sin esto el
+        # job falla con "Missing script: test" y deja el CI en rojo permanente.
+        run: npm test --if-present
         working-directory: ${{ matrix.service }}
+
+      - name: Benchmark del motor de análisis
+        if: matrix.service == 'analysis-svc'
+        run: npm run benchmark -- --strict
+        working-directory: analysis-svc
 
   # -----------------------------------------------------------
   # 2. Tests y build del frontend (Next.js)
@@ -106,7 +113,8 @@ jobs:
   # 4. Tests E2E (Playwright) contra frontend en desarrollo
   # -----------------------------------------------------------
   test-e2e:
-    runs-on: ubuntu-latest
+    # Pin a 24.04: Playwright 1.59.x no soporta instalar deps en ubuntu 26.04 (ubuntu-latest).
+    runs-on: ubuntu-24.04
     needs: [test-frontend]
     steps:
       - uses: actions/checkout@v4
