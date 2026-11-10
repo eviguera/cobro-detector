@@ -62,9 +62,20 @@ function decryptFileAES256GCM(
 ): Buffer {
   const key = Buffer.from(keyBase64, 'base64')
   const iv = Buffer.from(ivBase64, 'base64')
+
+  // Web Crypto (AES-GCM) concatena el tag de autenticación de 16 bytes al
+  // final del ciphertext. Node lo espera separado con setAuthTag(); sin esto
+  // el descifrado falla con "Unsupported state or unable to authenticate data".
+  const TAG_LENGTH = 16
+  if (encrypted.length <= TAG_LENGTH) {
+    throw new Error('Archivo cifrado inválido: contenido demasiado corto')
+  }
+  const ciphertext = encrypted.subarray(0, encrypted.length - TAG_LENGTH)
+  const authTag = encrypted.subarray(encrypted.length - TAG_LENGTH)
+
   const decipher = crypto.createDecipheriv(ENC_ALGORITHM, key, iv)
-  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
-  return decrypted
+  decipher.setAuthTag(authTag)
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()])
 }
 
 // --- Worker de cola (background, no bloquea el servidor HTTP) ---
@@ -79,7 +90,7 @@ async function processJob(job: {
   // Cargar el análisis para conocer user_id, si es plan Platino y los metadatos de cifrado.
   const { data: analysis, error: loadError } = await supabase
     .from('analyses')
-    .select('user_id, status, file_type, file_name, storage_path, encryption_key_iv, encryption_key_base64')
+    .select('user_id, plan, status, file_type, file_name, storage_path, encryption_key_iv, encryption_key_base64')
     .eq('id', job.analysisId)
     .single()
 
@@ -89,7 +100,9 @@ async function processJob(job: {
   }
 
   const userId = analysis.user_id as string
-  const isPlatino = analysis.status === 'awaiting_payment'
+  // El plan declarado al crear el análisis decide el cobro; `status` ya no
+  // lo controla el cliente (grants por columna).
+  const isPlatino = analysis.plan === 'platino'
   const storagePath = analysis.storage_path as string | null
   const encryptionKeyIv = analysis.encryption_key_iv as string | null
   const encryptionKeyBase64 = analysis.encryption_key_base64 as string | null
@@ -147,6 +160,18 @@ async function processJob(job: {
   } catch (error) {
     server.log.error({ err: error, analysisId: job.analysisId }, 'Error procesando análisis en worker')
     await analysisRepo.markError(job.analysisId, userId)
+
+    // Si el análisis se cobró con un crédito, devolverlo: el usuario no debe
+    // pagar por un análisis que falló. El flag credit_consumed_at evita
+    // devoluciones dobles.
+    const { data: refunded, error: refundError } = await supabase.rpc('refund_analysis_credit', {
+      p_analysis_id: job.analysisId,
+    })
+    if (refundError) {
+      server.log.error({ err: refundError, analysisId: job.analysisId }, 'No se pudo devolver el crédito')
+    } else if (refunded === true) {
+      server.log.info({ analysisId: job.analysisId }, 'Crédito devuelto por análisis fallido')
+    }
   } finally {
     // Eliminar el archivo cifrado de Storage SIEMPRE, incluso si falla el procesamiento.
     // Evita archivos huérfanos de estados de cuenta bancarios expuestos en el bucket.

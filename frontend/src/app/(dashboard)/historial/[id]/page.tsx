@@ -1,13 +1,34 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, AlertTriangle, CheckCircle2, Loader2, RotateCcw, Lock, Trash2, ShieldCheck } from 'lucide-react'
+import {
+  ArrowLeft,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  RotateCcw,
+  Lock,
+  Trash2,
+  ShieldCheck,
+  FileText,
+  ClipboardList,
+  Building2,
+  Clock3,
+} from 'lucide-react'
 import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
 import type { DetectedAnomaly, ParsedTransaction, Analysis } from '@/domain'
-import { AnomalyCard } from '@/components/anomaly-card'
-import { SecurityBadge } from '@/components/security-badge'
-import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableHeader, TableBody, TableHeaderCell, TableRow, TableCell } from '@/components/ui/table'
+import { buildAnalysisInsights } from '@/lib/analysis-insights'
+import { Card } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PriorityGauge } from '@/components/analysis/priority-gauge'
+import { FindingsExplorer } from '@/components/analysis/findings-explorer'
+import { RecoveryPlan } from '@/components/analysis/recovery-plan'
+import { TypeBreakdown } from '@/components/analysis/type-breakdown'
+import { ClaimTracker, type ClaimRow } from '@/components/analysis/claim-tracker'
+import { ReportSelectionProvider } from '@/components/analysis/report-selection'
+import { findingKey } from '@/lib/finding-key'
+import { TransactionsTable } from '@/components/analysis/transactions-table'
 
 import DownloadReportButton from './download-report-button'
 import PaywallButton from './paywall-button'
@@ -17,88 +38,97 @@ interface Props {
   params: { id: string }
 }
 
+export const metadata: Metadata = { title: 'Detalle del análisis' }
+
 export default async function AnalysisDetailPage({ params }: Props) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: analysisData } = await supabase
-    .from('analyses')
-    .select('*')
-    .eq('id', params.id)
-    .eq('user_id', user.id)
-    .single()
+  // La base aplica el paywall: get_analysis_report no devuelve
+  // anomalies/raw_data/ai_summary mientras el reporte esté bloqueado, y nunca
+  // devuelve las llaves de cifrado.
+  const { data: analysisData } = await supabase.rpc('get_analysis_report', {
+    p_analysis_id: params.id,
+  })
 
-  const analysis = analysisData as Analysis | null
+  const analysis = analysisData as unknown as Analysis | null
   if (!analysis) notFound()
+
+  const { data: claimData } = await supabase
+    .from('claim_tracking')
+    .select('status, sent_at, response_at, notes')
+    .eq('analysis_id', params.id)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  const claim = claimData as ClaimRow | null
 
   const anomalies = (analysis.anomalies ?? []) as unknown as DetectedAnomaly[]
   const transactions = (analysis.raw_data ?? []) as unknown as ParsedTransaction[]
-  const flaggedIds = new Set(anomalies.flatMap(a => a.transactionRefs))
+  const flaggedIds = Array.from(new Set(anomalies.flatMap((anomaly) => anomaly.transactionRefs)))
 
-  const totalHigh   = anomalies.filter(a => a.severity === 'high').length
-  const totalMedium = anomalies.filter(a => a.severity === 'medium').length
-  const totalLow    = anomalies.filter(a => a.severity === 'low').length
+  const insights = buildAnalysisInsights({
+    anomalies: analysis.anomalies,
+    totalTransactions: analysis.total_transactions,
+    recoverableAmount: analysis.recoverable_amount,
+    bank: analysis.bank,
+    hasAiSummary: Boolean(analysis.ai_summary),
+  })
 
-  // Platino sin monto recuperable no tiene nada que cobrar: el reporte es libre.
+  const anomalyKeys = insights.findings.map(findingKey)
+
   const reportUnlocked =
     analysis.status === 'completed' ||
     (analysis.status === 'awaiting_payment' && (analysis.recoverable_amount ?? 0) <= 0)
 
   if (analysis.status === 'processing' || analysis.status === 'pending') {
     return (
-      <div className="animate-fade-in max-w-2xl">
+      <div className="mx-auto max-w-2xl animate-fade-in">
         <AutoRefresh />
-        <Link href="/historial" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Volver al historial
+        <Link href="/historial" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver al historial
         </Link>
 
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-8 shadow-sm text-center">
-          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Análisis en proceso
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-            Estamos revisando <strong>{analysis.file_name}</strong>. Esta página se actualiza sola.
+        <Card className="p-8 text-center">
+          <span className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+          </span>
+          <h1 className="font-display text-xl font-semibold tracking-tight">Análisis en proceso</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Estamos revisando <strong className="text-foreground">{analysis.file_name}</strong>. Esta página se actualiza sola.
           </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Suele tomar menos de 1 minuto. Puedes volver más tarde desde el historial.
-          </p>
-        </div>
+          <p className="mt-1 text-xs text-muted-foreground">Suele tomar menos de 1 minuto.</p>
+        </Card>
       </div>
     )
   }
 
   if (analysis.status === 'error' || analysis.status === 'failed') {
     return (
-      <div className="animate-fade-in max-w-2xl">
-        <Link href="/historial" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Volver al historial
+      <div className="mx-auto max-w-2xl animate-fade-in">
+        <Link href="/historial" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver al historial
         </Link>
 
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-8 shadow-sm text-center">
-          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-            <AlertTriangle className="w-8 h-8 text-red-500" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            El análisis no se completó
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-            No pudimos procesar <strong>{analysis.file_name}</strong>.
+        <Card className="p-8 text-center">
+          <span className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-50 text-danger-600 dark:bg-danger-500/10 dark:text-danger-500">
+            <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <h1 className="font-display text-xl font-semibold tracking-tight">El análisis no se completó</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            No pudimos procesar <strong className="text-foreground">{analysis.file_name}</strong>.
           </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">
-            El archivo puede estar dañado o el servicio no respondió. Intenta subirlo de nuevo.
+          <p className="mt-1 text-xs text-muted-foreground">
+            El archivo puede estar dañado o el servicio no respondió. No se descontó crédito.
           </p>
           <Link
             href="/analisis"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
+            className="mt-6 inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
             Reintentar análisis
           </Link>
-        </div>
+        </Card>
       </div>
     )
   }
@@ -106,264 +136,252 @@ export default async function AnalysisDetailPage({ params }: Props) {
   if (analysis.status === 'awaiting_payment' && (analysis.recoverable_amount ?? 0) > 0) {
     const pct = Math.round((analysis.recoverable_amount ?? 0) * 0.2)
     return (
-      <div className="animate-fade-in max-w-2xl">
-        <Link href="/historial" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Volver al historial
+      <div className="mx-auto max-w-2xl animate-fade-in">
+        <Link href="/historial" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver al historial
         </Link>
 
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-8 shadow-sm text-center mb-6">
-          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-            <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Reporte bloqueado</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Plan Platino — Pagas solo el 20% de lo que recuperes</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
+        <Card className="p-7 text-center">
+          <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-warning-50 text-warning-600 dark:bg-warning-500/10 dark:text-warning-500">
+            <Lock className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <p className="eyebrow">Plan Platino</p>
+          <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight">Reporte listo para desbloquear</h1>
+          <p className="mt-2 text-xs text-muted-foreground">
             {analysis.file_name} · {analysis.bank ?? 'Banco no detectado'} · {formatDate(analysis.created_at)}
           </p>
-        </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          {[
-            { label: 'Anomalías', value: analysis.anomalies_count, color: 'text-red-600' },
-            { label: 'Monto recuperable', value: formatCLP(analysis.recoverable_amount), color: 'text-green-700', lg: true },
-            { label: '20% a pagar', value: formatCLP(pct), color: 'text-amber-600', lg: true },
-          ].map(m => (
-            <div key={m.label} className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-100 dark:border-gray-800/40 p-4">
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">{m.label}</p>
-              <p className={`font-bold ${m.lg ? 'text-lg' : 'text-xl'} ${m.color}`}>{m.value}</p>
-            </div>
-          ))}
-        </div>
+          <div className="mt-6 grid grid-cols-3 gap-3">
+            {[
+              { label: 'Hallazgos', value: String(analysis.anomalies_count) },
+              { label: 'Recuperable', value: formatCLP(analysis.recoverable_amount) },
+              { label: '20% a pagar', value: formatCLP(pct) },
+            ].map((metric) => (
+              <div key={metric.label} className="rounded-xl border border-border bg-secondary/30 p-3">
+                <p className="eyebrow">{metric.label}</p>
+                <p className="num mt-1.5 text-base font-semibold text-foreground">{metric.value}</p>
+              </div>
+            ))}
+          </div>
 
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-6 shadow-sm">
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-6 text-center">
-            Para desbloquear el reporte completo, realizá el pago del 20% ({formatCLP(pct)}) a través de MercadoPago.
+          <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
+            Paga el 20% de lo recuperado con MercadoPago. El reporte se libera automáticamente al confirmarse el pago.
           </p>
-          <PaywallButton
-            analysisId={params.id}
-            recoverableAmount={analysis.recoverable_amount ?? 0}
-            fileName={analysis.file_name}
-          />
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-3">
-            El reporte se libera automáticamente al acreditarse el pago
-          </p>
-        </div>
+          <div className="mt-5">
+            <PaywallButton
+              analysisId={params.id}
+              recoverableAmount={analysis.recoverable_amount ?? 0}
+              fileName={analysis.file_name}
+            />
+          </div>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="animate-fade-in max-w-4xl">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <Link href="/historial" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Volver al historial
+    <ReportSelectionProvider analysisId={analysis.id} keys={anomalyKeys}>
+      <div className="animate-fade-in space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <Link href="/historial" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver al historial
           </Link>
-          <h1 className="text-2xl font-bold text-foreground">{analysis.file_name}</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            {analysis.bank ?? 'Banco no detectado'} · Analizado el {formatDate(analysis.created_at)}
+          <p className="eyebrow-accent">Expediente</p>
+          <h1 className="mt-2 break-words font-display text-2xl font-semibold tracking-tight sm:text-[1.9rem]">
+            {analysis.file_name}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {analysis.bank ?? 'Banco no detectado'} · Analizado el {formatDate(analysis.created_at)} · {getStatusLabel(analysis.status)}
           </p>
-          {/* Badge de confianza */}
-          <SecurityBadge variant="compact" className="mt-3" />
         </div>
-        {reportUnlocked && (
-          <DownloadReportButton analysis={analysis} anomalies={anomalies} transactions={transactions} />
-        )}
+        {reportUnlocked ? (
+          <div className="shrink-0">
+            <DownloadReportButton analysis={analysis} anomalies={anomalies} transactions={transactions} />
+          </div>
+        ) : null}
       </div>
 
-      {/* Estado de seguridad del análisis */}
-      <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-6 shadow-sm mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
-            Estado de seguridad
-          </h3>
+      {/* Monto + prioridad */}
+      <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
+        <div className="dossier relative overflow-hidden p-6 pl-7 sm:p-7 sm:pl-8">
+          <span className={`absolute inset-y-0 left-0 w-1 ${insights.priority === 'alta' ? 'bg-danger-500' : insights.priority === 'media' ? 'bg-warning-500' : 'bg-success-500'}`} aria-hidden="true" />
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center justify-between gap-3"><p className="eyebrow">Monto recuperable</p>{insights.priority === 'alta' ? <span className="stamp text-danger-600 dark:text-danger-500">Prioridad alta</span> : null}</div>
+              <p className="num-display mt-2 text-[2.5rem] font-semibold leading-none tracking-tight text-foreground sm:text-[2.9rem]">
+                {formatCLP(insights.recoverable)}
+              </p>
+              <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-full bg-danger-50 px-2 py-0.5 font-semibold text-danger-700 dark:bg-danger-500/10 dark:text-danger-500">
+                  {insights.counts.total} hallazgos
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>{insights.counts.high} de prioridad alta</span>
+                {insights.largest ? (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>Mayor: {formatCLP(insights.largest.amount)}</span>
+                  </>
+                ) : null}
+              </p>
+            </div>
+            <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-border bg-secondary/40 text-muted-foreground sm:flex">
+              <FileText className="h-5 w-5" aria-hidden="true" />
+            </span>
+          </div>
+
+          <div className="mt-6 grid grid-cols-3 gap-4 border-t border-border pt-4">
+            <div>
+              <p className="eyebrow">Transacciones</p>
+              <p className="num mt-1 text-lg font-semibold">{analysis.total_transactions}</p>
+            </div>
+            <div>
+              <p className="eyebrow">Alta prioridad</p>
+              <p className="num mt-1 text-lg font-semibold text-danger-600 dark:text-danger-500">{insights.counts.high}</p>
+            </div>
+            <div>
+              <p className="eyebrow">Promedio</p>
+              <p className="num mt-1 text-lg font-semibold">{formatCLP(insights.average)}</p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-start gap-2 rounded-xl border border-border/70 bg-secondary/30 px-3.5 py-3">
+            <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              <strong className="font-semibold text-foreground">{insights.priorityReason}</strong>{" "}
+              {insights.hasDiscrepancy
+                ? 'El monto guardado no coincide exactamente con la suma de hallazgos; revisa el detalle.'
+                : ''}
+            </p>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <div className="dossier p-6">
+          <PriorityGauge
+            confidence={insights.confidence}
+            confidenceLabel={insights.confidenceLabel}
+            priority={insights.priority}
+          />
+          <div className="mt-5 space-y-2.5">
+            {[
+              { label: 'Alta', count: insights.counts.high, bar: 'bg-danger-500' },
+              { label: 'Media', count: insights.counts.medium, bar: 'bg-warning-500' },
+              { label: 'Baja', count: insights.counts.low, bar: 'bg-muted-foreground' },
+            ].map((row) => {
+              const total = Math.max(insights.counts.total, 1)
+              return (
+                <div key={row.label}>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">{row.label}</span>
+                    <span className="num font-semibold text-foreground">{row.count}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+                    <div className={`h-full rounded-full ${row.bar}`} style={{ width: `${(row.count / total) * 100}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      <Tabs defaultValue="resumen">
+        <TabsList>
+          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="hallazgos">
+            Hallazgos <span className="num ml-0.5 text-[11px] text-muted-foreground">({insights.counts.total})</span>
+          </TabsTrigger>
+          <TabsTrigger value="movimientos">
+            Movimientos <span className="num ml-0.5 text-[11px] text-muted-foreground">({transactions.length})</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="resumen" className="space-y-4">
+          <Card className="p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-primary" aria-hidden="true" />
+              <p className="eyebrow">Diagnóstico</p>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-foreground">
+              {analysis.ai_summary ||
+                (insights.counts.total > 0
+                  ? `Se detectaron ${insights.counts.total} cobros que no calzan con una operación válida por ${formatCLP(insights.recoverable)}. Revisa la pestaña Hallazgos para ver la evidencia de cada uno.`
+                  : 'No encontramos cobros injustificados en esta cartola. Revisa los movimientos si quieres validar caso a caso.')}
+            </p>
+          </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <RecoveryPlan steps={insights.actionPlan} bank={analysis.bank} />
+            <TypeBreakdown groups={insights.groups} />
+          </div>
+
+          <ClaimTracker
+            analysisId={analysis.id}
+            initial={claim}
+            title={`${analysis.file_name} · ${analysis.bank ?? 'Banco'}`}
+          />
+
+          <div className="flex items-start gap-2.5 rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+            <Building2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Regulador: Comisión para el Mercado Financiero (CMF) · cmfchile.cl · 800 700 100.
+          </div>
+        </TabsContent>
+
+        <TabsContent value="hallazgos">
+          {insights.findings.length > 0 ? (
+            <FindingsExplorer findings={insights.findings} groups={insights.groups} analysisId={analysis.id} bank={analysis.bank} />
+          ) : (
+            <div className="flex flex-col items-center rounded-2xl border border-success-200 bg-success-50/60 px-6 py-12 text-center dark:border-success-500/25 dark:bg-success-500/5">
+              <CheckCircle2 className="h-8 w-8 text-success-600 dark:text-success-500" aria-hidden="true" />
+              <p className="mt-3 font-display text-base font-semibold text-foreground">Sin cobros injustificados</p>
+              <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                Revisamos {analysis.total_transactions} transacciones y no encontramos duplicados ni irregularidades.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="movimientos">
+          {transactions.length > 0 ? (
+            <TransactionsTable transactions={transactions} flaggedIds={flaggedIds} />
+          ) : (
+            <Card className="p-8 text-center">
+              <p className="text-sm text-muted-foreground">No hay movimientos guardados para este análisis.</p>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Seguridad, al final y colapsada */}
+      <details className="group rounded-2xl border border-border bg-card">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
+          <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <ShieldCheck className="h-4 w-4 text-success-600 dark:text-success-500" aria-hidden="true" />
+            Cómo cuidamos tus datos
+          </span>
+          <span className="text-[11px] text-muted-foreground group-open:hidden">Ver detalle</span>
+          <span className="hidden text-[11px] text-muted-foreground group-open:inline">Ocultar</span>
+        </summary>
+        <div className="grid gap-3 border-t border-border p-5 sm:grid-cols-3">
           {[
-            {
-              title: 'Encriptado',
-              subtitle: 'AES-256',
-              icon: Lock,
-              status: 'Activo',
-              statusColor: 'text-emerald-600 dark:text-emerald-400',
-              cardBg: 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/40',
-              iconBg: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
-            },
-            {
-              title: 'Procesado',
-              subtitle: 'Análisis completo',
-              icon: CheckCircle2,
-              status:
-                analysis.status === 'completed'
-                  ? 'Completado'
-                  : analysis.status === 'processing' || analysis.status === 'pending'
-                    ? 'En proceso'
-                    : analysis.status === 'awaiting_payment'
-                      ? 'Pendiente de pago'
-                      : 'Error',
-              statusColor:
-                analysis.status === 'completed'
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : analysis.status === 'error' || analysis.status === 'failed'
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-amber-600 dark:text-amber-400',
-              cardBg: 'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40',
-              iconBg: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
-            },
-            {
-              title: 'Eliminado',
-              subtitle: 'CSV auto-eliminado',
-              icon: Trash2,
-              status: 'Sí (tras procesar)',
-              statusColor: 'text-amber-600 dark:text-amber-400',
-              cardBg: 'bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/40',
-              iconBg: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
-            },
+            { icon: Lock, title: 'Encriptado', detail: 'AES-256 antes de salir del navegador' },
+            { icon: CheckCircle2, title: 'Procesado', detail: 'Análisis aislado y trazable' },
+            { icon: Trash2, title: 'Eliminado', detail: 'El archivo original se borra al terminar' },
           ].map((item) => (
-            <div key={item.title} className={`${item.cardBg} rounded-xl p-4`}>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mb-3 ${item.iconBg}`}>
-                <item.icon className="w-4 h-4" />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5">
-                {item.title}
-              </p>
-              <p className="text-[10px] text-gray-600 dark:text-gray-400 mb-1.5 leading-tight">
-                {item.subtitle}
-              </p>
-              <p className={`text-sm font-bold ${item.statusColor}`}>{item.status}</p>
+            <div key={item.title} className="rounded-xl border border-border/70 bg-secondary/30 p-4">
+              <item.icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <p className="mt-2 text-xs font-semibold text-foreground">{item.title}</p>
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{item.detail}</p>
             </div>
           ))}
         </div>
-        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          Tu archivo se procesa de forma segura y se elimina automáticamente del servidor una vez finalizado el análisis. No almacenamos el contenido original del CSV.
+        <p className="border-t border-border px-5 py-3 text-[11px] leading-relaxed text-muted-foreground">
+          <Clock3 className="mr-1 inline h-3 w-3" aria-hidden="true" />
+          No almacenamos el contenido original de la cartola, solo los datos del análisis.
         </p>
+      </details>
       </div>
-
-      {/* Summary metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: 'Transacciones', value: analysis.total_transactions, sub: 'analizadas', color: '' },
-          { label: 'Anomalías', value: analysis.anomalies_count, sub: `${totalHigh} alta · ${totalMedium} media · ${totalLow} baja`, color: 'text-red-600' },
-          { label: 'Monto recuperable', value: formatCLP(analysis.recoverable_amount), sub: 'estimado', color: 'text-green-700', lg: true },
-          { label: 'Estado', value: getStatusLabel(analysis.status), sub: analysis.status === 'completed' ? 'Listo para reclamar' : '', color: 'text-blue-600' },
-        ].map(m => (
-          <Card key={m.label} className="p-5">
-            <p className="text-xs text-gray-400 mb-1">{m.label}</p>
-            <p className={`font-bold ${m.lg ? 'text-xl' : 'text-2xl'} ${m.color || 'text-foreground'}`}>{m.value}</p>
-            {m.sub && <p className="text-xs text-gray-400 mt-0.5">{m.sub}</p>}
-          </Card>
-        ))}
-      </div>
-
-      {/* AI Summary */}
-      {analysis.ai_summary && (
-        <Card className="p-5 mb-6">
-          <CardHeader>
-            <CardTitle className="text-xs font-semibold text-blue-600 mb-2 uppercase tracking-wide">
-              Análisis IA · Resumen ejecutivo
-            </CardTitle>
-          </CardHeader>
-          <div className="p-0">
-            <p className="text-sm text-blue-900 leading-relaxed">{analysis.ai_summary}</p>
-          </div>
-        </Card>
-      )}
-
-      {/* Anomalies */}
-      {anomalies.length > 0 ? (
-        <div className="mb-8">
-          <h2 className="font-semibold text-foreground mb-4">
-            Cobros incorrectos detectados
-            <span className="ml-2 text-sm font-normal text-gray-400">({anomalies.length})</span>
-          </h2>
-
-          <div className="space-y-3">
-            {anomalies.map((anomaly, i) => (
-              <AnomalyCard
-                key={i}
-                variant="full"
-                type={anomaly.type}
-                severity={anomaly.severity}
-                title={anomaly.title}
-                description={anomaly.description}
-                detail={anomaly.detail}
-                recoverableAmount={anomaly.recoverableAmount}
-              />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center mb-8">
-          <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-3" />
-          <p className="font-semibold text-green-900 mb-1">¡Sin anomalías detectadas!</p>
-          <p className="text-sm text-green-700">No encontramos cobros duplicados ni irregularidades en este estado de cuenta.</p>
-        </div>
-      )}
-
-      {/* Transactions table */}
-      {transactions.length > 0 && (
-        <Card className="mb-8">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-3 h-3 text-red-500" />
-              <span className="text-xs font-medium text-muted-foreground">Marcada como anomalía</span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHeaderCell>Fecha</TableHeaderCell>
-                  <TableHeaderCell>Descripción</TableHeaderCell>
-                  <TableHeaderCell className="text-right">Monto</TableHeaderCell>
-                  <TableHeaderCell className="text-center">Estado</TableHeaderCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map(tx => {
-                  const isFlagged = flaggedIds.has(tx.id)
-                  return (
-                    <TableRow key={tx.id} className={isFlagged ? 'bg-red-50' : ''}>
-                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{tx.date}</TableCell>
-                      <TableCell className="text-foreground max-w-xs truncate flex items-center gap-1.5">
-                        {tx.description}
-                        {isFlagged && (
-                          <AlertTriangle className="w-3 h-3 text-red-400" />
-                        )}
-                      </TableCell>
-                      <TableCell className={`text-right font-mono text-xs whitespace-nowrap ${
-                        tx.amount < 0 ? 'text-red-600' : 'text-green-600'
-                      }`}>
-                        {tx.amount < 0 ? '-' : '+'}{formatCLP(Math.abs(tx.amount))}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {isFlagged ? (
-                          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Revisar</span>
-                        ) : (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">OK</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      )}
-
-      {/* CMF info */}
-      <Card className="p-5">
-        <p className="font-medium text-foreground mb-1">¿El banco no responde? Puedes escalar a la CMF</p>
-        <p className="text-sm text-muted-foreground">
-          La Comisión para el Mercado Financiero (CMF) es el regulador bancario en Chile. Puedes presentar un reclamo en <strong className="text-foreground">cmfchile.cl</strong> si el banco no resuelve tu caso en 10 días hábiles.
-        </p>
-      </Card>
-    </div>
+    </ReportSelectionProvider>
   )
 }

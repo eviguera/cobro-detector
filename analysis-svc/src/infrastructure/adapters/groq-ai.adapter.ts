@@ -4,6 +4,7 @@ import type { ParsedTransaction, DetectedAnomaly } from '../../domain/analysis-r
 
 function sanitizeTransactions(transactions: any[]): any[] {
   return transactions.map(tx => ({
+    id: String(tx.id ?? '').slice(0, 64),
     date: String(tx.date ?? '').slice(0, 20),
     description: String(tx.description ?? '').replace(/[<>&"']/g, '').slice(0, 200),
     amount: typeof tx.amount === 'number' ? tx.amount : 0,
@@ -38,18 +39,18 @@ export async function analyzeTransactionsWithAI(
 
   const systemPrompt = `Eres un experto en detección de cobros bancarios incorrectos para negocios chilenos. Siempre respondes SOLO en JSON válido.`
 
-  const userPrompt = `Analiza estas transacciones de un estado de cuenta bancario${bankName ? ` del ${sanitizeBankName(bankName)}` : ''} y detecta:
+  const userPrompt = `Analiza estas transacciones de un estado de cuenta bancario${bankName ? ` del ${sanitizeBankName(bankName)}` : ''} y detecta SOLO lo que puedas respaldar con transacciones concretas:
 
-1. **COMISIONES DE CRÉDITO DUPLICADAS EN CUOTAS SIN INTERÉS**: 
-   - Las ventas en cuotas sin interés NO deben tener comisión de crédito en cada cuota.
-   - La comisión se cobra UNA SOLA VEZ.
-   - Caso Santander: Venta en cuotas → comisión repetida = ERROR.
+1. **COMISIONES DE CRÉDITO REPETIDAS**: una comisión de crédito debe cobrarse una vez por operación. Si el mismo monto aparece varias veces en el mismo mes para el mismo comercio, sobra (N-1) cobros.
+2. **INTERESES EN CUOTAS SIN INTERÉS**: una venta pactada "sin interés" no debe tener cargos por interés.
+3. **COBROS DUPLICADOS**: mismo comercio y mismo monto cobrado dos veces en pocos días.
+4. **CARGOS GENÉRICOS**: descripciones tipo "COM", "CARGO", "SERV" sin comercio identificable. Márcalos como severidad baja.
 
-2. **ERRORES EN CUOTAS SIN INTERÉS**: Ventas "sin interés" con montos inconsistentes o intereses.
-
-3. **CARGOS NO RECONOCIDOS**: Cargos genéricos sin relación clara a una operación.
-
-4. **COBROS DUPLICADOS**: Misma operación cobrada dos veces.
+Reglas de precisión:
+- NO marques ventas normales, compras con comercio identificable, mantención, seguros ni suscripciones como anomalía.
+- El monto recuperable debe ser SOLO el cobro que sobra, no el total de la operación.
+- Usa exclusivamente IDs que existan en <DATOS>.
+- Si no hay evidencia suficiente, devuelve una lista vacía.
 
 <DATOS>
 ${JSON.stringify(txSample, null, 2)}
@@ -61,14 +62,14 @@ Responde SOLO JSON con esta estructura exacta:
     {
       "type": "duplicate_commission",
       "severity": "high",
-      "title": "Título breve",
-      "description": "Descripción clara",
-      "detail": "Detalle técnico",
+      "title": "Título breve y específico",
+      "description": "Qué se cobró de más y por qué",
+      "detail": "Fechas y montos concretos",
       "recoverableAmount": 12345,
       "transactionRefs": ["id1"]
     }
   ],
-  "summary": "Resumen en 2-3 oraciones"
+  "summary": "Resumen en 2-3 oraciones con el monto total y el hallazgo principal"
 }`
 
   const controller = new AbortController()

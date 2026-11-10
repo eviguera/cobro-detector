@@ -6,21 +6,19 @@ interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: "default" | "destructive" | "success" | "warning" | "info"
 }
 
-const variants = {
-  default:
-    "bg-background text-foreground",
-  destructive:
-    "bg-destructive/10 border-destructive/50 text-destructive",
+const variants: Record<NonNullable<AlertProps["variant"]>, string> = {
+  default: "bg-card text-foreground",
+  destructive: "border-destructive/40 bg-danger-50 text-danger-700 dark:bg-danger-500/10 dark:text-danger-500",
   success:
-    "bg-success-50 dark:bg-success-500/10 border-success-200/50 dark:border-success-500 text-success-600 dark:text-success-400",
+    "border-success-200 bg-success-50 text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-500",
   warning:
-    "bg-warning-50 dark:bg-warning-500/10 border-warning-200/50 dark:border-warning-500 text-warning-600 dark:text-warning-400",
+    "border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-500",
   info:
-    "bg-blue-50 dark:bg-blue-900/10 border-blue-200/50 dark:border-blue-500 text-blue-600 dark:text-blue-400",
+    "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300",
 }
 
 const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  function Alert({ className, variant, ...props }, ref) {
+  function Alert({ className, variant = "default", ...props }, ref) {
     return (
       <div
         ref={ref}

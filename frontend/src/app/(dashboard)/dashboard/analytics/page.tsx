@@ -1,18 +1,26 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getMonthlyTrends, getBankStats, getAnomalyTypeStats, getTypeLabel } from '@/lib/analytics'
+import { getMonthlyTrends, getBankStats, getAnomalyTypeStats } from '@/lib/analytics'
 import { formatCLP } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowLeft, TrendingUp, Building2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, BarChart3, Building2, TrendingUp } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { Card } from '@/components/ui/card'
+import { StatCard } from '@/components/ui/stat-card'
+import { RecoveryTrend } from '@/components/dashboard/recovery-trend'
+import { TypeBreakdown } from '@/components/analysis/type-breakdown'
+import type { FindingGroup } from '@/lib/analysis-insights'
+import { ANOMALY_TYPES } from '@/lib/constants'
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 function parseMonthKey(key: string): string {
   const [year, month] = key.split('-')
-  return `${MONTH_NAMES[parseInt(month) - 1]} ${year.slice(2)}`
+  return `${MONTH_NAMES[parseInt(month, 10) - 1]} ${year.slice(2)}`
 }
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+export const metadata: Metadata = { title: 'Métricas' }
 
 export default async function AnalyticsPage() {
   const supabase = await createClient()
@@ -25,149 +33,125 @@ export default async function AnalyticsPage() {
     getAnomalyTypeStats(user.id),
   ])
 
-  const totalAnalyses = monthlyTrends.reduce((s, t) => s + t.analyses, 0)
-  const totalAnomalies = monthlyTrends.reduce((s, t) => s + t.anomalies, 0)
-  const totalRecoverable = monthlyTrends.reduce((s, t) => s + t.recoverable, 0)
-  const maxRecoverable = Math.max(...monthlyTrends.map((t) => t.recoverable), 1)
+  const totalAnalyses = monthlyTrends.reduce((sum, item) => sum + item.analyses, 0)
+  const totalAnomalies = monthlyTrends.reduce((sum, item) => sum + item.anomalies, 0)
+  const totalRecoverable = monthlyTrends.reduce((sum, item) => sum + item.recoverable, 0)
+  const maxBankAnomalies = Math.max(...bankStats.map((item) => item.anomalies), 1)
+
+  const typeTotal = anomalyTypes.reduce((sum, item) => sum + item.totalRecoverable, 0)
+  const groups: FindingGroup[] = anomalyTypes.map((item) => ({
+    type: item.type,
+    label: ANOMALY_TYPES[item.type] ?? item.type,
+    count: item.count,
+    amount: item.totalRecoverable,
+    share: typeTotal > 0 ? Math.round((item.totalRecoverable / typeTotal) * 100) : 0,
+    severities: { high: 0, medium: 0, low: 0 },
+  }))
 
   const hasData = totalAnalyses > 0
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gray-500" />
+    <div className="animate-fade-in space-y-6">
+      <div>
+        <Link
+          href="/dashboard"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Volver al panel
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Analytics</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Métricas detalladas de tus análisis</p>
-        </div>
+        <PageHeader
+          eyebrow="Métricas"
+          title="Métricas de tus cartolas"
+          description="Tendencias, bancos y tipos de hallazgo calculados sobre los mismos datos del panel y del historial."
+        />
       </div>
 
       {!hasData ? (
-        <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-12 text-center">
-          <AlertTriangle className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">Aún no tienes datos de análisis.</p>
-          <Link href="/analisis" className="inline-block mt-4 text-sm font-medium text-blue-600 hover:text-blue-700">
-            Realizar primer análisis →
+        <div className="flex flex-col items-center rounded-2xl border border-dashed border-border bg-card/60 px-6 py-16 text-center">
+          <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-secondary/60 text-muted-foreground">
+            <BarChart3 className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <h2 className="font-display text-base font-semibold">Aún no hay datos para graficar</h2>
+          <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+            Necesitamos al menos una cartola analizada para mostrar tendencias.
+          </p>
+          <Link
+            href="/analisis"
+            className="mt-6 inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+          >
+            Analizar mi primera cartola
           </Link>
         </div>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5">
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Total Análisis</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{totalAnalyses}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5">
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Total Anomalías</p>
-              <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">{totalAnomalies}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5">
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Total Recuperable</p>
-              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{formatCLP(totalRecoverable)}</p>
-            </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard title="Cartolas analizadas" value={totalAnalyses} icon={<BarChart3 className="h-5 w-5" />} accent="blue" />
+            <StatCard
+              title="Hallazgos"
+              value={totalAnomalies}
+              icon={<TrendingUp className="h-5 w-5" />}
+              accent={totalAnomalies > 0 ? 'amber' : 'slate'}
+            />
+            <StatCard
+              title="Monto recuperable"
+              value={formatCLP(totalRecoverable)}
+              icon={<Building2 className="h-5 w-5" />}
+              accent={totalRecoverable > 0 ? 'emerald' : 'slate'}
+            />
           </div>
 
-          {/* Monthly Trends */}
-          <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-5 h-5 text-blue-500" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tendencias Mensuales</h2>
-            </div>
-
-            {monthlyTrends.length > 0 ? (
-              <>
-                <div className="flex items-end gap-1.5 h-40">
-                  {monthlyTrends.map((t) => {
-                    const height = (t.recoverable / maxRecoverable) * 100
-                    return (
-                      <div key={t.month} className="flex-1 flex flex-col items-center gap-1">
-                        <span className="text-[10px] text-gray-400 tabular-nums">
-                          {formatCLP(t.recoverable).replace('$', '')}
-                        </span>
-                        <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-t-md relative overflow-hidden" style={{ height: `${Math.max(height, 3)}%`, minHeight: '4px' }}>
-                          <div className="absolute inset-0 bg-gradient-to-t from-blue-500 to-blue-400 opacity-80 rounded-t-md" />
-                        </div>
-                        <span className="text-[10px] text-gray-500">{parseMonthKey(t.month)}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-                <p className="text-xs text-gray-400 mt-3">Monto recuperable por mes (últimos 12 meses)</p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-400">Sin datos mensuales aún.</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Bank Comparison */}
-            <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Building2 className="w-5 h-5 text-emerald-500" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Anomalías por Banco</h2>
+          {monthlyTrends.length >= 2 ? (
+            <RecoveryTrend
+              data={monthlyTrends.map((item) => ({
+                month: parseMonthKey(item.month),
+                amount: item.recoverable,
+                analyses: item.analyses,
+              }))}
+              total={totalRecoverable}
+            />
+          ) : (
+            <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div>
+                <p className="eyebrow">Monto recuperable</p>
+                <p className="num-display mt-1 text-2xl font-semibold tracking-tight">{formatCLP(totalRecoverable)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Aún no hay suficiente historial para mostrar una tendencia. Analiza otra cartola para comparar mes a mes.
+                </p>
               </div>
+              <span className="inline-flex h-10 items-center rounded-xl border border-border bg-secondary/40 px-3 text-xs font-medium text-muted-foreground">
+                {totalAnalyses} {totalAnalyses === 1 ? 'cartola' : 'cartolas'}
+              </span>
+            </Card>
+          )}
 
-              {bankStats.length > 0 ? (
-                <div className="space-y-3">
-                  {bankStats.map((b, i) => {
-                    const maxAnomalies = Math.max(...bankStats.map((x) => x.anomalies), 1)
-                    const width = (b.anomalies / maxAnomalies) * 100
-                    return (
-                      <div key={b.bank}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-700 dark:text-gray-300 font-medium">{b.bank}</span>
-                          <span className="text-gray-500">{b.anomalies} anomalías</span>
-                        </div>
-                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2.5">
-                          <div
-                            className="h-2.5 rounded-full transition-all"
-                            style={{ width: `${width}%`, backgroundColor: COLORS[i % COLORS.length] }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400">Sin datos de bancos aún.</p>
-              )}
-            </div>
-
-            {/* Anomaly Types */}
-            <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tipos de Anomalía</h2>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <Card className="p-5 sm:p-6">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" aria-hidden="true" />
+                <h2 className="font-display text-sm font-semibold">Hallazgos por banco</h2>
               </div>
+              <div className="mt-5 space-y-3">
+                {bankStats.map((bank) => (
+                  <div key={bank.bank}>
+                    <div className="flex items-baseline justify-between text-xs">
+                      <span className="font-medium text-foreground">{bank.bank}</span>
+                      <span className="num text-muted-foreground">
+                        {bank.anomalies} hallazgos · {formatCLP(bank.recoverable)}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${(bank.anomalies / maxBankAnomalies) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
 
-              {anomalyTypes.length > 0 ? (
-                <div className="space-y-3">
-                  {anomalyTypes.map((a, i) => {
-                    const maxCount = Math.max(...anomalyTypes.map((x) => x.count), 1)
-                    const width = (a.count / maxCount) * 100
-                    return (
-                      <div key={a.type}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-700 dark:text-gray-300 font-medium">{getTypeLabel(a.type)}</span>
-                          <span className="text-gray-500">{a.count}</span>
-                        </div>
-                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2.5">
-                          <div
-                            className="h-2.5 rounded-full transition-all"
-                            style={{ width: `${width}%`, backgroundColor: COLORS[(i + 2) % COLORS.length] }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400">Sin anomalías detectadas aún.</p>
-              )}
-            </div>
+            <TypeBreakdown groups={groups} />
           </div>
         </>
       )}

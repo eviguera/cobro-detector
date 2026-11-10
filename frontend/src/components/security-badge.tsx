@@ -64,7 +64,7 @@ export function SecurityBadge({ variant = 'grid', className }: SecurityBadgeProp
         className={`inline-flex items-center gap-2.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1.5 text-xs font-semibold ${className ?? ''}`}
       >
         <ShieldCheck className="w-3 h-3 text-emerald-500" />
-        <span className="text-gray-600 dark:text-gray-300">Conexión segura · AES-256 · SSL/TLS</span>
+        <span className="text-muted-foreground dark:text-gray-300">Conexión segura · AES-256 · SSL/TLS</span>
       </div>
     )
   }
@@ -85,10 +85,10 @@ export function SecurityBadge({ variant = 'grid', className }: SecurityBadgeProp
               <feature.icon className={`w-4 h-4 ${feature.iconColor}`} />
             </div>
             <div>
-              <p className={`text-sm font-semibold text-gray-900 dark:text-gray-100 ${feature.iconColor}`}>
+              <p className={`text-sm font-semibold text-foreground ${feature.iconColor}`}>
                 {feature.title}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{feature.description}</p>
+              <p className="text-xs text-muted-foreground">{feature.description}</p>
             </div>
           </div>
         ))}
@@ -104,10 +104,10 @@ export function SecurityBadge({ variant = 'grid', className }: SecurityBadgeProp
           <div className={`w-8 h-8 mx-auto mb-2 rounded-lg flex items-center justify-center ${feature.iconColor} dark:${feature.iconColor}`}>
             <feature.icon className="w-4 h-4" />
           </div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
             {feature.title}
           </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 leading-tight">
+          <p className="text-xs text-muted-foreground leading-tight">
             {feature.description}
           </p>
         </div>

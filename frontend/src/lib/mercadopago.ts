@@ -1,3 +1,6 @@
+// mercadopago v3: el default export ya no es instanciable bajo ESM
+// (`new MP(...)` lanza `TypeError: ... is not a constructor`, y tsc NO lo detecta).
+// Mantener SIEMPRE imports nombrados.
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago'
 
 // Cliente MP configurado con el access token

@@ -47,18 +47,47 @@ export class SupabaseOrderRepositoryAdapter implements OrderRepository {
   }
 
   async updateStatus(id: string, updateData: {
-    status: string
+    status?: string
     mp_payment_id?: string
     mp_status?: string | null
     mp_detail?: string | null
     success_plan_active?: boolean
     mp_preference_id?: string
-  }): Promise<void> {
-    const { error } = await this.supabase
+  }, expectedStatus?: string): Promise<boolean> {
+    let query = this.supabase
       .from('orders')
       .update(updateData as Record<string, unknown>)
       .eq('id', id)
 
+    // Compare-and-swap: solo aplica si la orden sigue en el estado leído.
+    // Sin esto, dos webhooks concurrentes de MercadoPago acreditaban dos veces.
+    if (expectedStatus !== undefined) {
+      query = query.eq('status', expectedStatus)
+    }
+
+    const { data, error } = await query.select('id')
+
     if (error) throw new Error(`Error updating order: ${error.message}`)
+    if (expectedStatus === undefined) return true
+    return Array.isArray(data) && data.length > 0
+  }
+
+  async confirmPaid(orderId: string, data: {
+    mpPaymentId: string
+    mpStatus: string | null
+    mpDetail: string | null
+  }, expectedStatus: string): Promise<boolean> {
+    // CAS de la orden + acreditación de créditos en una sola transacción.
+    // Si la RPC falla, la orden NO queda 'paid' y el webhook puede reintentarse.
+    const { data: applied, error } = await this.supabase.rpc('confirm_order_paid', {
+      p_order_id: orderId,
+      p_mp_payment_id: data.mpPaymentId,
+      p_mp_status: data.mpStatus,
+      p_mp_detail: data.mpDetail,
+      p_expected_status: expectedStatus,
+    })
+
+    if (error) throw new Error(`Error confirming payment: ${error.message}`)
+    return applied === true
   }
 }

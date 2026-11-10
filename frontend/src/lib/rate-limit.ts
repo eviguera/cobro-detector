@@ -18,7 +18,7 @@ const memoryStore = new Map<string, MemoryWindow>()
 
 function memoryCleanup() {
   const now = Date.now()
-  for (const [key, w] of memoryStore.entries()) {
+  for (const [key, w] of Array.from(memoryStore.entries())) {
     if (now > w.resetAt) memoryStore.delete(key)
   }
 }

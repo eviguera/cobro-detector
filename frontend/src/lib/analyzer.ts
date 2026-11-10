@@ -15,7 +15,7 @@ export function deduplicateAnomalies(anomalies: DetectedAnomaly[]): DetectedAnom
     for (const group of groups) {
       const groupRefs = new Set(group.flatMap((a) => a.transactionRefs))
       const candidateRefs = new Set(anomaly.transactionRefs)
-      const hasOverlap = [...candidateRefs].some((r) => groupRefs.has(r))
+      const hasOverlap = Array.from(candidateRefs).some((r) => groupRefs.has(r))
 
       if (hasOverlap) {
         group.push(anomaly)
@@ -64,7 +64,7 @@ export function deduplicateAnomalies(anomalies: DetectedAnomaly[]): DetectedAnom
 
     const recoverableAmount = Math.max(...group.map((a) => a.recoverableAmount))
 
-    const transactionRefs = [...new Set(group.flatMap((a) => a.transactionRefs))]
+    const transactionRefs = Array.from(new Set(group.flatMap((a) => a.transactionRefs)))
 
     merged.push({
       type,

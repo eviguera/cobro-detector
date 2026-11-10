@@ -1,0 +1,51 @@
+[
+  {
+    "file": "santander-cuotas.csv",
+    "name": "Santander · comisión repetida + intereses + cargo genérico",
+    "bank": "Santander",
+    "expected": [
+      { "type": "duplicate_commission", "amount": 90000 },
+      { "type": "installment_error", "amount": 8500 },
+      { "type": "unknown_charge", "amount": 3000 }
+    ]
+  },
+  {
+    "file": "bci-duplicados.csv",
+    "name": "BCI · cobro duplicado mismo día",
+    "bank": "BCI",
+    "expected": [
+      { "type": "duplicate_charge", "amount": 15990 }
+    ]
+  },
+  {
+    "file": "chile-limpio.csv",
+    "name": "Chile · cartola limpia con suscripciones y comercios cortos",
+    "bank": "Chile",
+    "expected": []
+  },
+  {
+    "file": "estado-mixto.csv",
+    "name": "Estado · etiquetas CSV + comisión repetida",
+    "bank": "Estado",
+    "expected": [
+      { "type": "duplicate_commission", "amount": 30000 },
+      { "type": "incorrect_charge", "amount": 7500 },
+      { "type": "duplicate_commission", "amount": 5000 }
+    ]
+  },
+  {
+    "file": "falabella-cuotas.csv",
+    "name": "Falabella · intereses en cuotas + comisión repetida",
+    "bank": "Falabella",
+    "expected": [
+      { "type": "installment_error", "amount": 8500 },
+      { "type": "duplicate_commission", "amount": 10000 }
+    ]
+  },
+  {
+    "file": "ripley-suscripciones.csv",
+    "name": "Ripley · cartola limpia con suscripción mensual",
+    "bank": "Ripley",
+    "expected": []
+  }
+]

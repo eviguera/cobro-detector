@@ -80,7 +80,9 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
 
   const ExcelJS = await import('exceljs')
   const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.load(Buffer.from(buffer))
+  await workbook.xlsx.load(
+    Buffer.from(new Uint8Array(buffer)) as unknown as Parameters<typeof workbook.xlsx.load>[0]
+  )
 
   const worksheet = workbook.worksheets[0]
   if (!worksheet) return []
@@ -102,7 +104,7 @@ export async function parseExcelFile(buffer: ArrayBuffer): Promise<ParsedTransac
       const val = cell.value
       if (val instanceof Date) {
         rowData[header] = excelDateToString(val)
-      } else if (typeof val === 'number' || typeof val === 'string' || typeof val === 'boolean') {
+      } else if (typeof val === 'number' || typeof val === 'string') {
         rowData[header] = val
       } else {
         rowData[header] = String(val ?? '')

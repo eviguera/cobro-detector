@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { createServiceClient } from '../infrastructure/adapters/supabase-client.js'
+import { redis } from '../infrastructure/queue-connection.js'
 
 export async function healthRoutes(app: FastifyInstance) {
   app.get('/health', async (request, reply) => {
@@ -17,9 +18,21 @@ export async function healthRoutes(app: FastifyInstance) {
       overall = 'down'
     }
 
-    // 2. Verificar que GROQ_API_KEY esté configurada (no llamamos a Groq para evitar costo/latencia)
-    checks.groq = process.env.GROQ_API_KEY ? 'ok' : 'misconfigured'
-    if (!process.env.GROQ_API_KEY) overall = 'degraded'
+    // 2. Verificar Redis (cola de análisis). Sin Redis no se pueden encolar jobs.
+    try {
+      const pong = await redis.ping()
+      checks.redis = pong === 'PONG' ? 'ok' : 'degraded'
+      if (pong !== 'PONG') {
+        overall = 'down'
+      }
+    } catch {
+      checks.redis = 'down'
+      overall = 'down'
+    }
+
+    // 3. Groq es una capa opcional: si no está configurada, el motor sigue con
+    // reglas determinísticas. No debe marcar el servicio como degradado.
+    checks.groq = process.env.GROQ_API_KEY ? 'ok' : 'not_configured'
 
     const statusCode = overall === 'down' ? 503 : 200
 

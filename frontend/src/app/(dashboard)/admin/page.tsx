@@ -1,8 +1,11 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatCLP } from '@/lib/utils'
 import Link from 'next/link'
 import { ArrowLeft, Users, FileSearch, AlertTriangle, DollarSign, TrendingUp } from 'lucide-react'
+
+export const metadata: Metadata = { title: 'Administración' }
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -30,11 +33,11 @@ export default async function AdminPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/dashboard" className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gray-500" />
+          <ArrowLeft className="w-5 h-5 text-muted-foreground" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Panel de Administración</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Métricas globales del sistema</p>
+          <h1 className="text-2xl font-bold text-foreground">Panel de Administración</h1>
+          <p className="text-sm text-muted-foreground">Métricas globales del sistema</p>
         </div>
       </div>
 
@@ -42,22 +45,22 @@ export default async function AdminPage() {
         <div className="bg-white dark:bg-gray-900/60 rounded-2xl border p-5">
           <Users className="w-5 h-5 text-blue-500 mb-2" />
           <p className="text-2xl font-bold">{usersCount || 0}</p>
-          <p className="text-xs text-gray-500">Usuarios</p>
+          <p className="text-xs text-muted-foreground">Usuarios</p>
         </div>
         <div className="bg-white dark:bg-gray-900/60 rounded-2xl border p-5">
           <FileSearch className="w-5 h-5 text-emerald-500 mb-2" />
           <p className="text-2xl font-bold">{analysesCount || 0}</p>
-          <p className="text-xs text-gray-500">Análisis totales</p>
+          <p className="text-xs text-muted-foreground">Análisis totales</p>
         </div>
         <div className="bg-white dark:bg-gray-900/60 rounded-2xl border p-5">
           <AlertTriangle className="w-5 h-5 text-amber-500 mb-2" />
           <p className="text-2xl font-bold">{anomaliesCount || 0}</p>
-          <p className="text-xs text-gray-500">Anomalías detectadas</p>
+          <p className="text-xs text-muted-foreground">Anomalías detectadas</p>
         </div>
         <div className="bg-white dark:bg-gray-900/60 rounded-2xl border p-5">
           <DollarSign className="w-5 h-5 text-green-500 mb-2" />
           <p className="text-2xl font-bold">{formatCLP(revenue)}</p>
-          <p className="text-xs text-gray-500">Ingresos</p>
+          <p className="text-xs text-muted-foreground">Ingresos</p>
         </div>
       </div>
 
@@ -68,7 +71,7 @@ export default async function AdminPage() {
             <h2 className="font-semibold">Actividad Reciente</h2>
           </div>
           <p className="text-3xl font-bold mb-1">{weekCount || 0}</p>
-          <p className="text-sm text-gray-500">análisis en los últimos 7 días</p>
+          <p className="text-sm text-muted-foreground">análisis en los últimos 7 días</p>
         </div>
 
         <div className="bg-white dark:bg-gray-900/60 rounded-2xl border p-6">
@@ -77,14 +80,14 @@ export default async function AdminPage() {
             {(recentAnalyses || []).map((a) => (
               <div key={a.id} className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-gray-700 dark:text-gray-300">{a.file_name}</p>
-                  <p className="text-xs text-gray-400">{a.bank || '—'} · {new Date(a.created_at).toLocaleDateString('es-CL')}</p>
+                  <p className="truncate font-medium text-foreground">{a.file_name}</p>
+                  <p className="text-xs text-muted-foreground">{a.bank || '—'} · {new Date(a.created_at).toLocaleDateString('es-CL')}</p>
                 </div>
                 <div className="text-right ml-3 flex-shrink-0">
-                  <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${a.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : a.status === 'error' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${a.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : a.status === 'error' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-muted-foreground'}`}>
                     {a.status}
                   </span>
-                  {a.anomalies_count ? <p className="text-xs mt-0.5 text-gray-500">{a.anomalies_count} anomalías</p> : null}
+                  {a.anomalies_count ? <p className="text-xs mt-0.5 text-muted-foreground">{a.anomalies_count} anomalías</p> : null}
                 </div>
               </div>
             ))}

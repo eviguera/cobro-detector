@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { filterValidAnalyses } from '@/lib/analysis-metrics'
+import { ANOMALY_TYPES } from '@/lib/constants'
 
 export interface MonthlyTrend {
   month: string
@@ -24,16 +26,17 @@ export async function getMonthlyTrends(userId: string): Promise<MonthlyTrend[]> 
   const supabase = await createClient()
   const { data } = await supabase
     .from('analyses')
-    .select('created_at, anomalies_count, recoverable_amount')
+    .select('created_at, anomalies_count, recoverable_amount, status')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(60)
 
   if (!data) return []
 
+  const validData = filterValidAnalyses(data)
   const monthlyMap = new Map<string, MonthlyTrend>()
 
-  for (const analysis of data) {
+  for (const analysis of validData) {
     const date = new Date(analysis.created_at)
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
@@ -61,15 +64,16 @@ export async function getBankStats(userId: string): Promise<BankStat[]> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('analyses')
-    .select('bank, anomalies_count, recoverable_amount')
+    .select('bank, anomalies_count, recoverable_amount, status')
     .eq('user_id', userId)
     .not('bank', 'is', null)
 
   if (!data) return []
 
+  const validData = filterValidAnalyses(data)
   const bankMap = new Map<string, BankStat>()
 
-  for (const analysis of data) {
+  for (const analysis of validData) {
     const bank = analysis.bank || 'Desconocido'
     if (!bankMap.has(bank)) {
       bankMap.set(bank, { bank, analyses: 0, anomalies: 0, recoverable: 0 })
@@ -85,10 +89,22 @@ export async function getBankStats(userId: string): Promise<BankStat[]> {
 
 export async function getAnomalyTypeStats(userId: string): Promise<AnomalyTypeStat[]> {
   const supabase = await createClient()
+
+  // Solo anomalías de análisis válidos: un análisis fallido no debe sumar
+  // hallazgos ni hacer que "tipos" no cuadre con el total del panel.
+  const { data: analyses } = await supabase
+    .from('analyses')
+    .select('id, status')
+    .eq('user_id', userId)
+
+  const validIds = filterValidAnalyses(analyses).map((analysis) => analysis.id)
+  if (validIds.length === 0) return []
+
   const { data } = await supabase
     .from('anomalies')
     .select('type, recoverable_amount')
     .eq('user_id', userId)
+    .in('analysis_id', validIds)
 
   if (!data) return []
 
@@ -107,11 +123,5 @@ export async function getAnomalyTypeStats(userId: string): Promise<AnomalyTypeSt
 }
 
 export function getTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    duplicate_commission: 'Comisión duplicada',
-    incorrect_charge: 'Cobro incorrecto',
-    installment_error: 'Error en cuotas',
-    unknown_charge: 'Cargo no reconocido',
-  }
-  return labels[type] || type
+  return ANOMALY_TYPES[type] ?? type
 }

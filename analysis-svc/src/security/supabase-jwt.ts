@@ -75,7 +75,7 @@ function decodeSegment<T>(segment: string): T {
 }
 
 function isExpired(payload: JwtPayload): boolean {
-  return typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now()
+  return typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now()
 }
 
 function toAuthUser(payload: JwtPayload): AuthUser | null {
@@ -198,7 +198,7 @@ function verifyAsymmetric(
  * Verifica un access token de Supabase. Acepta HS256 (secreto compartido) y
  * ES256/RS256 (JWKS del proyecto). Devuelve null si es inválido o expirado.
  */
-export async function verifySupabaseJwt(token: string, rawSecret: string): Promise<AuthUser | null> {
+export async function verifySupabaseJwt(token: string, rawSecret: string | null): Promise<AuthUser | null> {
   const parts = token.split('.')
   if (parts.length !== 3) return null
   const [headerB64, payloadB64, signatureB64] = parts
@@ -214,6 +214,8 @@ export async function verifySupabaseJwt(token: string, rawSecret: string): Promi
     const signingInput = `${headerB64}.${payloadB64}`
 
     if (header.alg === 'HS256') {
+      // HS256 necesita el secreto compartido. Sin él, fail-closed.
+      if (!rawSecret) return null
       return verifyHs256(signingInput, signature, rawSecret) ? toAuthUser(payload) : null
     }
 
@@ -239,12 +241,11 @@ export function clearJwksCache(): void {
   inflightFetch = null
 }
 
-function getJwtSecret(): string {
-  return (
-    process.env.SUPABASE_JWT_SECRET ||
-    process.env.JWT_SECRET ||
-    'super-secret-jwt-token-with-at-least-32-characters-long'
-  )
+function getJwtSecret(): string | null {
+  // Fail-closed: sin secreto configurado no se verifica ningún token.
+  // Antes se caía al secreto de demo público de Supabase, con el que
+  // cualquiera podía forjar un JWT válido (incluido sub de otro usuario).
+  return process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET || null
 }
 
 export function extractBearerToken(request: FastifyRequest): string | null {
@@ -257,7 +258,9 @@ export function extractBearerToken(request: FastifyRequest): string | null {
 /** Fastify preHandler: exige JWT Supabase válido; expone request.authUser. Genera reply 401 y retorna false si falla. */
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
   const token = extractBearerToken(request)
-  const user = token ? await verifySupabaseJwt(token, getJwtSecret()) : null
+  // El secreto puede ser null: los tokens ES256/RS256 se validan por JWKS.
+  const secret = getJwtSecret()
+  const user = token ? await verifySupabaseJwt(token, secret) : null
   if (!user) {
     await reply.status(401).send({ error: 'Unauthorized: missing or invalid bearer token' })
     return false

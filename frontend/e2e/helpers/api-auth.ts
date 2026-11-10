@@ -104,10 +104,10 @@ export function authenticatedTest(
   title: string,
   fn: (page: any) => Promise<void>,
 ) {
-  return test(title, async ({ page }) => {
+  return base(title, async ({ page }) => {
     const { email, password } = getTestCredentials();
     if (!email || !password) {
-      test.skip();
+      base.skip();
       return;
     }
     await fn(page);

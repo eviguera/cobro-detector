@@ -28,8 +28,8 @@ export function ThemeToggle({ compact = false }: ThemeToggleProps) {
       title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
       className={
         compact
-          ? 'w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors'
-          : 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]'
+          ? 'w-10 h-10 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors'
+          : 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]'
       }
     >
       <div className="relative w-4 h-4">

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { detectBank, parseCSVLine } from './parser'
+import ExcelJS from 'exceljs'
+import { detectBank, parseCSVLine, parseExcelFile } from './parser'
 
 describe('detectBank', () => {
   it('detects Santander by keyword in filename', () => {
@@ -99,5 +100,63 @@ describe('parseCSVLine', () => {
 
   it('handles conjoined quoted fields with no separator gaps', () => {
     expect(parseCSVLine('"a","b","c"')).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('parseExcelFile', () => {
+  // Regresión: exceljs es CJS y bajo Node ESM el namespace de `import()` expone la
+  // librería en `.default`. Antes `new ExcelJS.Workbook()` lanzaba TypeError y toda
+  // cartola .xlsx fallaba en producción sin que ningún test lo detectara.
+  async function buildXlsx(rows: (string | number)[][]): Promise<ArrayBuffer> {
+    const workbook = new ExcelJS.Workbook()
+    const sheet = workbook.addWorksheet('Movimientos')
+    rows.forEach((row) => sheet.addRow(row))
+    return (await workbook.xlsx.writeBuffer()) as unknown as ArrayBuffer
+  }
+
+  it('parsea un .xlsx real (formato ZIP) y extrae las transacciones', async () => {
+    const buffer = await buildXlsx([
+      ['Fecha', 'Descripción', 'Monto'],
+      ['01/03/2024', 'COMPRA SUPERMERCADO', -45900],
+      ['02/03/2024', 'ABONO SUELDO', 1200000],
+    ])
+
+    // Verifica que el fixture sea realmente un ZIP (cabecera PK), no un CSV.
+    const magic = new Uint8Array(buffer.slice(0, 2))
+    expect([magic[0], magic[1]]).toEqual([0x50, 0x4b])
+
+    const transactions = await parseExcelFile(buffer)
+
+    expect(transactions).toHaveLength(2)
+    expect(transactions[0]).toMatchObject({
+      date: '2024-03-01',
+      description: 'COMPRA SUPERMERCADO',
+      amount: -45900,
+      type: 'debit',
+    })
+    expect(transactions[1]).toMatchObject({
+      date: '2024-03-02',
+      description: 'ABONO SUELDO',
+      amount: 1200000,
+      type: 'credit',
+    })
+  })
+
+  it('respeta las columnas pre-etiquetadas de anomalías en .xlsx', async () => {
+    const buffer = await buildXlsx([
+      ['Fecha', 'Descripción', 'Monto', 'Tipo_Anomalia', 'Reclamable', 'Motivo_Reclamo'],
+      ['05/04/2024', 'COMISION COBRADA', -8900, 'comision', 'SI', 'Cobro no informado'],
+    ])
+
+    const [transaction] = await parseExcelFile(buffer)
+
+    expect(transaction.tipoAnomalia).toBe('COMISION')
+    expect(transaction.reclamable).toBe(true)
+    expect(transaction.motivoReclamo).toBe('Cobro no informado')
+  })
+
+  it('rechaza archivos .xls (OLE2) con un mensaje claro', async () => {
+    const ole2 = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0x00, 0x00])
+    await expect(parseExcelFile(ole2.buffer)).rejects.toThrow(/\.xls no soportado/)
   })
 })

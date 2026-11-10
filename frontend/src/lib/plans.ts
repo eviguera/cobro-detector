@@ -60,3 +60,54 @@ export const PLANS: Plan[] = [
   },
 ]
 
+/** Plan por porcentaje (Platino): no tiene precio fijo ni créditos reales. */
+export function isPercentagePlan(plan: Plan): boolean {
+  return typeof plan.percentage === 'number' && plan.percentage > 0
+}
+
+export function getPlanByKey(key: string): Plan | undefined {
+  return PLANS.find((plan) => plan.key === key)
+}
+
+/**
+ * Titular de precio de un plan.
+ * Platino nunca debe mostrarse como "$0": se cobra un % de lo recuperado.
+ */
+export function getPlanPriceLabel(plan: Plan): string {
+  if (isPercentagePlan(plan)) return `${plan.percentage}%`
+  return formatPrice(plan.price)
+}
+
+/**
+ * Línea secundaria del precio: créditos y costo unitario.
+ */
+export function getPlanPriceDescription(plan: Plan): string {
+  if (isPercentagePlan(plan)) return 'de lo que recuperes · sin costo fijo'
+  if (plan.key === 'contador') {
+    return `${plan.credits} créditos · ${formatPrice(plan.pricePerAnalysis)} c/u`
+  }
+  return `${plan.credits} crédito${plan.credits === 1 ? '' : 's'} · ${formatPrice(
+    plan.pricePerAnalysis
+  )} por análisis`
+}
+
+/** Texto corto para badges y CTAs. */
+export function getPlanBadge(plan: Plan): string | null {
+  if (isPercentagePlan(plan)) return `${plan.percentage}%`
+  return null
+}
+
+/** Precio en CLP sin decimales. */
+export function formatPrice(value: number): string {
+  return new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+/** Formato compacto para tarjetas angostas: "$100.000" en vez de "$100.000 CLP". */
+export function formatPriceCompact(value: number): string {
+  return `$${new Intl.NumberFormat('es-CL').format(value)}`
+}
+

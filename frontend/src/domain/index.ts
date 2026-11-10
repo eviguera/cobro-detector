@@ -138,6 +138,19 @@ export interface ParsedTransaction {
   motivoReclamo?: string
 }
 
+export interface AnomalyEvidence {
+  /** Período o mes donde ocurrió el cobro (ej: "2026-03"). */
+  period?: string
+  /** Comercio u operación normalizada. */
+  merchant?: string
+  /** Cantidad de cobros que componen el hallazgo. */
+  count?: number
+  /** Fechas de las transacciones involucradas. */
+  dates?: string[]
+  /** Montos de las transacciones involucradas. */
+  amounts?: number[]
+}
+
 export interface DetectedAnomaly {
   type: string
   severity: 'high' | 'medium' | 'low'
@@ -146,6 +159,12 @@ export interface DetectedAnomaly {
   detail?: string
   recoverableAmount: number
   transactionRefs: string[]
+  /** 0–100. Qué tan segura es la detección con la evidencia disponible. */
+  confidence?: number
+  /** Datos concretos que sustentan el hallazgo. */
+  evidence?: AnomalyEvidence
+  /** Acción recomendada para el usuario. */
+  recommendedAction?: string
 }
 
 export interface Plan {
@@ -204,6 +223,7 @@ export interface AnalysisRunResponse {
   recoverableAmount: number
   summary: string
   bank: string
+  anomalies?: DetectedAnomaly[]
   awaitingPayment?: boolean
   paymentAmount?: number
 }

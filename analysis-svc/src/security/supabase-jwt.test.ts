@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { clearJwksCache, verifySupabaseJwt } from './supabase-jwt.js'
+import { clearJwksCache, requireAuth, verifySupabaseJwt } from './supabase-jwt.js'
 
 const HS256_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long'
 const KID_ES256 = 'kid-es256-test'
@@ -130,6 +130,60 @@ describe('verifySupabaseJwt', () => {
       const token = signHs256(validPayload(), HS256_SECRET)
       const user = await verifySupabaseJwt(token, base64Secret)
       expect(user?.id).toBe('b844c5c2-0000-4000-8000-000000000000')
+    })
+
+    // Regresión: `exp` era opcional, así que un token sin caducidad se
+    // aceptaba para siempre (combinado con el secreto demo, acceso eterno).
+    it('rechaza un token sin exp', async () => {
+      const payload = validPayload()
+      delete payload.exp
+      const token = signHs256(payload)
+      expect(await verifySupabaseJwt(token, HS256_SECRET)).toBeNull()
+    })
+
+    it('rechaza un token expirado', async () => {
+      const payload = { ...validPayload(), exp: Math.floor(Date.now() / 1000) - 60 }
+      expect(await verifySupabaseJwt(signHs256(payload), HS256_SECRET)).toBeNull()
+    })
+
+    // Regresión crítica: sin SUPABASE_JWT_SECRET se usaba el secreto de demo
+    // público de Supabase, así que cualquiera podía forjar tokens válidos.
+    // El secreto compartido no aplica a tokens asimétricos: sin
+    // SUPABASE_JWT_SECRET igual se deben validar ES256/RS256 vía JWKS
+    // (el Supabase local y los proyectos nuevos firman así).
+    it('valida ES256 por JWKS aunque no haya secreto compartido', async () => {
+      const token = signAsymmetric(es256, validPayload())
+      const user = await verifySupabaseJwt(token, null)
+      expect(user?.id).toBe('b844c5c2-0000-4000-8000-000000000000')
+    })
+
+    it('rechaza HS256 si no hay secreto compartido', async () => {
+      const token = signHs256(validPayload())
+      expect(await verifySupabaseJwt(token, null)).toBeNull()
+    })
+
+    it('requireAuth responde 401 (fail-closed) si no hay secreto configurado', async () => {
+      delete process.env.SUPABASE_JWT_SECRET
+      delete process.env.JWT_SECRET
+
+      const forged = signHs256(validPayload()) // firmado con el secreto demo público
+      const sent: { code?: number; body?: unknown } = {}
+      const request = { headers: { authorization: `Bearer ${forged}` } } as never
+      const reply = {
+        status(code: number) {
+          sent.code = code
+          return this
+        },
+        send(body: unknown) {
+          sent.body = body
+          return this
+        },
+      } as never
+
+      const ok = await requireAuth(request, reply)
+
+      expect(ok).toBe(false)
+      expect(sent.code).toBe(401)
     })
   })
 

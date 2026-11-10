@@ -13,7 +13,7 @@ test.describe('Flujo de análisis asíncrono (202 Accepted + polling)', () => {
       return;
     }
     await page.goto('/login', { timeout: 10000 });
-    await expect(page.getByText('Bienvenido de vuelta')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Ingresa a tu cuenta')).toBeVisible({ timeout: 10000 });
 
     const emailInput = page.locator('input[type="email"]').first();
     const passwordInput = page.locator('input[type="password"]').first();
@@ -59,21 +59,21 @@ test.describe('Flujo de análisis asíncrono (202 Accepted + polling)', () => {
 
     // Verificar que la página entra en estado de análisis (procesando)
     await expect(
-      page.locator('text=/analizando|procesando|analizando tu estado/i'),
+      page.locator('text=/analizando|procesando|revisando tu cartola/i').first(),
     ).toBeVisible({ timeout: 10000 });
 
     // Esperar a que el análisis complete (polling interno del frontend)
     // El flujo asíncrono devuelve 202 y el frontend hace polling hasta completed/awaiting_payment/error
     await expect(
       page.locator(
-        'text=/resultado|completado|análisis completo|reporte bloqueado|no pudimos completar/i',
-      ),
+        'text=/resultado de tu cartola|análisis completado|reporte bloqueado|no pudimos completar/i',
+      ).first(),
     ).toBeVisible({ timeout: 110000 });
 
     // Verificar que se mostraron resultados (métricas o mensaje de error)
     const hasResults = await page
       .locator(
-        'text=/transacciones analizadas|anomalía|monto recuperable|no pudimos completar|reporte bloqueado/i',
+        'text=/resultado de tu cartola|monto recuperable|hallazgos|no pudimos completar|reporte bloqueado/i',
       )
       .count();
 
@@ -84,10 +84,11 @@ test.describe('Flujo de análisis asíncrono (202 Accepted + polling)', () => {
 
   test('muestra estado de seguridad en la página de análisis', async ({ page }) => {
     test.setTimeout(60000);
+    await page.goto('/analisis', { timeout: 10000 });
 
     // Verificar que los badges de seguridad están presentes
     await expect(
-      page.locator('text=/conexión cifrada|HTTPS|seguro/i').first(),
+      page.locator('text=/privacidad primero|SSL\/TLS|auto-eliminación|cifrado/i').first(),
     ).toBeVisible({ timeout: 10000 });
 
     console.log('✅ Indicadores de seguridad visibles en /analisis');

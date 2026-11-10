@@ -122,7 +122,7 @@ export async function executeAndStoreAnalysis(
 
   const result: AnalysisResult = await analyzeFile(fileUrl, fileType, {
     userId,
-    companyId: null,
+    companyId: undefined,
     fileName,
   })
 
@@ -154,14 +154,14 @@ export async function executeAndStoreAnalysis(
     .eq('user_id', userId)
 
   if (result.anomalies && result.anomalies.length > 0) {
-    const anomaliesToInsert = result.anomalies.map((anomaly: Record<string, unknown>) => ({
+    const anomaliesToInsert = result.anomalies.map((anomaly) => ({
       analysis_id: analysisId,
       user_id: userId,
       type: anomaly.type as string,
       severity: anomaly.severity as string,
       title: anomaly.title as string,
       description: anomaly.description as string,
-      detail: (anomaly.detail as string) ?? null,
+      detail: anomaly.detail ?? null,
       recoverable_amount: anomaly.recoverableAmount as number,
       transaction_refs: anomaly.transactionRefs as string[],
       status: 'pending' as string,
@@ -199,7 +199,7 @@ export function enqueueAnalysisFallback(
     fileName,
     filePath: fileUrl,
     fileType,
-    companyId: null,
+    companyId: undefined,
     analysisId,
   }).catch(err => console.error('Error en fallback async:', err))
 }

@@ -9,15 +9,20 @@ export async function healthRoutes(app: FastifyInstance) {
     try {
       const supabase = createServiceClient()
       const { error } = await supabase.from('orders').select('id').limit(1)
-      checks.supabase = error ? 'degraded' : 'ok'
-      if (error) overall = 'degraded'
+      // Un error de PostgREST (credencial inválida, 5xx, permisos) significa
+      // que la dependencia no sirve: 'down' y 503, no 'degraded' con 200.
+      checks.supabase = error ? 'down' : 'ok'
+      if (error) overall = 'down'
     } catch {
       checks.supabase = 'down'
       overall = 'down'
     }
 
-    checks.mercadopago = process.env.MERCADOPAGO_ACCESS_TOKEN ? 'ok' : 'misconfigured'
-    if (!process.env.MERCADOPAGO_ACCESS_TOKEN) overall = 'degraded'
+    // Solo comprueba que esté CONFIGURADA; no valida la credencial contra el proveedor.
+    checks.mercadopago = process.env.MERCADOPAGO_ACCESS_TOKEN ? 'configured' : 'misconfigured'
+    // Igual que en notification-svc: un chequeo blando no debe rebajar 'down'
+    // a 'degraded' (devolvía 200 con Supabase inalcanzable).
+    if (!process.env.MERCADOPAGO_ACCESS_TOKEN && overall === 'ok') overall = 'degraded'
 
     const statusCode = overall === 'down' ? 503 : 200
 

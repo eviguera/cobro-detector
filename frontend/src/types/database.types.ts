@@ -451,6 +451,93 @@ export interface Database {
           created_at?: string
         }
       }
+      claim_tracking: {
+        Row: {
+          id: string
+          analysis_id: string
+          user_id: string
+          status: 'draft' | 'sent' | 'responded' | 'escalated'
+          sent_at: string | null
+          response_at: string | null
+          notes: string | null
+          reminder_sent_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          analysis_id: string
+          user_id: string
+          status?: 'draft' | 'sent' | 'responded' | 'escalated'
+          sent_at?: string | null
+          response_at?: string | null
+          notes?: string | null
+          reminder_sent_at?: string | null
+        }
+        Update: {
+          analysis_id?: string
+          status?: 'draft' | 'sent' | 'responded' | 'escalated'
+          sent_at?: string | null
+          response_at?: string | null
+          notes?: string | null
+        }
+      }
+      product_events: {
+        Row: {
+          id: string
+          user_id: string
+          event_type: string
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          event_type: string
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          event_type?: string
+          metadata?: Json | null
+        }
+      }
+      anomaly_feedback: {
+        Row: {
+          id: string
+          analysis_id: string
+          user_id: string
+          anomaly_key: string
+          anomaly_type: string | null
+          severity: string | null
+          reason: string
+          comment: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          analysis_id: string
+          user_id: string
+          anomaly_key: string
+          anomaly_type?: string | null
+          severity?: string | null
+          reason?: string
+          comment?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          analysis_id?: string
+          user_id?: string
+          anomaly_key?: string
+          anomaly_type?: string | null
+          severity?: string | null
+          reason?: string
+          comment?: string | null
+        }
+      }
     }
     Views: {
       [_ in never]: never

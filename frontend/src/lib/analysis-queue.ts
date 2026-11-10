@@ -25,7 +25,7 @@ async function processAnalysis(data: {
     // Ejecutar análisis
     const result: AnalysisResult = await analyzeFile(filePath, fileType, {
       userId,
-      companyId,
+      companyId: companyId ?? undefined,
       fileName,
     })
 
@@ -62,13 +62,12 @@ async function processAnalysis(data: {
 
     // Insertar anomalías detectadas
     if (result.anomalies && result.anomalies.length > 0) {
-      const anomaliesToInsert = result.anomalies.map((anomaly: Record<string, unknown>) => ({
+      const anomaliesToInsert = result.anomalies.map((anomaly) => ({
         analysis_id: analysisId,
         user_id: userId,
         type: anomaly.type as string,
         title: anomaly.title as string,
         description: anomaly.description as string,
-        amount: anomaly.amount as number,
         recoverable_amount: anomaly.recoverableAmount as number,
         transaction_refs: anomaly.transactionRefs as string[],
         severity: anomaly.severity as string,

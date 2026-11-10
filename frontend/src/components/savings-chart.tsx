@@ -8,37 +8,57 @@ interface SavingsChartProps {
   total: number
 }
 
+const BAR_AREA_HEIGHT = 156
+
 export function SavingsChart({ data, total }: SavingsChartProps) {
   if (data.length === 0) return null
 
-  const maxAmount = Math.max(...data.map(d => d.amount), 1)
+  const maxAmount = Math.max(...data.map((d) => d.amount), 1)
+  // Con un solo mes la barra no debe ocupar todo el ancho disponible.
+  const barWidth = data.length === 1 ? 'w-16' : 'w-full max-w-[64px]'
 
   return (
-    <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800/40 dark:bg-gray-900/60">
+      <div className="mb-5 flex items-start justify-between">
         <div>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold tracking-wider uppercase">Monto estimado a reclamar</p>
-          <p className="text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Monto estimado a reclamar
+          </p>
+          <p className="mt-1 font-display text-2xl font-bold text-emerald-600 dark:text-emerald-400">
             {formatCLP(total)}
           </p>
         </div>
-        <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl flex items-center justify-center">
-          <TrendingUp className="w-5 h-5 text-emerald-500" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
+          <TrendingUp className="h-5 w-5 text-emerald-500" />
         </div>
       </div>
 
-      <div className="flex items-end gap-2 h-32">
+      <div className="flex items-end gap-3" style={{ height: BAR_AREA_HEIGHT }}>
         {data.map((item, i) => {
-          const height = (item.amount / maxAmount) * 100
+          const pct = Math.max((item.amount / maxAmount) * 100, 2)
+
           return (
-            <div key={item.month} className="flex-1 flex flex-col items-center gap-1.5" style={{ animationDelay: `${i * 100}ms` }}>
-              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium tabular-nums">
+            <div
+              key={item.month}
+              className="flex h-full flex-1 flex-col items-center justify-end gap-1.5"
+              style={{ animationDelay: `${i * 100}ms` }}
+            >
+              <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
                 {formatCLP(item.amount).replace('$', '')}
               </span>
-              <div className="w-full bg-emerald-100 dark:bg-emerald-900/30 rounded-t-lg transition-all duration-700 ease-out animate-fade-in-up relative overflow-hidden min-h-[4px]" style={{ height: `${Math.max(height, 4)}%` }}>
-                <div className="absolute inset-0 bg-gradient-to-t from-emerald-500 to-emerald-400 dark:from-emerald-600 dark:to-emerald-400 opacity-80 rounded-t-lg" />
+
+              {/* Contenedor con alto definido: el % de la barra ya tiene referencia */}
+              <div className="flex min-h-0 w-full flex-1 items-end justify-center border-b border-gray-100 dark:border-gray-800/60">
+                <div
+                  className={`${barWidth} animate-fade-in-up rounded-t-lg bg-gradient-to-t from-emerald-500 to-emerald-400 transition-all duration-700 ease-out dark:from-emerald-600 dark:to-emerald-400`}
+                  style={{ height: `${pct}%` }}
+                  title={`${item.month}: ${formatCLP(item.amount)}`}
+                />
               </div>
-              <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wider">{item.month}</span>
+
+              <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
+                {item.month}
+              </span>
             </div>
           )
         })}

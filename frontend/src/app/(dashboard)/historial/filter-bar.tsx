@@ -32,8 +32,8 @@ export default function FilterBar({ current, q }: Props) {
           aria-current={current === opt.value ? 'page' : undefined}
           className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
             current === opt.value
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+              ? 'bg-white dark:bg-gray-700 text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300'
           }`}
         >
           {opt.label}

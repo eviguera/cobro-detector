@@ -39,6 +39,7 @@ export const SEVERITY: Record<string, { label: string; color: string; badgeStyle
 // Anomaly types
 export const ANOMALY_TYPES: Record<string, string> = {
   duplicate_commission: 'Comisión duplicada',
+  duplicate_charge: 'Cobro duplicado',
   installment_error: 'Error en cuotas',
   unknown_charge: 'Cargo no reconocido',
   incorrect_charge: 'Cobro incorrecto',

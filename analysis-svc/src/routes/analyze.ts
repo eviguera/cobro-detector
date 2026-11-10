@@ -11,7 +11,7 @@ import type { QueueJob } from '../domain/ports/queue.port.js'
 const supabase = createServiceClient()
 
 const analyzeSchema = z.object({
-  analysisId: z.string().uuid(),
+  analysisId: z.uuid(),
 })
 
 export async function analyzeRoutes(app: FastifyInstance) {
@@ -26,19 +26,15 @@ export async function analyzeRoutes(app: FastifyInstance) {
     const token = extractBearerToken(request)!
     const userSupabase = createUserClient(token)
 
-    const { data, error } = await userSupabase
-      .from('analyses')
-      .select('*')
-      .eq('id', id)
-      .single()
+    // El paywall y la ocultación de llaves se aplican en la base
+    // (get_analysis_report): el cliente ya no puede leer anomalies/raw_data
+    // por PostgREST ni aunque conozca el id.
+    const { data, error } = await userSupabase.rpc('get_analysis_report', {
+      p_analysis_id: id,
+    })
 
     if (error || !data) {
       return reply.status(404).send({ error: 'Analysis not found' })
-    }
-
-    // El analisis debe pertenecer al usuario del token.
-    if (request.authUser.id !== data.user_id) {
-      return reply.status(403).send({ error: 'Forbidden: resource belongs to another user' })
     }
     return reply.send(data)
   })
@@ -51,12 +47,11 @@ export async function analyzeRoutes(app: FastifyInstance) {
 
     const { analysisId } = parsed.data
 
-    const token = extractBearerToken(request)!
-    const userSupabase = createUserClient(token)
-
-    const { data: analysis, error } = await userSupabase
+    // El cliente ya no puede leer las llaves de cifrado (grants por columna),
+    // así que aquí se lee con service role y el ownership se valida explícito.
+    const { data: analysis, error } = await supabase
       .from('analyses')
-      .select('*, storage_path, encryption_key_iv, encryption_key_base64')
+      .select('id, user_id, company_id, plan, status, file_url, file_type, file_name, storage_path, encryption_key_iv, encryption_key_base64')
       .eq('id', analysisId)
       .single()
 
@@ -92,6 +87,37 @@ export async function analyzeRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: message })
     }
 
+    // HARDENED (2026-11): el consumo del crédito se hace en el servidor.
+    // Antes solo lo hacía el navegador (submit-analysis.ts), así que llamar a
+    // este endpoint directamente permitía análisis gratis ilimitados.
+    // El Plan Platino no consume créditos: se cobra el 20% del monto recuperado.
+    // El plan lo declara el cliente al crear el registro (`plan`), pero su
+    // consecuencia es pagar crédito o quedar con el reporte bloqueado; ninguna
+    // de las dos opciones da acceso gratis. `status` ya no lo escribe el cliente.
+    const isPlatino = analysis.plan === 'platino'
+    const companyId = (analysis.company_id as string | null) ?? null
+    let charged = false
+
+    if (!isPlatino) {
+      // Cobro idempotente y durable: el flag analyses.credit_consumed_at hace
+      // que un reintento del cliente no descuente dos veces.
+      const { data: chargeResult, error: creditError } = await supabase.rpc('charge_analysis_credit', {
+        p_analysis_id: analysisId,
+        p_company_id: companyId,
+      })
+      if (creditError) {
+        request.log.error({ err: creditError, analysisId }, 'charge_analysis_credit failed')
+        return reply.status(500).send({ error: 'No se pudo descontar el crédito' })
+      }
+      if (chargeResult === 'no_credits') {
+        return reply.status(402).send({ error: 'Sin créditos disponibles' })
+      }
+      if (chargeResult === 'already') {
+        return reply.status(409).send({ error: 'El análisis ya está en curso' })
+      }
+      charged = true
+    }
+
     // HARDENED (2026-11): el análisis se ejecuta de forma asíncrona mediante
     // una cola Redis. El endpoint devuelve 202 Accepted inmediatamente y el
     // worker procesa el job en background. El cliente hace polling en
@@ -108,7 +134,24 @@ export async function analyzeRoutes(app: FastifyInstance) {
       encryptionKeyBase64,
     }
 
-    await queue.enqueue(job)
+    try {
+      await queue.enqueue(job)
+    } catch (enqueueError) {
+      // El crédito ya se descontó: si el encolado falla, devolverlo para no
+      // cobrar un análisis que nunca se ejecutó. Las acreditaciones por
+      // empresa no se pueden revertir con add_credits (solo opera sobre la
+      // fila sin company_id), así que se registran para conciliación manual.
+      if (charged) {
+        const { data: refunded, error: refundError } = await supabase.rpc('refund_analysis_credit', {
+          p_analysis_id: analysisId,
+        })
+        if (refundError || refunded !== true) {
+          request.log.error({ err: refundError, userId, analysisId, companyId }, 'No se pudo devolver el crédito')
+        }
+      }
+      request.log.error({ err: enqueueError, analysisId }, 'No se pudo encolar el análisis')
+      return reply.status(503).send({ error: 'No se pudo encolar el análisis' })
+    }
 
     return reply.status(202).send({
       analysisId,

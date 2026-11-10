@@ -20,7 +20,7 @@ const processWebhook = new ProcessWebhookUseCase(paymentGateway, orderRepo, cred
 
 const preferenceSchema = z.object({
   userId: z.string(),
-  userEmail: z.string().email(),
+  userEmail: z.email(),
   userName: z.string().nullable(),
   planKey: z.string(),
   appUrl: z.string(),
@@ -28,11 +28,12 @@ const preferenceSchema = z.object({
 
 const unlockSchema = z.object({
   userId: z.string(),
-  userEmail: z.string().email(),
+  userEmail: z.email(),
   userName: z.string().nullable(),
   analysisId: z.string(),
   analysisFileName: z.string(),
-  recoverableAmount: z.number(),
+  // recoverableAmount NO se acepta del cliente: el monto se lee de la base
+  // (analyses.recoverable_amount), que es la fuente de verdad server-side.
   appUrl: z.string(),
 })
 
@@ -72,7 +73,11 @@ export async function paymentRoutes(app: FastifyInstance) {
       return reply.send(result)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      return reply.status(400).send({ error: message })
+      // Errores de cliente/firma → 400. Fallos de infraestructura (DB, RPC,
+      // red) → 5xx para que MercadoPago reintente el webhook.
+      const clientError = /Firma inválida|Falta firma|Payment ID faltante|Sin referencia externa|externalRef inválido/.test(message)
+      request.log.error({ err: error }, 'Webhook processing failed')
+      return reply.status(clientError ? 400 : 500).send({ error: message })
     }
   })
 
@@ -89,15 +94,23 @@ export async function paymentRoutes(app: FastifyInstance) {
     // El createUnlockPayment adjunta el análisis al pago: valida ownership server-side.
     const { data: analysisRow } = await supabase
       .from('analyses')
-      .select('id, user_id')
+      .select('id, user_id, recoverable_amount')
       .eq('id', data.analysisId)
       .single()
-    if (analysisRow && analysisRow.user_id !== user.id) {
+    if (!analysisRow) {
+      return reply.status(404).send({ error: 'Analysis not found' })
+    }
+    if (analysisRow.user_id !== user.id) {
       return reply.status(403).send({ error: 'Forbidden: analysis belongs to another user' })
     }
 
     try {
-      const result = await createUnlockPayment.execute(data)
+      // El monto se calcula con el valor guardado en la base, nunca con el
+      // que envía el navegador (antes: 20% de lo que el cliente declarara).
+      const result = await createUnlockPayment.execute({
+        ...data,
+        recoverableAmount: Number(analysisRow.recoverable_amount ?? 0),
+      })
       return reply.send(result)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'

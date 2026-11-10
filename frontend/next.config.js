@@ -54,6 +54,9 @@ const remotePatterns = supabaseUrlParsed
 
 const nextConfig = {
   pageExtensions: ['ts', 'tsx', 'js', 'jsx', 'md', 'mdx'],
+  // Permite compilar a un directorio alterno mientras hay un `next dev` activo
+  // (evita que ambos procesos compartan .next y se corrompan los manifests).
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // NOTA: ignoreBuildErrors está activo porque @supabase/ssr (v0.10.3) sigue
   // teniendo problemas de inferencia con el Database genérico (retorna 'never').
   // Los tipos en database.types.ts están sincronizados con las migraciones.

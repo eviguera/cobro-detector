@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { CheckCircle2, ArrowRight, Clock } from 'lucide-react'
 import Link from 'next/link'
@@ -7,6 +8,8 @@ import type { Order } from '@/types/database.types'
 interface Props {
   searchParams: { order?: string; pending?: string }
 }
+
+export const metadata: Metadata = { title: 'Pago exitoso' }
 
 export default async function PagoExitosoPage({ searchParams }: Props) {
   const isPending = searchParams.pending === 'true'

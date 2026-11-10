@@ -1,7 +1,25 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, ArrowRight, X, FileSpreadsheet, FileBadge, ShieldCheck, Sparkles, RotateCcw, CreditCard, ShieldAlert, Lock, Activity } from 'lucide-react'
+import {
+  Upload,
+  FileText,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  ArrowRight,
+  X,
+  FileSpreadsheet,
+  FileBadge,
+  ShieldCheck,
+  Sparkles,
+  RotateCcw,
+  CreditCard,
+  ShieldAlert,
+  ScanLine,
+  Building2,
+  Clock3,
+} from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { formatCLP } from '@/lib/utils'
@@ -9,23 +27,16 @@ import Link from 'next/link'
 
 import { SecurityBadge } from '@/components/security-badge'
 import { Card } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
 import { createClient } from '@/lib/supabase/client'
 import { submitAnalysis, NoCreditsError, AnalysisFailedError } from '@/application/submit-analysis'
+import { buildAnalysisInsights } from '@/lib/analysis-insights'
+import { trackEvent } from '@/lib/product-events'
 import type { AnalysisRunResponse } from '@/domain'
 
 type Step = 'upload' | 'analyzing' | 'done'
 
-interface AnomalyResult {
-  type: string
-  severity: string
-  title: string
-  description: string
-  detail: string
-  recoverableAmount: number
-}
-
 interface AnalysisResult extends AnalysisRunResponse {
-  anomalies?: AnomalyResult[]
   awaitingPayment?: boolean
   paymentAmount?: number
   syncError?: string
@@ -42,6 +53,18 @@ const ANALYSIS_STEPS = [
   { label: 'Generando reporte final', icon: CheckCircle2 },
 ]
 
+const BANKS = [
+  'Santander',
+  'BCI',
+  'Banco de Chile',
+  'BancoEstado',
+  'Itaú',
+  'Scotiabank',
+  'Security',
+  'Falabella',
+  'Ripley',
+]
+
 export default function AnalisisPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -53,6 +76,7 @@ export default function AnalisisPage() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [creditsLeft, setCreditsLeft] = useState<number | null>(null)
+  const [fileError, setFileError] = useState('')
   const [elapsed, setElapsed] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -61,7 +85,6 @@ export default function AnalisisPage() {
   const isPlatino = planFromUrl === 'platino'
   const hasNoCredits = creditsLeft === 0 && !isPlatino
 
-  // Saldo real para avisar ANTES de subir, no después de gastar el intento.
   useEffect(() => {
     let cancelled = false
     const supabase = createClient()
@@ -71,67 +94,60 @@ export default function AnalisisPage() {
       .single()
       .then(({ data, error }) => {
         if (cancelled) return
-        // Si falla la lectura, no asumimos "sin créditos": bloquearíamos a un
-        // usuario que sí tiene saldo. Dejamos el aviso en manos del backend.
         if (error && error.code !== 'PGRST116') {
           setCreditsLeft(null)
           return
         }
         setCreditsLeft(data ? Math.max(0, (data.total ?? 0) - (data.used ?? 0)) : 0)
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  // Cronómetro visible durante el análisis: da feedback de que sigue vivo.
   useEffect(() => {
     if (step !== 'analyzing') return
     setElapsed(0)
-    const timer = setInterval(() => setElapsed(seconds => seconds + 1), 1000)
+    const timer = setInterval(() => setElapsed((seconds) => seconds + 1), 1000)
     return () => clearInterval(timer)
   }, [step])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
   const handleFile = useCallback(async (f: File) => {
-    const allowed = ['application/pdf', 'application/vnd.ms-excel',
+    const allowed = [
+      'application/pdf',
+      'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/csv']
+      'text/csv',
+    ]
     if (!allowed.includes(f.type) && !f.name.match(/\.(pdf|xlsx|xls|csv)$/i)) {
-      toast.error('Formato no soportado. Usa PDF, Excel o CSV.')
+      setFileError('Ese archivo no es un PDF, Excel o CSV válido. Usa la cartola tal como la descarga tu banco.')
       return
     }
     if (f.size > 10 * 1024 * 1024) {
-      toast.error('El archivo es demasiado grande. Máximo 10MB.')
+      setFileError('Tu archivo pesa más de 10 MB. Descarga la cartola del mes, no del año.')
       return
     }
 
-    // Validar magic bytes (firma del archivo) para evitar archivos renombrados
-    // o con contenido malicioso disfrazado de CSV/Excel/PDF.
     const valid = await validateFileMagicBytes(f)
     if (!valid) {
-      toast.error('El archivo no parece ser un PDF, Excel o CSV válido.')
+      setFileError('El contenido del archivo no coincide con su extensión. Vuelve a descargar la cartola desde el banco.')
       return
     }
 
+    setFileError('')
     setFile(f)
   }, [])
 
-  /**
-   * Valida los "magic bytes" (primeros bytes del archivo) para confirmar
-   * que el archivo es realmente del tipo que dice ser, y no un archivo
-   * renombrado con contenido potencialmente malicioso.
-   */
   async function validateFileMagicBytes(file: File): Promise<boolean> {
     const header = await file.slice(0, 16).arrayBuffer()
     const bytes = new Uint8Array(header)
 
-    // PDF: %PDF (0x25 0x50 0x44 0x46)
     if (file.name.toLowerCase().endsWith('.pdf')) {
       return bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46
     }
 
-    // Excel moderno (.xlsx): PK\x03\x04 (ZIP-based)
-    // Excel antiguo (.xls): 0xD0 0xCF 0x11 0xE0 (OLE2)
     if (file.name.toLowerCase().endsWith('.xlsx')) {
       return bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04
     }
@@ -139,9 +155,7 @@ export default function AnalisisPage() {
       return bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0
     }
 
-    // CSV: no tiene magic bytes fijos, pero debe ser texto legible
     if (file.name.toLowerCase().endsWith('.csv')) {
-      // Verificar que los primeros bytes sean caracteres imprimibles (ASCII)
       for (let i = 0; i < Math.min(bytes.length, 16); i++) {
         const b = bytes[i]
         if (b !== 0x0a && b !== 0x0d && b !== 0x09 && (b < 0x20 || b > 0x7e)) {
@@ -154,12 +168,15 @@ export default function AnalisisPage() {
     return true
   }
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setDragging(false)
-    const f = e.dataTransfer.files[0]
-    if (f) handleFile(f)
-  }, [handleFile])
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      setDragging(false)
+      const f = e.dataTransfer.files[0]
+      if (f) handleFile(f)
+    },
+    [handleFile]
+  )
 
   const runAnalysis = async () => {
     if (!file || loading) return
@@ -178,9 +195,13 @@ export default function AnalisisPage() {
 
     const controller = new AbortController()
     abortRef.current = controller
+    void trackEvent('analysis_started', {
+      file_type: file.type || 'desconocido',
+      plan: isPlatino ? 'platino' : 'creditos',
+    })
 
     const interval = setInterval(() => {
-      setCurrentAnalysisStep(prev => {
+      setCurrentAnalysisStep((prev) => {
         if (prev >= ANALYSIS_STEPS.length - 1) {
           clearInterval(interval)
           return prev
@@ -189,13 +210,13 @@ export default function AnalisisPage() {
       })
     }, 900)
 
-    // Si el servicio no responde, cortar a los 2 minutos en vez de dejar
-    // al usuario atrapado en una pantalla de progreso infinita.
     const timeout = setTimeout(() => controller.abort(), 120_000)
 
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
       if (!user) {
         toast.error('Tu sesión expiró. Vuelve a iniciar sesión.')
@@ -215,29 +236,42 @@ export default function AnalisisPage() {
 
       setCurrentAnalysisStep(ANALYSIS_STEPS.length - 1)
 
-      // Platino solo paga cuando hay algo que recuperar. Sin anomalías no
-      // corresponde mostrar un paywall de $0.
-      const awaitingPayment = Boolean(analysisResult.awaitingPayment) ||
-        (isPlatino && (analysisResult.recoverableAmount ?? 0) > 0 && (analysisResult.anomaliesCount ?? 0) > 0)
+      const awaitingPayment =
+        Boolean(analysisResult.awaitingPayment) ||
+        (isPlatino &&
+          (analysisResult.recoverableAmount ?? 0) > 0 &&
+          (analysisResult.anomaliesCount ?? 0) > 0)
 
       const resultData: AnalysisResult = {
         ...analysisResult,
-        anomalies: [],
         awaitingPayment,
-        paymentAmount: awaitingPayment ? Math.round((analysisResult.recoverableAmount ?? 0) * 0.2) : undefined,
+        paymentAmount: awaitingPayment
+          ? Math.round((analysisResult.recoverableAmount ?? 0) * 0.2)
+          : undefined,
       }
 
       setResult(resultData)
       setStep('done')
+      // Refrescar el layout del servidor para que el saldo de créditos y el
+      // historial reflejen el análisis recién ejecutado.
+      router.refresh()
+      void trackEvent('analysis_completed', {
+        analysis_id: analysisResult.analysisId,
+        findings: analysisResult.anomaliesCount,
+        recoverable: analysisResult.recoverableAmount,
+        bank: analysisResult.bank,
+        awaiting_payment: awaitingPayment,
+      })
       toast.success(
         awaitingPayment
           ? 'Análisis listo. Revisa el reporte para desbloquearlo.'
-          : 'Análisis completado exitosamente',
+          : 'Análisis completado exitosamente'
       )
     } catch (err: unknown) {
       if (cancelledRef.current) return
 
       if (err instanceof NoCreditsError) {
+        void trackEvent('analysis_failed', { reason: 'no_credits' })
         toast.error('No tienes créditos disponibles. Compra un plan para continuar.')
         setStep('upload')
         router.push('/precios')
@@ -246,6 +280,10 @@ export default function AnalisisPage() {
 
       if (err instanceof AnalysisFailedError) {
         const timedOut = /abort/i.test(err.message)
+        void trackEvent('analysis_failed', {
+          reason: timedOut ? 'timeout' : 'service_error',
+          analysis_id: err.analysisId,
+        })
         setResult({
           analysisId: err.analysisId,
           status: 'failed',
@@ -269,6 +307,7 @@ export default function AnalisisPage() {
         return
       }
 
+      void trackEvent('analysis_failed', { reason: 'unexpected' })
       toast.error(err instanceof Error ? err.message : 'Error al analizar el archivo')
       setStep('upload')
     } finally {
@@ -299,39 +338,39 @@ export default function AnalisisPage() {
 
   if (step === 'upload') {
     return (
-      <div className="animate-fade-in-up max-w-2xl mx-auto">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-blue-500" />
-            <span className="text-xs font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400 font-mono">
-              Nuevo análisis
+      <div className="animate-fade-in space-y-6">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ScanLine className="h-4 w-4" aria-hidden="true" />
             </span>
+            <div>
+              <p className="eyebrow-accent">Nuevo análisis</p>
+              <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-[1.9rem]">
+                Auditar una cartola
+              </h1>
+            </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <h1 className="text-3xl sm:text-4xl font-display font-bold text-gray-900 dark:text-gray-50 tracking-tight">
-              Analizar estado de cuenta
-            </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800/40">
-              <Lock className="w-3 h-3" />
-              Conexión cifrada (HTTPS)
-            </span>
-          </div>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-            Sube tu estado de cuenta bancario y detectamos cobros injustificados en minutos.
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Sube tu estado de cuenta bancario. Revisamos comisiones, cuotas y cargos repetidos
+            uno por uno, con evidencia para reclamar.
           </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2">
             {isPlatino ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                <ShieldAlert className="w-3.5 h-3.5" />
-                Plan Platino · pagas solo el 20% si encontramos cobros
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-warning-200 bg-warning-50 px-3 py-1 text-xs font-medium text-warning-700 dark:border-warning-500/25 dark:bg-warning-500/10 dark:text-warning-500">
+                <ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                Plan Platino · pagas 20% solo si encontramos cobros
               </span>
             ) : creditsLeft !== null ? (
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                hasNoCredits
-                  ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                  : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-              }`}>
-                <CreditCard className="w-3.5 h-3.5" />
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                  hasNoCredits
+                    ? 'border-danger-200 bg-danger-50 text-danger-700 dark:border-danger-500/25 dark:bg-danger-500/10 dark:text-danger-500'
+                    : 'border-border bg-secondary/60 text-foreground'
+                }`}
+              >
+                <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
                 {hasNoCredits
                   ? 'Sin créditos disponibles'
                   : `${creditsLeft} crédito${creditsLeft !== 1 ? 's' : ''} disponible${creditsLeft !== 1 ? 's' : ''}`}
@@ -340,266 +379,282 @@ export default function AnalisisPage() {
           </div>
         </div>
 
-        {hasNoCredits && (
-          <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/40 dark:bg-amber-900/20">
+        {hasNoCredits ? (
+          <div className="rounded-2xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/25 dark:bg-warning-500/10">
             <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-warning-600 dark:text-warning-500" aria-hidden="true" />
               <div className="flex-1">
-                <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                <p className="text-sm font-semibold text-warning-700 dark:text-warning-500">
                   Necesitas créditos para analizar
                 </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-                  Cada análisis consume 1 crédito. Compra un plan para continuar o usa el Plan Platino.
+                <p className="mt-0.5 text-xs leading-relaxed text-warning-700/80 dark:text-warning-500/80">
+                  Cada análisis consume 1 crédito. Compra un plan o usa el Plan Platino.
                 </p>
               </div>
               <Link
                 href="/precios"
-                className="flex-shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700"
+                className="shrink-0 rounded-lg bg-warning-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-warning-500"
               >
                 Ver planes
               </Link>
             </div>
           </div>
-        )}
+        ) : null}
 
-        {/* Mensaje de privacidad antes de subir */}
-        <div className="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/20 p-4">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 w-5 h-5 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                Privacidad de tus datos
-              </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-emerald-700 dark:text-emerald-300">
-                Tu CSV se procesa y se elimina automáticamente, no lo guardamos. Toda la conexión es cifrada con SSL/TLS.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Sellos de seguridad cerca del área de drop */}
-        <SecurityBadge variant="grid" className="mb-6" />
-
-        <label
-          htmlFor="analysis-file"
-          onDragOver={e => { e.preventDefault(); setDragging(true) }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          className={`relative block cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-300 focus-within:ring-2 focus-within:ring-blue-500/30 sm:p-12 ${
-            file
-              ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/10'
-              : dragging
-                ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-900/20 scale-[1.02]'
-                : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-gray-50/50 dark:hover:bg-gray-800/30'
-          }`}
-        >
-          <input
-            id="analysis-file"
-            ref={fileInputRef}
-            type="file"
-            className="sr-only"
-            accept=".pdf,.xlsx,.xls,.csv"
-            onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
-            aria-describedby="analysis-file-help"
-          />
-
-          {file ? (
-            <div className="animate-fade-in-scale">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shadow-inner">
-                <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <p className="font-display font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                {file.name}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 font-mono">
-                {(file.size / 1024).toFixed(0)} KB
-              </p>
-              <button
-                type="button"
-                onClick={e => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setFile(null)
-                  if (fileInputRef.current) fileInputRef.current.value = ''
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-              >
-                <X className="w-3 h-3" />
-                Quitar archivo
-              </button>
-            </div>
-          ) : (
-            <div>
-              <div className={`w-16 h-16 mx-auto mb-5 rounded-2xl flex items-center justify-center transition-all duration-300 ${
-                dragging
-                  ? 'bg-blue-100 dark:bg-blue-900/50 scale-110'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-              }`}>
-                <Upload className={`w-7 h-7 transition-colors duration-300 ${
-                  dragging ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
-                }`} />
-              </div>
-              <p className="font-display font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
-                Arrastra tu estado de cuenta aquí
-              </p>
-              <p className="text-sm text-gray-400 dark:text-gray-500 mb-2">
-                o haz clic para seleccionar un archivo
-              </p>
-              <p id="analysis-file-help" className="text-xs text-gray-400 dark:text-gray-400 font-mono">
-                PDF, Excel (.xlsx) o CSV · Máximo 10MB
-              </p>
-            </div>
-          )}
-        </label>
-
-        <div className="mt-6 bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-100 dark:border-gray-800/40 p-4 shadow-sm">
-          <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 mb-3 uppercase tracking-wider">
-            Bancos compatibles
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {['Santander', 'BCI', 'Banco de Chile', 'BancoEstado', 'Itaú', 'Scotiabank', 'Security', 'Falabella', 'Ripley'].map(bank => (
-              <span key={bank} className="text-[11px] px-2.5 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-400 font-medium">
-                {bank}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-start gap-2.5 text-xs text-gray-400 dark:text-gray-500">
-          <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-500" />
-          <span>
-            Tu archivo se procesa de forma segura. No almacenamos el contenido original, solo los datos del análisis.
-          </span>
-        </div>
-
-        {file && (
-          hasNoCredits ? (
-            <Link
-              href="/precios"
-              className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-xl bg-amber-500 py-3.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-amber-600"
+        <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+          <div>
+            <div
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragging(true)
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              className={`relative block cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-300 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 sm:p-12 ${
+                file
+                  ? 'border-success-500 bg-success-50/40 dark:bg-success-500/5'
+                  : dragging
+                    ? 'border-primary bg-accent/60'
+                    : 'border-border bg-card hover:border-primary/40 hover:bg-secondary/30'
+              }`}
             >
-              <CreditCard className="w-4 h-4" />
-              Comprar créditos para analizar
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          ) : (
-            <button
-              onClick={runAnalysis}
-              disabled={loading}
-              className="mt-6 w-full flex items-center justify-center gap-2.5 py-3.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+              <input
+                id="analysis-file"
+                ref={fileInputRef}
+                type="file"
+                className="sr-only"
+                accept=".pdf,.xlsx,.xls,.csv"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                aria-describedby="analysis-file-help"
+              />
+
+              {file ? (
+                <div className="animate-fade-in-scale">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-success-50 text-success-600 shadow-inner dark:bg-success-500/10 dark:text-success-500">
+                    <CheckCircle2 className="h-8 w-8" aria-hidden="true" />
+                  </div>
+                  <p className="font-display text-base font-semibold text-foreground">{file.name}</p>
+                  <p className="num mt-1 text-sm text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setFile(null)
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" aria-hidden="true" />
+                    Quitar archivo
+                  </button>
+                </div>
               ) : (
-                <Sparkles className="w-4 h-4" />
+                <label htmlFor="analysis-file" className="flex cursor-pointer flex-col items-center">
+                  <div
+                    className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl transition-all duration-300 ${
+                      dragging ? 'scale-110 bg-primary/10 text-primary' : 'bg-secondary/60 text-muted-foreground'
+                    }`}
+                  >
+                    <Upload className="h-7 w-7" aria-hidden="true" />
+                  </div>
+                  <p className="font-display text-base font-semibold text-foreground">
+                    Arrastra tu cartola aquí
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">o haz clic para seleccionar un archivo</p>
+                </label>
               )}
-              {isPlatino ? 'Analizar con Plan Platino' : 'Analizar ahora (usa 1 crédito)'}
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          )
-        )}
+            </div>
+
+            <p id="analysis-file-help" className="num mt-2 text-xs text-muted-foreground">
+              {file ? 'Archivo listo para analizar · ' : ''}PDF, Excel (.xlsx) o CSV · Máximo 10 MB
+            </p>
+
+            {fileError ? (
+              <div role="alert" className="mt-3 flex items-start gap-2.5 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 dark:border-danger-500/25 dark:bg-danger-500/10">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger-600 dark:text-danger-500" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-danger-700 dark:text-danger-500">{fileError}</p>
+                  <p className="mt-0.5 text-[11px] text-danger-700/80 dark:text-danger-500/80">
+                    Si el problema sigue, escríbenos a soporte@cobrodetector.cl con el nombre del archivo.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setFileError('')} aria-label="Cerrar aviso" className="text-danger-600 hover:text-danger-700 dark:text-danger-500">
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            ) : null}
+
+            {file ? (
+              hasNoCredits ? (
+                <Link
+                  href="/precios"
+                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-warning-500 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-px hover:bg-warning-600"
+                >
+                  <CreditCard className="h-4 w-4" aria-hidden="true" />
+                  Comprar créditos para analizar
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              ) : (
+                <button
+                  onClick={runAnalysis}
+                  disabled={loading}
+                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:-translate-y-px hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
+                  {isPlatino ? 'Analizar con Plan Platino' : 'Analizar ahora (usa 1 crédito)'}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )
+            ) : null}
+
+            <div className="mt-6 rounded-xl border border-border bg-card p-4">
+              <p className="eyebrow">Bancos compatibles</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {BANKS.map((bank) => (
+                  <span
+                    key={bank}
+                    className="rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-[11px] font-medium text-muted-foreground"
+                  >
+                    {bank}
+                  </span>
+                ))}
+              </div>
+              <a
+                href="/cartola-ejemplo.csv"
+                download
+                className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-semibold text-primary hover:underline"
+              >
+                <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                Descargar cartola de ejemplo
+              </a>
+            </div>
+          </div>
+
+          <aside className="space-y-4">
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-success-600 dark:text-success-500" aria-hidden="true" />
+                <p className="text-sm font-semibold text-foreground">Privacidad primero</p>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Tu archivo se cifra antes de salir del navegador y se elimina automáticamente
+                al terminar el análisis. No guardamos el contenido original.{' '}
+                <Link href="/seguridad" className="font-medium text-primary hover:underline">
+                  Ver cómo cuidamos tus datos
+                </Link>
+              </p>
+              <div className="mt-4">
+                <SecurityBadge variant="detailed" />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-secondary/30 p-5">
+              <p className="eyebrow">Qué revisamos</p>
+              <ul className="mt-3 space-y-2.5">
+                {[
+                  'Comisiones de crédito repetidas',
+                  'Cuotas sin interés mal calculadas',
+                  'Cobros duplicados y cargos genéricos',
+                  'Consistencia de montos y fechas',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-[12px] leading-snug text-muted-foreground">
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-600 dark:text-success-500" aria-hidden="true" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex items-start gap-2.5 rounded-xl border border-border/70 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+              <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              El análisis suele tardar menos de 1 minuto. Puedes salir y volver al historial.
+            </div>
+          </aside>
+        </div>
       </div>
     )
   }
 
   if (step === 'analyzing') {
     const rawProgress = ((currentAnalysisStep + 1) / ANALYSIS_STEPS.length) * 100
-    // Nunca mostrar 100% mientras el servicio sigue trabajando.
     const progress = currentAnalysisStep >= ANALYSIS_STEPS.length - 1 ? 92 : Math.min(rawProgress, 90)
-    const elapsedLabel = elapsed < 60
-      ? `${elapsed}s`
-      : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+    const elapsedLabel =
+      elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
 
     return (
-      <div className="animate-fade-in-up max-w-lg mx-auto pt-16 sm:pt-24">
-        <div className="relative w-20 h-20 mx-auto mb-8">
-          <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
-            <Loader2 className="w-10 h-10 text-blue-600 dark:text-blue-400 animate-spin" />
+      <div className="animate-fade-in mx-auto max-w-xl pt-8 sm:pt-14">
+        <div className="text-center">
+          <div className="relative mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+            <Loader2 className="h-7 w-7 animate-spin text-primary" aria-hidden="true" />
+            <span className="absolute -inset-2 rounded-3xl border border-primary/15 animate-pulse-subtle" aria-hidden="true" />
           </div>
-          <div className="absolute -inset-3 border-2 border-blue-200 dark:border-blue-800 rounded-3xl animate-pulse-subtle" />
+          <p className="eyebrow-accent">Auditoría en curso</p>
+          <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight">
+            Estamos revisando tu cartola
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Normalmente toma menos de 1 minuto · {elapsedLabel}
+          </p>
         </div>
 
-        <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-gray-50 text-center mb-2">
-          Analizando tu estado de cuenta
-        </h2>
-        <p className="text-gray-400 dark:text-gray-500 text-sm text-center mb-10">
-          Normalmente toma menos de 1 minuto · {elapsedLabel}
-        </p>
+        <Card className="mt-8 p-5 sm:p-6">
+          <Progress
+            value={progress}
+            label="Progreso del análisis"
+            hint={`${Math.round(progress)}% · paso ${currentAnalysisStep + 1} de ${ANALYSIS_STEPS.length}`}
+          />
 
-        <div className="mb-8" role="status" aria-live="polite" aria-label="Progreso del análisis">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-3 h-3 text-blue-500 animate-pulse-subtle" />
-              <span className="text-xs font-semibold text-gray-900 dark:text-gray-50">Procesando análisis</span>
-            </div>
-            <span className="text-xs font-mono text-blue-600 dark:text-blue-400">
-              {Math.round(progress)}%
-            </span>
-          </div>
-          <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${progress}%` }}
-              role="progressbar"
-              aria-valuenow={Math.round(progress)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={`Progreso del análisis: ${Math.round(progress)} por ciento completado`}
-            />
-          </div>
-          <div className="flex justify-between mt-2">
-            <span className="text-xs text-gray-400 font-mono">{Math.round(progress)}%</span>
-            <span className="text-xs text-gray-400">{currentAnalysisStep + 1} de {ANALYSIS_STEPS.length}</span>
-          </div>
-        </div>
+          <div className="mt-5 space-y-0.5" aria-live="polite">
+            {ANALYSIS_STEPS.map((s, i) => {
+              const isCompleted = i < currentAnalysisStep
+              const isActive = i === currentAnalysisStep
+              const StepIcon = s.icon
 
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm space-y-0.5" aria-live="polite" aria-label="Paso actual del análisis">
-          <div className="flex items-center gap-2 mb-2">
-            <Activity className="w-4 h-4 text-blue-500 animate-spin" />
-            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">Procesando archivo…</span>
-          </div>
-          {ANALYSIS_STEPS.map((s, i) => {
-            const isCompleted = i < currentAnalysisStep
-            const isActive = i === currentAnalysisStep
-            const StepIcon = s.icon
-
-            return (
-              <div
-                key={s.label}
-                className={`flex items-center gap-3 py-2 px-3 rounded-lg text-sm transition-all duration-300 ${
-                  isCompleted ? 'text-emerald-600 dark:text-emerald-400' :
-                  isActive ? 'text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 font-medium' :
-                  'text-gray-400 dark:text-gray-400'
-                }`}
-              >
-                <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
-                  isCompleted ? 'bg-emerald-50 dark:bg-emerald-900/20' :
-                  isActive ? 'bg-blue-100 dark:bg-blue-900/50' :
-                  'bg-gray-100 dark:bg-gray-800'
-                }`}>
-                  {isCompleted ? (
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  ) : isActive ? (
-                    <StepIcon className="w-3.5 h-3.5 animate-pulse-subtle" />
-                  ) : (
-                    <StepIcon className="w-3.5 h-3.5 opacity-40" />
-                  )}
+              return (
+                <div
+                  key={s.label}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-all duration-300 ${
+                    isCompleted
+                      ? 'text-muted-foreground'
+                      : isActive
+                        ? 'bg-accent font-medium text-accent-foreground'
+                        : 'text-muted-foreground/60'
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${
+                      isCompleted
+                        ? 'bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-500'
+                        : isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-secondary text-muted-foreground/60'
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <StepIcon className={`h-3.5 w-3.5 ${isActive ? 'animate-pulse-subtle' : ''}`} aria-hidden="true" />
+                    )}
+                  </span>
+                  <span>{s.label}</span>
+                  {isActive ? <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
                 </div>
-                <span className="font-medium">{s.label}</span>
-                {isActive && (
-                  <Loader2 className="w-3.5 h-3.5 ml-auto animate-spin" />
-                )}
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+
+          <p className="mt-4 border-t border-border pt-3 text-[11px] leading-relaxed text-muted-foreground">
+            El porcentaje es estimado. El análisis se completa cuando el servicio confirma el resultado.
+          </p>
+        </Card>
 
         <button
           type="button"
           onClick={cancelAnalysis}
-          className="mt-5 flex w-full items-center justify-center gap-2 py-2.5 text-sm text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+          className="mx-auto mt-5 flex items-center justify-center gap-2 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
           Cancelar análisis
         </button>
       </div>
@@ -611,78 +666,79 @@ export default function AnalisisPage() {
   if (result.awaitingPayment) {
     const recoverable = result.recoverableAmount ?? 0
     const pct = Math.round(recoverable * 0.2)
-    return (
-      <div className="animate-fade-in-up max-w-lg mx-auto pt-8 sm:pt-16">
-        <div className="relative w-16 h-16 mx-auto mb-6">
-          <div className="absolute inset-0 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center">
-            <ShieldCheck className="w-8 h-8 text-amber-500" />
-          </div>
-        </div>
-        <h2 className="text-xl font-display font-bold text-gray-900 dark:text-gray-50 text-center mb-2">
-          Reporte bloqueado — Plan Platino
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-8 leading-relaxed">
-          Detectamos <strong>{result.anomaliesCount} anomalía{result.anomaliesCount !== 1 ? 's' : ''}</strong> con un monto recuperable de <strong>{formatCLP(result.recoverableAmount ?? 0)}</strong>.
-        </p>
 
-        <div className="bg-white dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-100 dark:border-gray-800/40 p-6 shadow-sm mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">20% de lo recuperado</span>
-            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCLP(pct)}</span>
+    return (
+      <div className="animate-fade-in mx-auto max-w-lg pt-6 sm:pt-12">
+        <div className="text-center">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-warning-200 bg-warning-50 text-warning-600 dark:border-warning-500/25 dark:bg-warning-500/10 dark:text-warning-500">
+            <ShieldCheck className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <p className="eyebrow mt-4">Plan Platino</p>
+          <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight">Reporte listo para desbloquear</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Detectamos <strong className="text-foreground">{result.anomaliesCount} hallazgo{result.anomaliesCount !== 1 ? 's' : ''}</strong> con{" "}
+            <strong className="text-foreground">{formatCLP(recoverable)}</strong> recuperables.
+          </p>
+        </div>
+
+        <Card className="mt-6 p-6">
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm font-medium text-muted-foreground">20% de lo recuperado</span>
+            <span className="num-display text-3xl font-semibold text-warning-600 dark:text-warning-500">{formatCLP(pct)}</span>
           </div>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">
-            Pagá solo cuando recuperes. El reporte completo se libera al acreditar el pago.
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            Pagas solo si recuperas. El reporte completo se libera al acreditarse el pago.
           </p>
           <button
             onClick={() => router.push(`/historial/${result.analysisId}`)}
-            className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
+            className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-warning-500 text-sm font-semibold text-white transition-colors hover:bg-warning-600"
           >
             Ir al reporte y pagar
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
-        </div>
+        </Card>
 
-        <button onClick={resetForm} className="w-full py-3 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex items-center justify-center gap-2">
-          <RotateCcw className="w-3.5 h-3.5" />
+        <button
+          onClick={resetForm}
+          className="mx-auto mt-5 flex items-center justify-center gap-2 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
           Nuevo análisis
         </button>
       </div>
     )
   }
 
-  const syncError = result.syncError
-
-  if (syncError) {
+  if (result.syncError) {
     return (
-      <div className="animate-fade-in-up max-w-lg mx-auto pt-16 sm:pt-24">
-        <div className="relative w-16 h-16 mx-auto mb-6">
-          <div className="absolute inset-0 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center">
-            <AlertCircle className="w-8 h-8 text-red-500" />
-          </div>
+      <div className="animate-fade-in mx-auto max-w-lg pt-8 sm:pt-14">
+        <div className="text-center">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-danger-200 bg-danger-50 text-danger-600 dark:border-danger-500/25 dark:bg-danger-500/10 dark:text-danger-500">
+            <AlertCircle className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <h2 className="mt-4 font-display text-2xl font-semibold tracking-tight">No pudimos completar el análisis</h2>
         </div>
-        <h2 className="text-xl font-display font-bold text-gray-900 dark:text-gray-50 text-center mb-2">
-          No pudimos completar el análisis
-        </h2>
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl p-4 mb-6">
-          <p className="text-sm text-red-700 dark:text-red-300 font-mono whitespace-pre-wrap">
-            {syncError}
+
+        <div className="mt-6 rounded-xl border border-danger-200 bg-danger-50 p-4 dark:border-danger-500/25 dark:bg-danger-500/10">
+          <p className="num whitespace-pre-wrap text-xs leading-relaxed text-danger-700 dark:text-danger-500">
+            {result.syncError}
           </p>
         </div>
-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6">
-          El archivo se subió correctamente, pero el servicio de análisis no respondió.
-          Puedes reintentar con el mismo archivo o revisar el historial.
+        <p className="mt-4 text-center text-sm leading-relaxed text-muted-foreground">
+          El archivo se subió correctamente, pero el servicio no respondió. Puedes reintentar
+          o revisar el historial.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <button
             onClick={resetForm}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
             Intentar de nuevo
           </button>
           <button
             onClick={() => router.push(`/historial/${result.analysisId}`)}
-            className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold text-sm transition-all"
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-card px-5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
           >
             Ver en historial
           </button>
@@ -691,105 +747,151 @@ export default function AnalisisPage() {
     )
   }
 
+  const hasFindings = (result.anomaliesCount ?? 0) > 0
+  const insights = buildAnalysisInsights({
+    anomalies: result.anomalies,
+    totalTransactions: result.totalTransactions,
+    recoverableAmount: result.recoverableAmount,
+    bank: result.bank,
+    hasAiSummary: Boolean(result.summary),
+  })
+  const topFindings = insights.findings.slice(0, 3)
+
   return (
-    <div className="animate-fade-in-up max-w-3xl">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-mono">
-              Análisis completado
-            </span>
-          </div>
-          <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-gray-50 tracking-tight">
-            Resultados del análisis
-          </h1>
-          {result.totalTransactions && (
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400 font-mono">
-              {result.totalTransactions} transacciones analizadas
-            </p>
-          )}
-        </div>
+    <div className="animate-fade-in mx-auto max-w-3xl space-y-6">
+      <div>
+        <p className="eyebrow-accent">Análisis completado</p>
+        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">Resultado de tu cartola</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          {result.totalTransactions} transacciones revisadas
+          {result.bank ? ` · ${result.bank}` : ''}
+        </p>
       </div>
 
-      <Card className="mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children">
-          <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
-            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
-              Anomalías detectadas
+      <section
+        className={`relative overflow-hidden rounded-2xl border p-6 sm:p-7 ${
+          hasFindings
+            ? 'border-border bg-card'
+            : 'border-success-200 bg-success-50/60 dark:border-success-500/25 dark:bg-success-500/5'
+        }`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="eyebrow">{hasFindings ? 'Monto recuperable' : 'Resultado'}</p>
+            <p
+              className={`num-display mt-2 text-[2.4rem] font-semibold leading-none tracking-tight sm:text-[2.8rem] ${
+                hasFindings ? 'text-foreground' : 'text-success-700 dark:text-success-500'
+              }`}
+            >
+              {hasFindings ? formatCLP(result.recoverableAmount ?? 0) : 'Sin cobros injustificados'}
             </p>
-            <p className={`text-3xl font-display font-bold ${
-              (result.anomaliesCount ?? 0) > 0
-                ? 'text-red-600 dark:text-red-400'
-                : 'text-emerald-600 dark:text-emerald-400'
-            }`}>
-              <span className="tabular-nums">{result.anomaliesCount}</span>
+            <p className="mt-3 max-w-lg text-[13px] leading-relaxed text-muted-foreground">
+              {hasFindings
+                ? `Detectamos ${result.anomaliesCount} hallazgo${result.anomaliesCount !== 1 ? 's' : ''}. Revisa el detalle, la evidencia y el plan de reclamo.`
+                : 'No encontramos cobros duplicados ni irregularidades en esta cartola.'}
             </p>
           </div>
-          <div className="bg-white dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800/40 p-5 shadow-sm">
-            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
-              Monto recuperable
-            </p>
-            <p className="text-2xl font-display font-bold text-gray-900 dark:text-gray-100">
-              <span className="tabular-nums">{formatCLP(result.recoverableAmount ?? 0)}</span>
-            </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">estimado</p>
+          <span
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${
+              hasFindings
+                ? 'border-danger-200 bg-card text-danger-600 dark:border-danger-500/25 dark:text-danger-500'
+                : 'border-success-200 bg-card text-success-600 dark:border-success-500/25 dark:text-success-500'
+            }`}
+          >
+            {hasFindings ? <AlertCircle className="h-5 w-5" aria-hidden="true" /> : <CheckCircle2 className="h-5 w-5" aria-hidden="true" />}
+          </span>
+        </div>
+
+        <div className="mt-6 grid grid-cols-3 gap-4 border-t border-border/60 pt-4">
+          <div>
+            <p className="eyebrow">Transacciones</p>
+            <p className="num mt-1 text-lg font-semibold">{result.totalTransactions}</p>
           </div>
-          <div className={`rounded-2xl p-5 ${
-            (result.anomaliesCount ?? 0) > 0
-              ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40'
-              : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40'
-          }`}>
-            <p className={`text-xs font-medium uppercase tracking-wider mb-1.5 ${
-              (result.anomaliesCount ?? 0) > 0
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : 'text-blue-600 dark:text-blue-400'
-            }`}>
-              Siguiente paso
-            </p>
-            <p className={`text-sm font-semibold ${
-              (result.anomaliesCount ?? 0) > 0
-                ? 'text-emerald-900 dark:text-emerald-100'
-                : 'text-blue-900 dark:text-blue-100'
-            }`}>
-              {(result.anomaliesCount ?? 0) > 0
-                ? 'Descarga el reporte y ve al banco'
-                : 'No encontramos cobros injustificados'}
-            </p>
+          <div>
+            <p className="eyebrow">Hallazgos</p>
+            <p className={`num mt-1 text-lg font-semibold ${hasFindings ? 'text-danger-600 dark:text-danger-500' : ''}`}>{result.anomaliesCount}</p>
+          </div>
+          <div>
+            <p className="eyebrow">Estado</p>
+            <p className="mt-1 text-sm font-semibold text-success-600 dark:text-success-500">Completado</p>
           </div>
         </div>
-      </Card>
+      </section>
 
-      {result.summary && (
-        <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-5 mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-blue-500" />
-            <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-              Resumen del análisis (IA)
-            </p>
+      {result.summary ? (
+        <Card className="p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
+            <p className="eyebrow">Resumen del análisis</p>
           </div>
-          <p className="text-sm text-blue-900 dark:text-blue-100 leading-relaxed">
-            {result.summary}
-          </p>
-        </div>
-      )}
+          <p className="mt-3 text-sm leading-relaxed text-foreground">{result.summary}</p>
+        </Card>
+      ) : null}
 
-      <div className="mt-8 flex flex-col sm:flex-row gap-3">
+      {topFindings.length > 0 ? (
+        <Card className="p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <p className="eyebrow">Principales hallazgos</p>
+            <span className="num text-[11px] text-muted-foreground">{insights.counts.total} en total</span>
+          </div>
+          <ul className="mt-3 divide-y divide-border/70">
+            {topFindings.map((finding) => (
+              <li key={`${finding.type}-${finding.title}`} className="flex items-start justify-between gap-4 py-2.5">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span
+                    className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                      finding.severity === 'high'
+                        ? 'bg-danger-500'
+                        : finding.severity === 'medium'
+                          ? 'bg-warning-500'
+                          : 'bg-muted-foreground'
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-foreground">{finding.title}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {finding.type === 'duplicate_commission'
+                        ? 'Comisión duplicada'
+                        : finding.type === 'duplicate_charge'
+                          ? 'Cobro duplicado'
+                          : finding.type === 'installment_error'
+                            ? 'Error en cuotas'
+                            : finding.type === 'incorrect_charge'
+                              ? 'Cobro incorrecto'
+                              : 'Cargo no reconocido'}
+                      {typeof finding.confidence === 'number' ? ` · ${finding.confidence}% confianza` : ''}
+                    </p>
+                  </div>
+                </div>
+                <span className="num shrink-0 text-[13px] font-semibold text-foreground">{formatCLP(finding.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      <div className="flex flex-col gap-2 sm:flex-row">
         <button
           onClick={() => router.push(`/historial/${result.analysisId}`)}
-          className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-blue-600/20 dark:shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/30 dark:hover:shadow-blue-500/40 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+          className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:-translate-y-px hover:shadow-md"
         >
-          <FileText className="w-4 h-4" />
-          {(result.anomaliesCount ?? 0) > 0 ? 'Ver reporte completo' : 'Ver detalle del análisis'}
-          <ArrowRight className="w-4 h-4" />
+          <FileText className="h-4 w-4" aria-hidden="true" />
+          {hasFindings ? 'Ver reporte y evidencia' : 'Ver detalle del análisis'}
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </button>
         <button
           onClick={resetForm}
-          className="px-6 py-3.5 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
+          className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
         >
-          <RotateCcw className="w-3.5 h-3.5" />
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
           Nuevo análisis
         </button>
+      </div>
+
+      <div className="flex items-start gap-2.5 rounded-xl border border-border/70 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+        <Building2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        Guarda el reporte. Si el banco no responde en 10 días hábiles, puedes escalar el caso a la CMF.
       </div>
     </div>
   )

@@ -14,9 +14,9 @@ const sendNotification = new SendAnalysisNotificationUseCase(emailSender)
 const trackEvent = new TrackEventUseCase(eventRepo)
 
 const notificationSchema = z.object({
-  to: z.string().email(),
+  to: z.email(),
   userName: z.string().min(1),
-  analysisId: z.string().uuid(),
+  analysisId: z.uuid(),
   anomaliesCount: z.number().int().nonnegative(),
   recoverableAmount: z.number().nonnegative(),
 })
@@ -24,7 +24,7 @@ const notificationSchema = z.object({
 const eventSchema = z.object({
   userId: z.string().nullable(),
   eventType: z.string().min(1),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 })
 
 export async function notificationRoutes(app: FastifyInstance) {
