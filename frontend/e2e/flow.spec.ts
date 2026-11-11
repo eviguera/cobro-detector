@@ -14,30 +14,30 @@ test.describe('CobroDetector E2E Tests', () => {
     // Verificar que el testimonio está presente
     await expect(page.getByText('Rodrigo')).toBeVisible();
     
-    // Verificar estadísticas
-    await expect(page.getByText('97%')).toBeVisible();
+    // Verificar estadísticas del hero
+    await expect(page.getByText('3 min', { exact: true })).toBeVisible();
+    await expect(page.getByText('9+', { exact: true })).toBeVisible();
   });
 
   test('Login page renders', async ({ page }) => {
     await page.goto('/login');
-    
-    // Verificar que la página carga
-    await expect(page.locator('form, input').first()).toBeVisible();
-    
-    // Verificar que hay inputs
-    const inputs = page.locator('input');
-    const count = await inputs.count();
-    expect(count).toBeGreaterThan(0);
+
+    // El formulario debe renderizar aunque no haya sesión ni backend real.
+    await expect(page.locator('form')).toBeVisible();
+    await expect(page.locator('#email')).toBeVisible();
+    await expect(page.locator('#password')).toBeVisible();
   });
 
-  test('Pricing page loads', async ({ page }) => {
-    await page.goto('/precios');
-    
-    // Verificar que la página carga
-    await expect(page.locator('h2, h1').first()).toBeVisible();
-    
-    // Verificar que hay precios en la página
-    await expect(page.getByText(/\$[0-9]/)).toBeVisible();
+  test('Pricing section loads on landing', async ({ page }) => {
+    await page.goto('/#precios');
+
+    const pricing = page.locator('#precios');
+    await expect(
+      pricing.getByRole('heading', { name: 'Pago por análisis, sin suscripción' })
+    ).toBeVisible();
+
+    // Verificar que hay precios en la sección
+    await expect(pricing.getByText(/\$/).first()).toBeVisible();
   });
 
   test('Protected routes redirect to login', async ({ page }) => {

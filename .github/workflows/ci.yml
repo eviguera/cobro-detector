@@ -116,6 +116,13 @@ jobs:
     # Pin a 24.04: Playwright 1.59.x no soporta instalar deps en ubuntu 26.04 (ubuntu-latest).
     runs-on: ubuntu-24.04
     needs: [test-frontend]
+    # Valores dummy: los smoke tests E2E solo recorren páginas públicas. Sin
+    # estas variables, @supabase/ssr lanza al construir los clientes de login
+    # (browser/server) y del middleware, por lo que las páginas no renderizan.
+    # Deben estar definidas al arrancar `next dev` porque NEXT_PUBLIC_* se inlinea.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
     steps:
       - uses: actions/checkout@v4
 
