@@ -16,6 +16,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { PLANS, getPlanPriceDescription, getPlanPriceLabel, isPercentagePlan } from '@/lib/plans'
+import { PlanComparison } from '@/components/plan-comparison'
 
 const STEPS = [
   {
@@ -187,7 +188,7 @@ export default function LandingPage() {
 
               <p className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Lock className="h-3.5 w-3.5 text-success-600 dark:text-success-500" aria-hidden="true" />
-                Cifrado TLS · El archivo se elimina después del análisis
+                Cifrado AES-256-GCM en tu navegador · El archivo se elimina al terminar el análisis
               </p>
 
               <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-border pt-6">
@@ -376,13 +377,15 @@ export default function LandingPage() {
           <figure className="relative rounded-3xl border border-border bg-card p-8 shadow-card sm:p-10">
             <Quote className="h-7 w-7 text-brand-500/40" aria-hidden="true" />
             <blockquote className="mt-4 text-lg leading-relaxed text-foreground sm:text-xl">
-              Revisé los 300 pagos con tarjeta de mi carnicería y descubrí que el banco me cobraba la comisión de crédito
-              en <strong>cada cuota</strong>, cuando solo debía cobrarse una vez. Fui con el reporte y me devolvieron{' '}
-              <strong className="text-success-600 dark:text-success-500">$500.000 CLP</strong>.
+              Revisando los pagos con tarjeta de mi carnicería descubrí que el banco me cobraba la comisión de crédito
+              en <strong>cada cuota</strong>, cuando solo debía cobrarse una vez. Con el reporte pude reclamar con
+              evidencia, sin revisar los movimientos uno por uno.
             </blockquote>
             <figcaption className="mt-5 text-sm text-muted-foreground">
               <span className="font-medium text-foreground">Rodrigo</span> · dueño de carnicería, Rancagua
-              <span className="mt-0.5 block text-xs">Historia real que inspiró CobroDetector</span>
+              <span className="mt-0.5 block text-xs">
+                Caso que inspiró CobroDetector. El monto recuperable depende de tu propia cartola.
+              </span>
             </figcaption>
           </figure>
         </section>
@@ -394,8 +397,8 @@ export default function LandingPage() {
               {[
                 {
                   icon: Lock,
-                  title: 'Cifrado de extremo a extremo',
-                  desc: 'Tus archivos viajan con TLS y se procesan en un entorno aislado.',
+                  title: 'Cifrado en tu navegador',
+                  desc: 'Tu cartola se cifra con AES-256-GCM antes de salir, con una clave única por análisis.',
                 },
                 {
                   icon: Trash2,
@@ -430,7 +433,23 @@ export default function LandingPage() {
             <p className="mt-3 text-muted-foreground">Los créditos no vencen. Elige según cuántas cartolas revises.</p>
           </div>
 
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <PlanComparison
+            className="mt-8 md:hidden"
+            renderAction={(plan) => (
+              <Link
+                href="/login?mode=signup"
+                className={`inline-flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  plan.highlighted
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'border border-border bg-surface-muted text-foreground hover:bg-muted'
+                }`}
+              >
+                {isPercentagePlan(plan) ? 'Empezar sin costo fijo' : 'Comenzar'}
+              </Link>
+            )}
+          />
+
+          <div className="mt-10 hidden gap-5 md:grid sm:grid-cols-2 lg:grid-cols-4">
             {PLANS.map((plan) => {
               const percentage = isPercentagePlan(plan)
               return (
@@ -487,7 +506,7 @@ export default function LandingPage() {
             })}
           </div>
 
-          <p className="mt-6 text-center text-xs text-muted-foreground">
+          <p className="mt-6 hidden text-center text-xs text-muted-foreground md:block">
             Todos los planes incluyen análisis completos y reporte descargable.
           </p>
         </section>

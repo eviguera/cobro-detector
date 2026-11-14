@@ -6,6 +6,7 @@ export interface AnalysisRepository {
   updateStatus(analysisId: string, userId: string, status: string): Promise<void>
   storeResults(analysisId: string, userId: string, result: AnalysisResult, isPlatino: boolean): Promise<void>
   insertAnomalies(analysisId: string, userId: string, anomalies: Array<Record<string, unknown>>): Promise<void>
+  deleteAnomaliesByAnalysis(analysisId: string, userId: string): Promise<void>
   markError(analysisId: string, userId: string): Promise<void>
   getCreditsLeft(userId: string): Promise<number>
 }

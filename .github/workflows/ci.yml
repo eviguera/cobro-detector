@@ -20,6 +20,18 @@ jobs:
       fail-fast: false
       matrix:
         service: [api-svc, analysis-svc, payment-svc, notification-svc, admin-svc]
+    # Redis para los tests de integración de la cola (analysis-svc). Las demás
+    # patas de la matriz no lo usan, pero el overhead es mínimo.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -43,6 +55,10 @@ jobs:
         # job falla con "Missing script: test" y deja el CI en rojo permanente.
         run: npm test --if-present
         working-directory: ${{ matrix.service }}
+        env:
+          # Solo analysis-svc lo usa: activa los tests de integración de la
+          # cola (scripts Lua) contra el service Redis del job.
+          REDIS_TEST_URL: ${{ matrix.service == 'analysis-svc' && 'redis://localhost:6379' || '' }}
 
       - name: Benchmark del motor de análisis
         if: matrix.service == 'analysis-svc'
@@ -77,7 +93,10 @@ jobs:
         working-directory: frontend
 
   # -----------------------------------------------------------
-  # 3. Lint de todos los servicios
+  # 3. Lint (incremental): instala deps por servicio y ejecuta linters
+  #    disponibles. Se mantiene continue-on-error mientras se limpia la
+  #    deuda histórica; objetivo: convertir en gate por servicio de forma
+  #    progresiva (quitar continue-on-error cuando cada uno esté limpio).
   # -----------------------------------------------------------
   lint:
     runs-on: ubuntu-latest
@@ -88,25 +107,65 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
-      - name: Install root deps (if any)
+      - name: Install analysis-svc deps
         run: npm ci
-        continue-on-error: true
-
-      - name: Lint analysis-svc
-        run: npm run lint
         working-directory: analysis-svc
         continue-on-error: true
 
-      - name: Lint payment-svc
-        run: npm run lint
+      - name: Lint analysis-svc
+        run: npm run lint --if-present
+        working-directory: analysis-svc
+        continue-on-error: true
+
+      - name: Install payment-svc deps
+        run: npm ci
         working-directory: payment-svc
+        continue-on-error: true
+
+      - name: Lint payment-svc
+        run: npm run lint --if-present
+        working-directory: payment-svc
+        continue-on-error: true
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
         continue-on-error: true
 
       - name: Lint frontend
         run: npx next lint
         working-directory: frontend
+        continue-on-error: true
+
+      - name: Install api-svc deps
+        run: npm ci
+        working-directory: api-svc
+        continue-on-error: true
+
+      - name: Lint api-svc
+        run: npm run lint --if-present
+        working-directory: api-svc
+        continue-on-error: true
+
+      - name: Install notification-svc deps
+        run: npm ci
+        working-directory: notification-svc
+        continue-on-error: true
+
+      - name: Lint notification-svc
+        run: npm run lint --if-present
+        working-directory: notification-svc
+        continue-on-error: true
+
+      - name: Install admin-svc deps
+        run: npm ci
+        working-directory: admin-svc
+        continue-on-error: true
+
+      - name: Lint admin-svc
+        run: npm run lint --if-present
+        working-directory: admin-svc
         continue-on-error: true
 
   # -----------------------------------------------------------

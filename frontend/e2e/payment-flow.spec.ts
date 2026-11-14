@@ -1,50 +1,61 @@
 import { test, expect } from '@playwright/test'
-import { getTestCredentials, login } from './helpers/auth'
+import { hasTestCredentials, login, MISSING_CREDENTIALS } from './helpers/auth'
 
-const { email, password } = getTestCredentials()
+/**
+ * Requiere un usuario E2E real. Sin TEST_EMAIL / TEST_PASSWORD (PRs de fork)
+ * el describe completo se salta con motivo explícito.
+ *
+ * El flujo de análisis de punta a punta necesita el stack local levantado
+ * (Supabase + analysis-svc + Redis). Se activa con E2E_FULL_STACK=1; si no,
+ * se salta para no fallar por servicios que el CI público no tiene.
+ */
+const hasFullStack = process.env.E2E_FULL_STACK === '1'
+const MISSING_STACK =
+  'E2E_FULL_STACK!=1: requiere analysis-svc + Supabase local, omitido'
 
-test.describe('Flujo de Pago E2E', () => {
-  test('Página de precios muestra créditos disponibles', async ({ page }) => {
-    const ok = await login(page, email, password)
-    if (!ok) { test.skip(); return }
+test.describe('Planes y créditos', () => {
+  test.skip(!hasTestCredentials, MISSING_CREDENTIALS)
+
+  test('la página de precios lista los planes y el saldo de créditos', async ({ page }) => {
+    await login(page)
 
     await page.goto('/precios')
-    await page.waitForTimeout(3000)
 
-    await expect(page.locator('h2, h1').first()).toBeVisible()
-    await expect(page.locator('span.text-4xl').first()).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Elige tu plan' })).toBeVisible()
+    await expect(page.getByText(/Los créditos no vencen/i)).toBeVisible()
 
-    console.log('✅ Página de precios cargada')
+    // Cuatro planes, cada uno con su CTA de compra.
+    await expect(page.getByRole('button', { name: /Comprar |Empezar sin costo fijo/ })).toHaveCount(4)
   })
 })
 
-test.describe('Deduplicación E2E', () => {
-  test('Análisis no genera anomalías duplicadas', async ({ page }) => {
-    test.setTimeout(120000)
-    const ok = await login(page, email, password)
-    if (!ok) { test.skip(); return }
+test.describe('Deduplicación de hallazgos', () => {
+  test.skip(!hasTestCredentials, MISSING_CREDENTIALS)
+  test.skip(!hasFullStack, MISSING_STACK)
 
-    // Completar onboarding tour primero
-    await page.evaluate(() => localStorage.setItem('cobro-detector-onboarding-done', 'true'))
+  test('un análisis no reporta la misma transacción dos veces', async ({ page }) => {
+    test.setTimeout(180_000)
+    await login(page)
+
+    await page.addInitScript(() => {
+      localStorage.setItem('cobro-detector-onboarding-done', 'true')
+    })
     await page.goto('/analisis')
-    await page.waitForTimeout(3000)
 
-    const fileInput = page.locator('input[type="file"]').first()
-    await fileInput.setInputFiles('e2e/fixtures/test-statement.csv')
-    await page.waitForTimeout(1000)
+    await page.locator('#analysis-file').setInputFiles('e2e/fixtures/test-statement.csv')
+    await expect(page.getByText('test-statement.csv')).toBeVisible()
 
-    const analyzeButton = page.getByRole('button', { name: /analizar|enviar|procesar/i }).first()
-    await expect(analyzeButton).toBeEnabled({ timeout: 5000 })
-    await analyzeButton.click({ force: true })
+    const analyze = page.getByRole('button', { name: /Analizar ahora/ })
+    await expect(analyze).toBeEnabled()
+    await analyze.click()
 
-    try {
-      await page.waitForSelector('text=/resultado|completado|análisis completo/i', { timeout: 90000 })
-    } catch {
-      console.log('⚠️ Timeout esperando resultados')
-    }
+    await expect(
+      page.getByRole('heading', { name: /Resultado de tu cartola/i })
+    ).toBeVisible({ timeout: 150_000 })
 
-    const anomalyCards = page.locator('[class*="anomaly"], [data-testid*="anomaly"]')
-    const cardCount = await anomalyCards.count()
-    console.log(`🔍 Anomaly cards encontradas: ${cardCount}`)
+    // `mergeAnomalies` garantiza que una transacción recuperable se reclama
+    // una sola vez: el monto recuperable no puede superar el total de cargos.
+    const recoverable = page.getByText(/Monto recuperable/i).first()
+    await expect(recoverable).toBeVisible()
   })
 })

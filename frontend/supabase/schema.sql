@@ -157,10 +157,11 @@ CREATE TABLE IF NOT EXISTS analyses (
   file_type TEXT NOT NULL,
   file_url TEXT,
   -- Campos de cifrado y retención (seguridad de datos bancarios)
-  storage_path TEXT,                 -- Ruta en Supabase Storage del archivo cifrado
+  storage_path TEXT,                 -- Ruta del archivo cifrado (misma forma en ambos backends)
+  storage_driver TEXT NOT NULL DEFAULT 'supabase', -- Backend del archivo: 'supabase' | 's3'
   encryption_key_iv TEXT,            -- IV del cifrado AES-256-GCM (base64)
   encryption_key_base64 TEXT,        -- Clave de cifrado (base64) para que analysis-svc descifre
-  file_deleted_at TIMESTAMPTZ,       -- Timestamp de eliminación del archivo de Storage
+  file_deleted_at TIMESTAMPTZ,       -- Timestamp de eliminación REAL del archivo de Storage
   bank TEXT,
   period_start DATE,
   period_end DATE,
@@ -180,9 +181,13 @@ CREATE TABLE IF NOT EXISTS analyses (
 -- existían, así que se fuerzan de forma idempotente. Sin esto, el flujo de
 -- subida cifrada falla con PGRST204 ("Could not find the 'storage_path' column").
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS storage_path TEXT;
+ALTER TABLE analyses ADD COLUMN IF NOT EXISTS storage_driver TEXT NOT NULL DEFAULT 'supabase';
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS encryption_key_iv TEXT;
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS encryption_key_base64 TEXT;
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS file_deleted_at TIMESTAMPTZ;
+ALTER TABLE analyses DROP CONSTRAINT IF EXISTS analyses_storage_driver_check;
+ALTER TABLE analyses ADD CONSTRAINT analyses_storage_driver_check
+  CHECK (storage_driver IN ('supabase', 's3'));
 
 -- anomalies
 CREATE TABLE IF NOT EXISTS anomalies (

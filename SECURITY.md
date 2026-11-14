@@ -45,6 +45,22 @@ Verificación de JWT de Supabase Auth sin dependencias externas (Node `crypto`):
 - `src/routes/analyze.ts`: integra `safe-fetch` (no `fetch` directo) y mapea los errores a mensajes genéricos.
 - Test de verificación adicional: `npx tsc --noEmit` limpio en `analysis-svc`.
 
+### Storage (Supabase + S3 opcional)
+- `src/domain/ports/storage.port.ts` define el contrato (`upload`, `createSignedDownloadUrl`, `remove`, `driver`) y `buildStoragePath`/`sanitizeFileName`. El path siempre es `${userId}/${timestamp}-${archivo}.enc`, en ambos backends.
+- `analyses.storage_driver` (`'supabase' | 's3'`, NOT NULL default `'supabase'`) es la fuente de verdad del backend por análisis; la ruta por sí sola no lo revela. La escribe el cliente al crear el registro y la lee el worker.
+- Driver `supabase` (default de producción): upload directo navegador → Supabase Storage, cifrado AES-256-GCM antes de subir.
+- Driver `s3` (opt-in): el navegador nunca recibe credenciales AWS. Pide URLs prefirmadas a `POST /api/storage/upload-url` y `POST /api/storage/download-url` y borra con `DELETE /api/storage/object?path=`. El SDK de AWS es **solo servidor** (`s3-storage.adapter.ts`) y únicamente lo importan esos route handlers.
+- Los tres route handlers exigen sesión (`auth.getUser()` → 401), responden 404 si el driver no es `s3`, y validan propiedad del path: debe empezar por `${user.id}/`; se rechazan `..`, rutas absolutas, backslashes, caracteres de control y paths de más de 512 caracteres (`src/lib/storage-path.ts`).
+- TTLs: PUT prefirmado 600 s; GET prefirmado 3600 s (cubre los reintentos del worker: 3 intentos × 10 min de visibilidad).
+- El `ContentType` del PUT prefirmado **no** se firma: el bucket debe aplicar sus propias reglas de tipo/tamaño y habilitar CORS para el origen de la app.
+- `analysis-svc` no lleva dependencia de AWS: la allowlist SSRF (`src/security/supabase-url.ts`) acepta hosts S3/R2 solo cuando el driver está configurado, con patrones anclados; la reescritura local para el Supabase de desarrollo se limita a `/storage/v1/object/`.
+- Borrado: el worker borra el objeto en Supabase y solo entonces escribe `file_deleted_at`; en S3 delega en la regla de lifecycle del bucket y nunca marca `file_deleted_at`.
+
+### Envelope de la clave de cifrado (DEK/KEK)
+- El archivo se cifra en el navegador con AES-256-GCM (clave efímera/DEK por archivo). Antes de persistir la DEK en `analyses.encryption_key_base64`, el frontend la envía autenticado a `POST /api/storage/wrap-key` (route handler server-side) que la envuelve con `ANALYSIS_KEY_ENCRYPTION_KEY` (KEK, AES-256-GCM, formato `v1:<iv>.<tag>.<ct>`). `analysis-svc` la desenvuelve al procesar.
+- **Configuración requerida**: la misma `ANALYSIS_KEY_ENCRYPTION_KEY` (base64, 32 bytes) debe estar en el entorno server del frontend y en `analysis-svc`. Generar con `openssl rand -base64 32` y gestionar en un secret manager.
+- **Compatibilidad/rollout**: si la KEK no está configurada, opera en modo legado (DEK en texto plano en DB) para no romper entornos sin la variable. Filas legadas (base64 plano) siguen siendo legibles; filas envueltas requieren la KEK correcta. Planificar backfill/re-encripción de filas legadas y rotación de KEK antes de considerar cerrada la exposición histórica.
+
 ### Frontend
 - `src/lib/rate-limit.ts`: rate limit del lado cliente como capa preventiva.
 - `src/infrastructure/http/client.ts` + servicios: errores genéricos al usuario; sin exponer detalles de backend.
@@ -62,6 +78,7 @@ Verificación de JWT de Supabase Auth sin dependencias externas (Node `crypto`):
 | `SUPABASE_JWT_SECRET` | api-, payment-, admin-, notification-svc | **Obligatoria** (fail-closed): sin ella toda ruta autenticada responde 401. En `analysis-svc` solo es necesaria si el proyecto firma con HS256 |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | SVCs + frontend | El service role debe ser server-side; nunca al cliente |
 | `MERCADOPAGO_ACCESS_TOKEN` / `MERCADOPAGO_WEBHOOK_SECRET` | payment-svc | El webhook verifica la firma con el secret |
+| `ANALYSIS_KEY_ENCRYPTION_KEY` | frontend (server) y `analysis-svc` | KEK (base64, 32 bytes) para envolver la clave de archivo en DB. Misma en ambos; sin ella se usa modo legado (clave en texto plano). Gestionar en secret manager y planificar rotación/backfill |
 | — (signed URLs) | frontend (`supabase-storage.ts`, `analysis.service.ts`) | `createSignedUrl(path, 3600)` con expiración fija de 1 h |
 
 ## Hardening de base de datos (2026-11-09)
@@ -85,8 +102,12 @@ Migración versionada: `supabase/migrations/20261109_security_hardening.sql` (id
 | Orden | Archivo | Cuándo | ¿Rompe si se aplica antes del deploy? |
 |---|---|---|---|
 | 1 | `supabase/migrations/20261109_security_hardening.sql` | ya aplicada en local y producción (2026-11-10) | No |
-| 2 | `supabase/migrations/20261110_analyses_schema_align.sql` | ya aplicada en producción | No (solo agrega columnas) |
-| 3 | `supabase/migrations/20261110_analyses_paywall.sql` | **junto con el deploy** de microservicios + frontend | **Sí**: revoca INSERT/UPDATE y recorta SELECT en `analyses`; un frontend viejo que haga `insert({status})` o `select('*')` deja de funcionar |
+| 2 | `supabase/migrations/20261110000100_analyses_schema_align.sql` | ya aplicada en producción | No (solo agrega columnas) |
+| 3 | `supabase/migrations/20261110000200_analyses_paywall.sql` | **junto con el deploy** de microservicios + frontend | **Sí**: revoca INSERT/UPDATE y recorta SELECT en `analyses`; un frontend viejo que haga `insert({status})` o `select('*')` deja de funcionar |
+| 4 | `supabase/migrations/20261113000000_fase0_integridad.sql` | ya aplicada en producción (2026-11-13) | No (crea `events` si falta y la RPC `mark_analysis_failed`, ambas aditivas) |
+| 5 | `supabase/migrations/20261113100000_payment_webhook_idempotency.sql` | ya aplicada en producción (2026-11-13) | No (crea `payment_events` + RPCs de dedup; aplicar ANTES de desplegar payment-svc nuevo) |
+
+> Nota (2026-11-13): las migraciones 2 y 3 se renombraron con versión completa (`20261110000100`/`20261110000200`) para que `schema_align` ordene antes que `paywall` en instalaciones nuevas por nombre de archivo.
 
 Aplicación: `DATABASE_URL="postgresql://..." ./scripts/apply-prod-migration.sh` (o `npx supabase db push`).
 

@@ -5,6 +5,7 @@ import { MercadoPagoGatewayAdapter } from '../infrastructure/adapters/mercadopag
 import { SupabaseOrderRepositoryAdapter } from '../infrastructure/adapters/supabase-order-repository.adapter.js'
 import { SupabaseAnalysisRepositoryAdapter } from '../infrastructure/adapters/supabase-analysis-repository.adapter.js'
 import { SupabaseCreditRepositoryAdapter } from '../infrastructure/adapters/supabase-credit-repository.adapter.js'
+import { SupabasePaymentEventRepositoryAdapter } from '../infrastructure/adapters/supabase-payment-event-repository.adapter.js'
 import { CreatePaymentUseCase, CreateUnlockPaymentUseCase } from '../application/create-payment.use-case.js'
 import { ProcessWebhookUseCase } from '../application/process-webhook.use-case.js'
 import { requireAuth, requireSelfOr403, type AuthUser } from '../security/supabase-jwt.js'
@@ -14,9 +15,10 @@ const paymentGateway = new MercadoPagoGatewayAdapter()
 const orderRepo = new SupabaseOrderRepositoryAdapter(supabase)
 const analysisRepo = new SupabaseAnalysisRepositoryAdapter(supabase)
 const creditRepo = new SupabaseCreditRepositoryAdapter(supabase)
+const paymentEventRepo = new SupabasePaymentEventRepositoryAdapter(supabase)
 const createPayment = new CreatePaymentUseCase(paymentGateway, orderRepo, creditRepo)
 const createUnlockPayment = new CreateUnlockPaymentUseCase(paymentGateway)
-const processWebhook = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, analysisRepo)
+const processWebhook = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, analysisRepo, paymentEventRepo)
 
 const preferenceSchema = z.object({
   userId: z.string(),
