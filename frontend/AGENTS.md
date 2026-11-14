@@ -31,16 +31,22 @@ npm run build         # Build de producción
   - `src/domain/` — entidades de negocio (Analysis, Profile, Payment, etc.) sin dependencias externas.
   - `src/application/` — casos de uso orquestan la lógica (submitAnalysis, createPaymentPreference).
   - `src/infrastructure/http/` — HTTP clients por microservicio (analysis-api, payment-api, auth-api, admin-api). Un solo `client.ts` base con configuración de URLs via env vars.
-  - `src/infrastructure/adapters/` — adapters a servicios externos (supabase-storage para upload de archivos).
+  - `src/infrastructure/adapters/` — adapters a servicios externos (storage, HTTP clients). El storage vive detrás de un puerto: `src/domain/ports/storage.port.ts` + adapters en `src/infrastructure/adapters/storage/`.
   - `src/ui/` (alias `src/app/`, `src/components/`) — componentes React, páginas, layouts.
 - **Supabase** directo solo para file upload (Storage) y creación de registros de análisis. Toda otra lógica va por HTTP a microservicios.
+- **Storage con dos backends** (`src/domain/ports/storage.port.ts`):
+  - Contrato: `upload({ path, data, contentType })`, `createSignedDownloadUrl(path, ttl)`, `remove(path)` y `driver` (`'supabase' | 's3'`). `buildStoragePath()` y `sanitizeFileName()` también viven en el puerto.
+  - `supabase` es el driver por defecto de producción (`STORAGE_DRIVER` / `NEXT_PUBLIC_STORAGE_DRIVER`). `s3` es opt-in y sirve para AWS S3, Cloudflare R2 y MinIO.
+  - Cada análisis persiste su backend en `analyses.storage_driver`; la ruta `${userId}/${ts}-${archivo}.enc` es idéntica en ambos, así que la columna es la única fuente de verdad.
+  - El navegador sube a Supabase directo (con cifrado AES-GCM previo). Con `s3`, el navegador pide un **PUT prefirmado** a `POST /api/storage/upload-url` y sube directo al bucket: evita el límite de body de Vercel y nunca ve credenciales AWS (`HttpS3StorageAdapter`).
+  - El SDK de AWS (`@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`) es **solo servidor** (`S3StorageAdapter`); únicamente lo importan los route handlers de `/api/storage/*`.
 - **Next.js 14 App Router** (páginas: `src/app/`). Alias `@/` → `src/`. Route groups: `(auth)` y `(dashboard)`.
 - **Supabase Auth** gestionada via `@supabase/ssr`:
   - `src/lib/supabase/server.ts` — cliente server cacheado
   - `src/lib/supabase/client.ts` — cliente browser
   - `src/lib/supabase/db.ts` — helper `tables(client)` (workaround bug `@supabase/ssr`)
   - No hay cliente separado para middleware; `src/middleware.ts` usa `createServerClient` directamente.
-- **Middleware** (`src/middleware.ts`): solo protege rutas de página (`/dashboard`, `/analisis`, `/historial`, `/precios`). Sin API routes.
+- **Middleware** (`src/middleware.ts`): solo protege rutas de página (`/dashboard`, `/analisis`, `/historial`, `/precios`). Las API routes se autentican por sí mismas (`/api/storage/*` usa `auth.getUser()`).
 - **Configuración**: `opencode.json` con plugin `superpowers` + `.mcp.json`.
 - **Deploy**: Vercel proyecto `cobro-detector` con **Root Directory = `frontend`**, framework `nextjs`, build `npm run build`, output `.next`. El `vercel.json` de la raíz debe reflejar lo mismo; si el proyecto vuelve a root `.`, el build falla en 0 ms porque el `package.json` raíz no tiene build.
 - **Tailwind CSS** con `darkMode: ['class']`, variables CSS para temas. Fuentes: **Instrument Serif** (display/editorial), **Archivo** (body), **JetBrains Mono** (datos).
@@ -51,8 +57,10 @@ npm run build         # Build de producción
 - **Benchmark**: `analysis-svc/benchmarks/` + `npm run benchmark` (precision/recall/F1 por caso; `--strict` falla bajo 90%).
 - **Motor de reglas**: `analysis-svc/src/domain/anomaly-rules.ts`. Reglas de precisión: comisión de crédito repetida, cobro duplicado (mismo comercio + monto, ventana ≤10 días), intereses en cuotas sin interés, cargos genéricos y etiquetas del CSV. Cada hallazgo incluye `confidence` (0–100), `evidence` y `recommendedAction`. `mergeAnomalies` evita doble conteo: una transacción recuperable se reclama una sola vez.
 - **Parseo de archivos**: CSV, Excel (`exceljs`), y PDF (`pdf-parse`) de estados de cuenta (del lado de analysis-svc).
-- **Límite de subida**: `10mb` vía `next.config.js` `serverActions.bodySizeLimit`. El bucket `analysis-files` solo acepta `text/csv`, `application/pdf`, `application/vnd.ms-excel` y `.xlsx`; el adapter debe declarar el MIME original aunque el contenido vaya cifrado.
-- **Cifrado**: AES-256-GCM en el navegador (Web Crypto). El tag de autenticación viene concatenado al ciphertext; analysis-svc debe separar los últimos 16 bytes y usar `decipher.setAuthTag()`.
+- **Cola de análisis (Redis, confiable)**: el worker corre en `analysis-svc/src/worker.ts` como **proceso separado** del HTTP (`src/index.ts`). Patrón claim/ack con scripts Lua atómicos: `analysis:queue` (lista) → `analysis:processing` (sorted set con timestamp) → ack/retry, DLQ en `analysis:dlq`, reaper que recupera jobs de workers muertos (default 10 min de visibilidad, con heartbeat `touch` mientras el job sigue vivo) y shutdown elegante por SIGTERM. En compose: servicio `analysis-worker` (misma imagen, `command: node dist/worker.js`). Scripts: `npm run dev:worker` / `npm run start:worker`. Configuración por env: `QUEUE_MAX_ATTEMPTS`, `QUEUE_STALE_SECONDS`, `QUEUE_REAP_INTERVAL_SECONDS`, `QUEUE_POLL_INTERVAL_MS`, `QUEUE_HARD_SHUTDOWN_SECONDS` (ver `analysis-svc/.env.example`). Los fallos de negocio marcan `error` + devuelven crédito (terminal); solo los transitorios (DB/Redis caídos) reintentan. Un error inesperado del worker (bug) no se reintenta: va a la DLQ y cierra el análisis con `failTerminal`. Tests de integración contra Redis real: `REDIS_TEST_URL=redis://localhost:6379 npm test` (en CI hay un service Redis).
+- **Límite de subida**: `10mb` vía `next.config.js` `serverActions.bodySizeLimit` (aplica al camino Supabase). El bucket `analysis-files` solo acepta `text/csv`, `application/pdf`, `application/vnd.ms-excel` y `.xlsx`; el adapter debe declarar el MIME original aunque el contenido vaya cifrado. Con el driver `s3` el PUT prefirmado no pasa por el servidor de Next, así que ese límite no aplica; el `ContentType` no se firma y el bucket debe aplicar sus propias reglas.
+- **CSP con S3**: `next.config.js` calcula el origen del endpoint S3 (más `*.r2.cloudflarestorage.com` y `*.s3.<region>.amazonaws.com`) y lo agrega a `connect-src` solo cuando el driver es `s3`. `img-src` no se toca.
+- **Cifrado**: AES-256-GCM en el navegador (Web Crypto). El tag de autenticación viene concatenado al ciphertext; analysis-svc separa los últimos 16 bytes y usa `decipher.setAuthTag()`. La clave efímera del archivo (DEK) se envuelve en el servidor del frontend vía `POST /api/storage/wrap-key` con `ANALYSIS_KEY_ENCRYPTION_KEY` (KEK, `v1:iv.tag.ct`) antes de guardarse en `analyses.encryption_key_base64`; `analysis-svc` la desenvuelve (`security/key-wrap.ts`). Misma KEK en frontend server y analysis-svc; sin KEK opera en modo legado y las filas envueltas no se podrán descifrar. Filas legadas (texto plano) siguen siendo compatibles.
 
 ## Quirks de TypeScript
 
@@ -78,7 +86,7 @@ npm run build         # Build de producción
 El skill `cobro-detector-db` (`.agents/skills/cobro-detector-db/SKILL.md`) es la referencia completa del schema. Resumen ejecutivo:
 
 - **Schema consolidado**: `supabase/schema.sql` — 15 tablas, 30+ índices, RLS en todas las tablas de usuario, 8 triggers, 3 constraints, 2 vistas `security_invoker`.
-- **Feedback, telemetría y reclamo**: `anomaly_feedback` guarda el feedback por hallazgo (falsos positivos); `product_events` guarda eventos del embudo (`analysis_started`, `analysis_completed`, `analysis_failed`, `report_downloaded`, `claim_status_changed`); `claim_tracking` guarda el estado del reclamo (`draft|sent|responded|escalated`). Todas con RLS `auth.uid() = user_id`.
+- **Feedback, telemetría y reclamo**: `anomaly_feedback` guarda el feedback por hallazgo (falsos positivos); `events` guarda eventos del embudo (`analysis_started`, `analysis_completed`, `analysis_failed`, `report_downloaded`, `claim_status_changed`), la escribe notification-svc con service role y el usuario solo puede leer los suyos; `claim_tracking` guarda el estado del reclamo (`draft|sent|responded|escalated`). Todas con RLS `auth.uid() = user_id`.
 - **Schema `internal`**: privado para funciones SECURITY DEFINER (`verify_api_key`, `consume_credit`, `can_access_company`). Wrappers públicos en `public`.
 - Aplicar `supabase/schema.sql` en SQL Editor de Supabase para instalaciones nuevas. Es idempotente (`IF NOT EXISTS` / `CREATE OR REPLACE` / bloques `DO`).
 - **Nunca usar `apply_migration`** para cambios iterativos. Usar `execute_sql` (MCP). Luego correr advisors.
@@ -97,9 +105,14 @@ El skill `cobro-detector-db` (`.agents/skills/cobro-detector-db/SKILL.md`) es la
 ## Seguridad
 
 - **Autenticación**: el frontend usa sesión Supabase (`supabase.auth.getUser()`) para páginas protegidas vía middleware. Los microservicios usan API keys (Bearer token) o JWT de Supabase según el endpoint.
-- **No hay API routes en el frontend** — toda la lógica de negocio pasa por microservicios.
-- El middleware solo protege rutas de página; no hay autenticación de rutas API en el frontend.
-- **Validación de archivos**: el upload se hace directo a Supabase Storage desde el frontend. El análisis lo procesa analysis-svc.
+- **No hay API routes de negocio en el frontend** — toda la lógica de negocio pasa por microservicios. La única excepción es `/api/storage/*` (URLs prefirmadas de S3 y borrado de objetos), que existe solo para no exponer credenciales AWS ni superar el límite de body de Vercel; no contiene lógica de negocio.
+- El middleware solo protege rutas de página; las API routes autentican internamente.
+- **Route handlers de storage** (`src/app/api/storage/`), todos `runtime = 'nodejs'` y `dynamic = 'force-dynamic'`:
+  - `POST /api/storage/upload-url` → PUT prefirmado (TTL 600 s).
+  - `POST /api/storage/download-url` → GET prefirmado (TTL 3600 s, cubre los reintentos del worker).
+  - `DELETE /api/storage/object?path=` → borrado real del objeto.
+  - Responden `401` sin sesión y `404` si el driver activo no es `s3`. Validan que el path empiece por `${user.id}/` y rechazan `..`, rutas absolutas, backslashes, caracteres de control y paths de más de 512 chars (`src/lib/storage-path.ts`).
+- **Validación de archivos**: con el driver `supabase` el upload va directo a Supabase Storage desde el navegador; con `s3` va por PUT prefirmado contra el bucket (`CORS` del bucket debe permitir el origen de la app). En ambos casos el análisis lo procesa analysis-svc.
 
 ## Plan de mejora pendiente
 
@@ -121,13 +134,20 @@ El skill `cobro-detector-db` (`.agents/skills/cobro-detector-db/SKILL.md`) es la
 - ~~Agregar health checks entre microservicios~~ **Completado** (`GET /health` en analysis-svc)
 
 ### Completado en la iteración de producto (2026-11)
-- Rediseño visual "ledger" en landing, login, panel, análisis, historial, detalle, precios y métricas.
-- Onboarding ya no bloquea el primer pantallazo: se abre desde "Guía rápida" en el sidebar.
+- Rediseño visual "ledger" en landing, login, panel, análisis, historial, detalle, precios y métricas.- Onboarding ya no bloquea el primer pantallazo: se abre desde "Guía rápida" en el sidebar.
 - `⌘K` command palette para navegación.
 - Detalle v2: monto → prioridad/confianza → hallazgos con evidencia → plan de reclamo → movimientos.
 - Motor de análisis con precisión, confianza, evidencia y resumen determinístico.
 - Accesibilidad: 0 violaciones axe (WCAG 2.2 AA) en `/`, `/login`, `/dashboard`, `/historial`, `/historial/[id]`, `/analisis`, `/precios`, `/dashboard/analytics`.
 - Verificación E2E real con una cartola de prueba: 10 movimientos → 4 hallazgos → $113.500 recuperables.
+
+### Fiabilidad de cola y pagos (2026-11-13)
+- Cola Redis confiable: claim/ack atómico (scripts Lua), reintentos con presupuesto, DLQ y reaper de workers muertos. Worker en proceso aparte (`analysis-worker` en compose) con shutdown elegante por SIGTERM.
+- Idempotencia del webhook de MercadoPago: tabla `payment_events` + dedup antes de llamar a la API; `markCompleted` con CAS (`awaiting_payment` → `completed`).
+- `mark_analysis_failed` como RPC con validación de dueño (el UPDATE directo estaba revocado por el paywall).
+- `/health` de analysis-svc reporta profundidad de cola (pendientes / processing / DLQ).
+- Rate limit en analysis-svc (100/min), igual que el resto de los servicios.
+- CI: service Redis para los tests de integración de la cola.
 
 ### Baja prioridad
 - Configurar Sentry para monitoreo de errores

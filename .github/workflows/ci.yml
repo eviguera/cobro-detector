@@ -20,6 +20,18 @@ jobs:
       fail-fast: false
       matrix:
         service: [api-svc, analysis-svc, payment-svc, notification-svc, admin-svc]
+    # Redis para los tests de integración de la cola (analysis-svc). Las demás
+    # patas de la matriz no lo usan, pero el overhead es mínimo.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -39,8 +51,19 @@ jobs:
         working-directory: ${{ matrix.service }}
 
       - name: Run tests
-        run: npm test
+        # `--if-present`: api-svc todavía no tiene suite de tests. Sin esto el
+        # job falla con "Missing script: test" y deja el CI en rojo permanente.
+        run: npm test --if-present
         working-directory: ${{ matrix.service }}
+        env:
+          # Solo analysis-svc lo usa: activa los tests de integración de la
+          # cola (scripts Lua) contra el service Redis del job.
+          REDIS_TEST_URL: ${{ matrix.service == 'analysis-svc' && 'redis://localhost:6379' || '' }}
+
+      - name: Benchmark del motor de análisis
+        if: matrix.service == 'analysis-svc'
+        run: npm run benchmark -- --strict
+        working-directory: analysis-svc
 
   # -----------------------------------------------------------
   # 2. Tests y build del frontend (Next.js)
@@ -70,7 +93,10 @@ jobs:
         working-directory: frontend
 
   # -----------------------------------------------------------
-  # 3. Lint de todos los servicios
+  # 3. Lint (incremental): instala deps por servicio y ejecuta linters
+  #    disponibles. Se mantiene continue-on-error mientras se limpia la
+  #    deuda histórica; objetivo: convertir en gate por servicio de forma
+  #    progresiva (quitar continue-on-error cuando cada uno esté limpio).
   # -----------------------------------------------------------
   lint:
     runs-on: ubuntu-latest
@@ -81,20 +107,30 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
-      - name: Install root deps (if any)
+      - name: Install analysis-svc deps
         run: npm ci
-        continue-on-error: true
-
-      - name: Lint analysis-svc
-        run: npm run lint
         working-directory: analysis-svc
         continue-on-error: true
 
-      - name: Lint payment-svc
-        run: npm run lint
+      - name: Lint analysis-svc
+        run: npm run lint --if-present
+        working-directory: analysis-svc
+        continue-on-error: true
+
+      - name: Install payment-svc deps
+        run: npm ci
         working-directory: payment-svc
+        continue-on-error: true
+
+      - name: Lint payment-svc
+        run: npm run lint --if-present
+        working-directory: payment-svc
+        continue-on-error: true
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
         continue-on-error: true
 
       - name: Lint frontend
@@ -102,12 +138,50 @@ jobs:
         working-directory: frontend
         continue-on-error: true
 
+      - name: Install api-svc deps
+        run: npm ci
+        working-directory: api-svc
+        continue-on-error: true
+
+      - name: Lint api-svc
+        run: npm run lint --if-present
+        working-directory: api-svc
+        continue-on-error: true
+
+      - name: Install notification-svc deps
+        run: npm ci
+        working-directory: notification-svc
+        continue-on-error: true
+
+      - name: Lint notification-svc
+        run: npm run lint --if-present
+        working-directory: notification-svc
+        continue-on-error: true
+
+      - name: Install admin-svc deps
+        run: npm ci
+        working-directory: admin-svc
+        continue-on-error: true
+
+      - name: Lint admin-svc
+        run: npm run lint --if-present
+        working-directory: admin-svc
+        continue-on-error: true
+
   # -----------------------------------------------------------
   # 4. Tests E2E (Playwright) contra frontend en desarrollo
   # -----------------------------------------------------------
   test-e2e:
-    runs-on: ubuntu-latest
+    # Pin a 24.04: Playwright 1.59.x no soporta instalar deps en ubuntu 26.04 (ubuntu-latest).
+    runs-on: ubuntu-24.04
     needs: [test-frontend]
+    # Valores dummy: los smoke tests E2E solo recorren páginas públicas. Sin
+    # estas variables, @supabase/ssr lanza al construir los clientes de login
+    # (browser/server) y del middleware, por lo que las páginas no renderizan.
+    # Deben estar definidas al arrancar `next dev` porque NEXT_PUBLIC_* se inlinea.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
     steps:
       - uses: actions/checkout@v4
 

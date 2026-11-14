@@ -81,13 +81,14 @@ vi.mock('../security/supabase-url.js', () => ({
 }))
 
 vi.mock('../infrastructure/queue-connection.js', () => ({
-  queue: {
+  // El proceso HTTP usa funciones lazy: getQueue()/getRedis().
+  getQueue: vi.fn(() => ({
     enqueue: vi.fn(async () => {
       if (state.enqueueError) throw new Error('redis down')
       state.enqueued += 1
     }),
-  },
-  redis: { ping: vi.fn(async () => 'PONG') },
+  })),
+  getRedis: vi.fn(() => ({ ping: vi.fn(async () => 'PONG') })),
 }))
 
 const { analyzeRoutes } = await import('./analyze.js')

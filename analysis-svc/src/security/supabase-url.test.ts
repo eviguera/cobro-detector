@@ -10,6 +10,8 @@ describe('resolveAllowedFileUrl', () => {
   beforeEach(() => {
     process.env.NODE_ENV = 'production'
     process.env.SUPABASE_URL = 'https://abcdefgh.supabase.co'
+    delete process.env.S3_BUCKET
+    delete process.env.S3_ENDPOINT
   })
 
   afterEach(() => {
@@ -54,6 +56,77 @@ describe('resolveAllowedFileUrl', () => {
     it('rechaza URLs malformadas', () => {
       expect(() => resolveAllowedFileUrl('no-es-una-url')).toThrow(InvalidFileUrlError)
     })
+
+    describe('S3 / R2', () => {
+      it('acepta path-style de AWS', () => {
+        const url = 'https://s3.us-east-1.amazonaws.com/analysis-files/u/f.csv.enc?X-Amz-Signature=x'
+        expect(resolveAllowedFileUrl(url).toString()).toBe(url)
+      })
+
+      it('acepta virtual-host de AWS', () => {
+        expect(() =>
+          resolveAllowedFileUrl(
+            'https://analysis-files.s3.us-east-1.amazonaws.com/u/f.csv.enc?X-Amz-Signature=x',
+          ),
+        ).not.toThrow()
+      })
+
+      it('acepta la variante regional con guion (s3-<region>)', () => {
+        expect(() =>
+          resolveAllowedFileUrl('https://s3-us-west-2.amazonaws.com/analysis-files/u/f.csv.enc'),
+        ).not.toThrow()
+      })
+
+      it('acepta el dominio de China (.com.cn)', () => {
+        expect(() =>
+          resolveAllowedFileUrl(
+            'https://analysis-files.s3.cn-north-1.amazonaws.com.cn/u/f.csv.enc',
+          ),
+        ).not.toThrow()
+      })
+
+      it('acepta Cloudflare R2', () => {
+        expect(() =>
+          resolveAllowedFileUrl(
+            'https://accountid.r2.cloudflarestorage.com/analysis-files/u/f.csv.enc?X-Amz-Signature=x',
+          ),
+        ).not.toThrow()
+      })
+
+      it('acepta el host del S3_ENDPOINT configurado', () => {
+        process.env.S3_ENDPOINT = 'https://minio.internal.example.com'
+        expect(() =>
+          resolveAllowedFileUrl('https://minio.internal.example.com/analysis-files/u/f.csv.enc'),
+        ).not.toThrow()
+      })
+
+      it('acepta el virtual-host del bucket configurado', () => {
+        process.env.S3_BUCKET = 'cobrodetector-files'
+        expect(() =>
+          resolveAllowedFileUrl(
+            'https://cobrodetector-files.s3.amazonaws.com/u/f.csv.enc',
+          ),
+        ).not.toThrow()
+      })
+
+      it('rechaza http aunque sea un host de S3', () => {
+        expect(() =>
+          resolveAllowedFileUrl('http://s3.us-east-1.amazonaws.com/analysis-files/u/f.csv.enc'),
+        ).toThrow(InvalidFileUrlError)
+      })
+
+      it('rechaza dominios que imitan a AWS', () => {
+        expect(() =>
+          resolveAllowedFileUrl('https://s3.amazonaws.com.evil.example/analysis-files/u/f.enc'),
+        ).toThrow(InvalidFileUrlError)
+        expect(() =>
+          resolveAllowedFileUrl('https://s3evil.amazonaws.com/analysis-files/u/f.enc'),
+        ).toThrow(InvalidFileUrlError)
+        expect(() =>
+          resolveAllowedFileUrl('https://s3.us-east-1.amazonaws.com.evil.example/x'),
+        ).toThrow(InvalidFileUrlError)
+      })
+    })
   })
 
   describe('desarrollo', () => {
@@ -88,6 +161,15 @@ describe('resolveAllowedFileUrl', () => {
       expect(() => resolveAllowedFileUrl('https://evil.example.com/x')).toThrow(
         InvalidFileUrlError,
       )
+    })
+
+    it('no reescribe las URLs del emulador S3 local', () => {
+      const url =
+        'https://127.0.0.1:9297/analysis-files/user/f.csv.enc?X-Amz-Signature=abc&X-Amz-Credential=def'
+      const result = resolveAllowedFileUrl(url)
+      expect(result.origin).toBe('https://127.0.0.1:9297')
+      expect(result.pathname).toBe('/analysis-files/user/f.csv.enc')
+      expect(result.searchParams.get('X-Amz-Signature')).toBe('abc')
     })
   })
 })

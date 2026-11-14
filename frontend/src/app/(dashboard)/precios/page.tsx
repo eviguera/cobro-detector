@@ -15,6 +15,7 @@ import { cn } from '@/lib/cn'
 import { BuyButton } from './buy-button'
 import { PlatinoCalculator } from './platino-calculator'
 import { Card } from '@/components/ui/card'
+import { PlanComparison } from '@/components/plan-comparison'
 
 const FAQ = [
   {
@@ -75,8 +76,19 @@ export default async function PreciosPage() {
         </p>
       </div>
 
+      {/* Comparación compacta (móvil): misma data, sin scroll horizontal */}
+      <PlanComparison
+        className="md:hidden"
+        renderAction={(plan) => (
+          <BuyButton
+            plan={plan}
+            variant={isPercentagePlan(plan) ? 'platino' : plan.highlighted ? 'highlighted' : 'default'}
+          />
+        )}
+      />
+
       {/* Tarjetas */}
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="hidden gap-6 md:grid md:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((plan) => {
           const percentage = isPercentagePlan(plan)
           const badge = getPlanBadge(plan)

@@ -5,7 +5,7 @@ import { createUserClient } from '../infrastructure/adapters/supabase-user-clien
 import { extractBearerToken } from '../security/supabase-jwt.js'
 import { requireAuth, requireSelfOr403 } from '../security/supabase-jwt.js'
 import { InvalidFileUrlError, resolveAllowedFileUrl } from '../security/supabase-url.js'
-import { queue } from '../infrastructure/queue-connection.js'
+import { getQueue } from '../infrastructure/queue-connection.js'
 import type { QueueJob } from '../domain/ports/queue.port.js'
 
 const supabase = createServiceClient()
@@ -135,7 +135,7 @@ export async function analyzeRoutes(app: FastifyInstance) {
     }
 
     try {
-      await queue.enqueue(job)
+      await getQueue().enqueue(job)
     } catch (enqueueError) {
       // El crédito ya se descontó: si el encolado falla, devolverlo para no
       // cobrar un análisis que nunca se ejecutó. Las acreditaciones por

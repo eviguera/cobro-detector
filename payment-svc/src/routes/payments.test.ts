@@ -57,8 +57,19 @@ vi.mock('../infrastructure/adapters/supabase-credit-repository.adapter.js', () =
   SupabaseCreditRepositoryAdapter: vi.fn(function () {
     return {
       getCredits: vi.fn(),
-      consumeAtomic: vi.fn(),
       addCredits: vi.fn(),
+    }
+  }),
+}))
+
+// Mock del repositorio de eventos de pago (idempotencia del webhook): el
+// stub de supabase-client de este archivo no expone `.rpc`, así que sin
+// este mock la ruta /v1/webhook fallaría al consultar isProcessed.
+vi.mock('../infrastructure/adapters/supabase-payment-event-repository.adapter.js', () => ({
+  SupabasePaymentEventRepositoryAdapter: vi.fn(function () {
+    return {
+      record: vi.fn().mockResolvedValue(true),
+      isProcessed: vi.fn().mockResolvedValue(false),
     }
   }),
 }))

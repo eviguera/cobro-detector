@@ -1,4 +1,4 @@
-import { deduplicateAnomalies } from '@/lib/analyzer'
+import { deduplicateAnomalies, isAllowedStorageUrl } from '@/lib/analyzer'
 import type { DetectedAnomaly } from '@/types/database.types'
 
 function anomaly(overrides: Partial<DetectedAnomaly> = {}): DetectedAnomaly {
@@ -133,5 +133,97 @@ describe('deduplicateAnomalies', () => {
     expect(result[0].transactionRefs).toContain('tx-A')
     expect(result[0].transactionRefs).toContain('tx-C')
     expect(result[1].transactionRefs).toContain('tx-X')
+  })
+})
+
+describe('isAllowedStorageUrl', () => {
+  const originalEnv = process.env
+
+  beforeEach(() => {
+    process.env = {
+      ...originalEnv,
+      NEXT_PUBLIC_SUPABASE_URL: 'https://demo.supabase.co',
+      NEXT_PUBLIC_STORAGE_DRIVER: 'supabase',
+    }
+    delete process.env.S3_ENDPOINT
+    delete process.env.NEXT_PUBLIC_S3_ENDPOINT
+  })
+
+  afterAll(() => {
+    process.env = originalEnv
+  })
+
+  it('acepta el prefijo público de Supabase Storage con el driver supabase', () => {
+    expect(
+      isAllowedStorageUrl('https://demo.supabase.co/storage/v1/object/public/analysis-files/u1/cartola.csv.enc')
+    ).toBe(true)
+  })
+
+  it('rechaza otro bucket de Supabase', () => {
+    expect(
+      isAllowedStorageUrl('https://demo.supabase.co/storage/v1/object/public/otros/cartola.csv')
+    ).toBe(false)
+  })
+
+  it('rechaza hosts que no son Supabase ni S3 con el driver supabase', () => {
+    expect(isAllowedStorageUrl('https://evil.example/cartola.csv')).toBe(false)
+    expect(
+      isAllowedStorageUrl('https://bucket.s3.us-east-1.amazonaws.com/analysis-files/x.enc')
+    ).toBe(false)
+  })
+
+  it('con el driver s3 acepta URLs prefirmadas de AWS', () => {
+    process.env.NEXT_PUBLIC_STORAGE_DRIVER = 's3'
+    expect(
+      isAllowedStorageUrl(
+        'https://cobro-detector.s3.us-east-1.amazonaws.com/analysis-files/u1/x.enc?X-Amz-Signature=abc'
+      )
+    ).toBe(true)
+    expect(
+      isAllowedStorageUrl('https://s3.us-east-1.amazonaws.com/cobro-detector/analysis-files/u1/x.enc')
+    ).toBe(true)
+    expect(
+      isAllowedStorageUrl('https://s3.us-east-1.amazonaws.com.cn/bucket/x.enc')
+    ).toBe(true)
+  })
+
+  it('con el driver s3 acepta Cloudflare R2', () => {
+    process.env.NEXT_PUBLIC_STORAGE_DRIVER = 's3'
+    expect(
+      isAllowedStorageUrl('https://acc.r2.cloudflarestorage.com/bucket/analysis-files/u1/x.enc')
+    ).toBe(true)
+  })
+
+  it('con el driver s3 acepta el host del S3_ENDPOINT configurado', () => {
+    process.env.NEXT_PUBLIC_STORAGE_DRIVER = 's3'
+    process.env.S3_ENDPOINT = 'http://127.0.0.1:9000'
+    expect(
+      isAllowedStorageUrl('http://127.0.0.1:9000/bucket/analysis-files/u1/x.enc')
+    ).toBe(true)
+  })
+
+  it('rechaza lookalikes y protocolos no http(s) aunque el driver sea s3', () => {
+    process.env.NEXT_PUBLIC_STORAGE_DRIVER = 's3'
+    expect(
+      isAllowedStorageUrl('https://s3.amazonaws.com.evil.example/bucket/x.enc')
+    ).toBe(false)
+    expect(
+      isAllowedStorageUrl('https://s3evil.amazonaws.com/bucket/x.enc')
+    ).toBe(false)
+    expect(
+      isAllowedStorageUrl('ftp://s3.us-east-1.amazonaws.com/bucket/x.enc')
+    ).toBe(false)
+    expect(isAllowedStorageUrl('no-es-una-url')).toBe(false)
+  })
+
+  it('rechaza traversal y URLs demasiado largas', () => {
+    expect(
+      isAllowedStorageUrl('https://demo.supabase.co/storage/v1/object/public/analysis-files/../../etc/passwd')
+    ).toBe(false)
+    expect(
+      isAllowedStorageUrl(
+        'https://demo.supabase.co/storage/v1/object/public/analysis-files/' + 'a'.repeat(2048)
+      )
+    ).toBe(false)
   })
 })

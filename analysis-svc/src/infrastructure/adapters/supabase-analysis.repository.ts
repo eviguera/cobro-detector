@@ -71,7 +71,30 @@ export class SupabaseAnalysisRepository implements AnalysisRepository {
     if (error) throw error
   }
 
+  /**
+   * Idempotencia para re-ejecuciones de la cola (reaper/retry): un job que
+   * corre dos veces no debe dejar anomalías duplicadas.
+   */
+  async deleteAnomaliesByAnalysis(analysisId: string, userId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('anomalies')
+      .delete()
+      .eq('analysis_id', analysisId)
+      .eq('user_id', userId)
+    if (error) throw error
+  }
+
   async markError(analysisId: string, userId: string): Promise<void> {
-    await this.updateStatus(analysisId, userId, 'error')
+    // CAS: solo un análisis pendiente o en proceso puede pasar a 'error'.
+    // Sin esto, una re-ejecución (reap de un job lento) degradaría un
+    // análisis ya completado/awaiting_payment y devolvería crédito de un
+    // reporte ya entregado.
+    const { error } = await this.supabase
+      .from('analyses')
+      .update({ status: 'error' })
+      .eq('id', analysisId)
+      .eq('user_id', userId)
+      .in('status', ['pending', 'processing'])
+    if (error) throw error
   }
 }

@@ -15,6 +15,40 @@ try {
 const supabaseOrigin = supabaseUrlParsed ? supabaseUrlParsed.origin : ''
 const isDev = process.env.NODE_ENV !== 'production'
 
+// Storage: Supabase por defecto. Si el driver es S3, el navegador necesita
+// alcanzar el endpoint elegido (AWS regional, R2 o un S3 compatible como el
+// emulador local) para el PUT/GET prefirmado.
+const storageDriver = (process.env.NEXT_PUBLIC_STORAGE_DRIVER || 'supabase').trim()
+const s3Origin = (() => {
+  if (storageDriver !== 's3') return undefined
+  const endpoint = (process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.S3_ENDPOINT || '').trim()
+  if (endpoint) {
+    try {
+      return new URL(endpoint).origin
+    } catch {
+      return undefined
+    }
+  }
+  const region = (process.env.S3_REGION || '').trim()
+  return region ? `https://s3.${region}.amazonaws.com` : 'https://s3.amazonaws.com'
+})()
+
+const s3Sources = (() => {
+  if (storageDriver !== 's3') return []
+  const sources = new Set()
+  if (s3Origin) sources.add(s3Origin)
+  const bucket = (process.env.S3_BUCKET || '').trim()
+  const region = (process.env.S3_REGION || '').trim()
+  if (bucket && region) {
+    sources.add(`https://${bucket}.s3.${region}.amazonaws.com`)
+    sources.add(`https://${bucket}.s3.amazonaws.com`)
+  }
+  // Cloudflare R2 (host por cuenta) y S3 virtual-host genérico.
+  sources.add('https://*.r2.cloudflarestorage.com')
+  if (region) sources.add(`https://*.s3.${region}.amazonaws.com`)
+  return [...sources]
+})()
+
 const devOrigins = isDev
   ? ['http://localhost:*', 'http://127.0.0.1:*', 'ws://localhost:*', 'ws://127.0.0.1:*']
   : []
@@ -24,6 +58,7 @@ const connectSrc = [
   supabaseOrigin,
   'https://*.supabase.co',
   'https://*.vercel.app',
+  ...s3Sources,
   ...devOrigins,
 ]
   .filter(Boolean)

@@ -3,18 +3,34 @@ import { RedisAnalysisQueue } from './adapters/redis-queue.adapter.js'
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379'
 
-/**
- * Conexión usada por las rutas HTTP para encolar jobs (RPUSH).
- *
- * IMPORTANTE: no debe usarse para `dequeue()`. `BLPOP` bloquea la conexión
- * completa en Redis, así que si el worker comparte esta conexión los RPUSH del
- * endpoint quedan encolados detrás del bloqueo y `POST /v1/analyze` nunca
- * responde. Por eso el worker tiene su propia conexión (`workerRedis`).
- */
-export const redis = new Redis(redisUrl)
+// Conexiones LAZY: el proceso worker (src/worker.ts) solo materializa la suya.
+// Si fueran constantes, cada worker abriría también la conexión del HTTP
+// sin usarla.
+let httpRedis: Redis | null = null
+let httpQueue: RedisAnalysisQueue | null = null
+let workerRedis: Redis | null = null
+let workerQueue: RedisAnalysisQueue | null = null
 
-/** Conexión dedicada al worker de la cola (BLPOP). */
-export const workerRedis = redis.duplicate()
+/** Conexión Redis del proceso HTTP (enqueue + health check). */
+export function getRedis(): Redis {
+  if (!httpRedis) httpRedis = new Redis(redisUrl)
+  return httpRedis
+}
 
-export const queue = new RedisAnalysisQueue(redis)
-export const workerQueue = new RedisAnalysisQueue(workerRedis)
+/** Cola vista por las rutas HTTP y el health check (enqueue + métricas). */
+export function getQueue(): RedisAnalysisQueue {
+  if (!httpQueue) httpQueue = new RedisAnalysisQueue(getRedis())
+  return httpQueue
+}
+
+/** Conexión dedicada al worker de la cola. */
+export function getWorkerRedis(): Redis {
+  if (!workerRedis) workerRedis = getRedis().duplicate()
+  return workerRedis
+}
+
+/** Cola del worker (claim/ack/retry/reap/touch). */
+export function getWorkerQueue(): RedisAnalysisQueue {
+  if (!workerQueue) workerQueue = new RedisAnalysisQueue(getWorkerRedis())
+  return workerQueue
+}

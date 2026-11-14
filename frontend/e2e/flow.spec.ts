@@ -1,79 +1,71 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('CobroDetector E2E Tests', () => {
-  test('Homepage loads correctly', async ({ page }) => {
+/**
+ * Smoke de rutas públicas. No requiere credenciales ni backend: cualquier
+ * usuario/visitante anónimo debe poder recorrer estas páginas.
+ */
+test.describe('Rutas públicas', () => {
+  test('homepage carga con hero y estadísticas', async ({ page }) => {
     await page.goto('/');
-    
-    // Verificar que la página carga
+
     await expect(page).toHaveTitle(/CobroDetector/);
-    
-    // Verificar que existe un h1
-    const heading = page.locator('h1');
-    await expect(heading).toBeVisible();
-    
-    // Verificar que el testimonio está presente
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+
+    // Testimonio y estadísticas del hero: copy estable de la landing.
     await expect(page.getByText('Rodrigo')).toBeVisible();
-    
-    // Verificar estadísticas
-    await expect(page.getByText('97%')).toBeVisible();
+    await expect(page.getByText('3 min', { exact: true })).toBeVisible();
+    await expect(page.getByText('9+', { exact: true })).toBeVisible();
   });
 
-  test('Login page renders', async ({ page }) => {
+  test('login renderiza el formulario sin sesión', async ({ page }) => {
     await page.goto('/login');
-    
-    // Verificar que la página carga
-    await expect(page.locator('form, input').first()).toBeVisible();
-    
-    // Verificar que hay inputs
-    const inputs = page.locator('input');
-    const count = await inputs.count();
-    expect(count).toBeGreaterThan(0);
+
+    await expect(page.getByRole('heading', { name: /Ingresa a tu cuenta/i })).toBeVisible();
+    await expect(page.locator('#email')).toBeVisible();
+    await expect(page.locator('#password')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Ingresar' })).toBeVisible();
   });
 
-  test('Pricing page loads', async ({ page }) => {
-    await page.goto('/precios');
-    
-    // Verificar que la página carga
-    await expect(page.locator('h2, h1').first()).toBeVisible();
-    
-    // Verificar que hay precios en la página
-    await expect(page.getByText(/\$[0-9]/)).toBeVisible();
+  test('sección de precios de la landing muestra planes', async ({ page }) => {
+    await page.goto('/#precios');
+
+    const pricing = page.locator('#precios');
+    await expect(
+      pricing.getByRole('heading', { name: /Pago por análisis, sin suscripción/i })
+    ).toBeVisible();
+
+    // Al menos un precio formateado aparece en la sección.
+    await expect(pricing.getByText(/\$/).first()).toBeVisible();
   });
 
-  test('Protected routes redirect to login', async ({ page }) => {
-    // Probar /analisis
-    await page.goto('/analisis');
-    await page.waitForURL('**/login');
-    expect(page.url()).toContain('/login');
-    
-    // Probar /dashboard
-    await page.goto('/dashboard');
-    await page.waitForURL('**/login');
-    expect(page.url()).toContain('/login');
-  });
-
-  test('Dark mode button exists', async ({ page }) => {
-    await page.goto('/');
-    
-    // Buscar botón de tema
-    const themeButton = page.locator('button[aria-label*="theme"], button[aria-label*="tema"], [class*="theme"]').first();
-    
-    // Si existe, hacer clic
-    if (await themeButton.isVisible()) {
-      await themeButton.click();
-      await page.waitForTimeout(500);
+  test('rutas protegidas redirigen a login sin sesión', async ({ page }) => {
+    for (const route of ['/analisis', '/historial', '/precios', '/dashboard']) {
+      await page.goto(route);
+      await expect(page, `${route} debe redirigir a /login`).toHaveURL(/\/login$/);
     }
-    
-    // La prueba pasa si no hay errores
-    expect(true).toBeTruthy();
   });
 
-  test('Mobile responsive', async ({ page }) => {
-    // Configurar viewport móvil
+  /**
+   * El CTA del header apunta a `/login?mode=signup` (intención de registro).
+   * Nota: hoy la página de login ignora el parámetro `mode` y muestra el
+   * formulario de ingreso; este test fija la navegación, no el copy del
+   * formulario. Cuando el parámetro se respete habrá que asertar
+   * "Crea tu cuenta" aquí.
+   */
+  test('CTA "Comenzar" del header lleva a la intención de registro', async ({ page }) => {
+    await page.goto('/');
+
+    await page.locator('header').getByRole('link', { name: 'Comenzar' }).click();
+
+    await expect(page).toHaveURL(/\/login\?mode=signup$/);
+    await expect(page.locator('form')).toBeVisible();
+  });
+
+  test('homepage es usable en viewport móvil', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
-    
-    // Verificar que la página se ve correctamente
-    await expect(page.locator('h1')).toBeVisible();
+
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Comenzar' }).first()).toBeVisible();
   });
 });
