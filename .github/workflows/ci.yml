@@ -85,7 +85,7 @@ jobs:
         working-directory: frontend
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck:ci
         working-directory: frontend
 
       - name: Run unit tests
@@ -126,7 +126,6 @@ jobs:
       - name: Lint payment-svc
         run: npm run lint --if-present
         working-directory: payment-svc
-        continue-on-error: true
 
       - name: Install frontend deps
         run: npm ci
@@ -136,7 +135,6 @@ jobs:
       - name: Lint frontend
         run: npx next lint
         working-directory: frontend
-        continue-on-error: true
 
       - name: Install api-svc deps
         run: npm ci
@@ -146,7 +144,6 @@ jobs:
       - name: Lint api-svc
         run: npm run lint --if-present
         working-directory: api-svc
-        continue-on-error: true
 
       - name: Install notification-svc deps
         run: npm ci
@@ -156,7 +153,6 @@ jobs:
       - name: Lint notification-svc
         run: npm run lint --if-present
         working-directory: notification-svc
-        continue-on-error: true
 
       - name: Install admin-svc deps
         run: npm ci
@@ -166,7 +162,6 @@ jobs:
       - name: Lint admin-svc
         run: npm run lint --if-present
         working-directory: admin-svc
-        continue-on-error: true
 
   # -----------------------------------------------------------
   # 4. Tests E2E (Playwright) contra frontend en desarrollo

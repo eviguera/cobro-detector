@@ -139,9 +139,7 @@ async function assertAccessible(
 
   expect(
     disallowed,
-    `Violaciones de accesibilidad ${[
-      ...BLOCKING_IMPACTS,
-    ].join('/')} en ${route}:\n\n${formatViolations(disallowed)}\n`
+    `Violaciones de accesibilidad ${Array.from(BLOCKING_IMPACTS).join('/')} en ${route}:\n\n${formatViolations(disallowed)}\n`
   ).toEqual([])
 }
 

@@ -7,6 +7,34 @@ import { healthRoutes } from './routes/health.js'
 import { notificationRoutes } from './routes/notifications.js'
 import { claimReminderRoutes } from './routes/claim-reminders.js'
 
+function validateStartupEnv(): void {
+  const isProd = process.env.NODE_ENV === 'production'
+  const missing: string[] = []
+  if (!process.env.SUPABASE_URL) missing.push('SUPABASE_URL')
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY')
+
+  if (isProd && missing.length > 0) {
+    // eslint-disable-next-line no-console
+    console.error(`[notification-svc] Faltan variables críticas en producción: ${missing.join(', ')}`)
+    process.exit(1)
+  }
+  if (!isProd && missing.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(`[notification-svc] Variables no configuradas (modo dev): ${missing.join(', ')}`)
+  }
+  if (isProd && !(process.env.CORS_ORIGINS || '').trim()) {
+    // eslint-disable-next-line no-console
+    console.error('[notification-svc] CORS_ORIGINS es requerido en producción')
+    process.exit(1)
+  }
+  if (isProd && !process.env.SENTRY_DSN) {
+    // eslint-disable-next-line no-console
+    console.warn('[notification-svc] SENTRY_DSN no configurado en producción: sin monitoreo de errores')
+  }
+}
+
+validateStartupEnv()
+
 // HARDENED (2026-11): Sentry para monitoreo de errores en backend.
 // Solo se activa si SENTRY_DSN está configurado (variable de entorno).
 if (process.env.SENTRY_DSN) {
