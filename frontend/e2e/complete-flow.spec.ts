@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test'
-import { getTestCredentials, login } from './helpers/auth'
+import { TEST_EMAIL, TEST_PASSWORD, hasTestCredentials, login } from './helpers/auth'
 
-const { email, password } = getTestCredentials()
+const email = TEST_EMAIL
+const password = TEST_PASSWORD
 
 test.describe.serial('Flujo E2E autenticado', () => {
   test('Login y navegación básica', async ({ page }) => {
     test.setTimeout(60000)
-    const ok = await login(page, email, password)
-    if (!ok) { test.skip(); return }
+    if (!hasTestCredentials) { test.skip(); return }
+    await login(page, email, password)
 
     // Completar onboarding tour primero
     await page.evaluate(() => localStorage.setItem('cobro-detector-onboarding-done', 'true'))

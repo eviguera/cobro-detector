@@ -427,13 +427,58 @@ function detectLabeledAnomalies(transactions: ParsedTransaction[]): DetectedAnom
   return anomalies
 }
 
-function isAllowedStorageUrl(url: string): boolean {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  if (!supabaseUrl) return false
-  if (!url.startsWith(supabaseUrl + '/storage/v1/object/public/analysis-files/')) return false
-  if (url.includes('..')) return false
+/**
+ * Hosts de S3/R2 aceptados por el navegador/servidor de Next. Es el espejo de
+ * `analysis-svc/src/security/supabase-url.ts`: mismo patrón anclado para no
+ * aceptar imitadores (`s3.amazonaws.com.evil.example`, `s3evil.amazonaws.com`).
+ */
+const S3_URL_HOST_PATTERN =
+  /^(?:[a-z0-9][a-z0-9.-]*\.)?s3(?:[.-][a-z0-9-]+)*\.amazonaws\.com(?:\.cn)?$/i
+const R2_URL_HOST_SUFFIX = '.r2.cloudflarestorage.com'
+
+function isAllowedS3Url(parsed: URL): boolean {
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
+
+  const hostname = parsed.hostname.toLowerCase()
+  if (S3_URL_HOST_PATTERN.test(hostname) || hostname.endsWith(R2_URL_HOST_SUFFIX)) {
+    return true
+  }
+
+  const endpoint = (process.env.S3_ENDPOINT || process.env.NEXT_PUBLIC_S3_ENDPOINT)?.trim()
+  if (endpoint) {
+    try {
+      if (new URL(endpoint).hostname.toLowerCase() === hostname) return true
+    } catch {
+      // endpoint malformado: lo ignoramos
+    }
+  }
+
+  return false
+}
+
+export function isAllowedStorageUrl(url: string): boolean {
   if (url.length > 2048) return false
-  return true
+  if (url.includes('..')) return false
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (
+    supabaseUrl &&
+    url.startsWith(supabaseUrl + '/storage/v1/object/public/analysis-files/')
+  ) {
+    return true
+  }
+
+  // Con el driver S3 las URLs vienen prefirmadas (GET/GET con X-Amz-*), no del
+  // prefijo público de Supabase. Solo aplica si el driver está activo.
+  if (process.env.NEXT_PUBLIC_STORAGE_DRIVER === 's3') {
+    try {
+      return isAllowedS3Url(new URL(url))
+    } catch {
+      return false
+    }
+  }
+
+  return false
 }
 
 export async function analyzeFile(

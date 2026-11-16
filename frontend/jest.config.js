@@ -8,5 +8,6 @@ module.exports = {
   setupFiles: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^server-only$': '<rootDir>/src/test/mocks/server-only.js',
   },
 }

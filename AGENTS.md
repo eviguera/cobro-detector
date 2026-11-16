@@ -1,0 +1,28 @@
+# AGENTS.md (root)
+
+Monorepo: `frontend/` (Next.js 14, Vercel root=`frontend`, vercel.json en raíz apunta allí), microservicios `analysis-svc/`, `payment-svc/`, `notification-svc/`, `api-svc/`, `admin-svc/`, `supabase/` (schema/migraciones), `scripts/`. Raíz solo tiene devDep `supabase` (`package.json`) — no hay app raíz; build/deps/tests se ejecutan por paquete.
+
+## Comandos y verificación (no obvios)
+- Frontend (desde `frontend/`): `npm run dev|build|lint|test`, `npm run test:e2e` (requiere `TEST_EMAIL`/`TEST_PASSWORD`, ver `frontend/.env.example`), `npm run typecheck`/`typecheck:ci` = `tsc --noEmit -p tsconfig.check.json` (estable en paralelo/CI). `npx ts-node scripts/qa-check.ts` verifica migraciones/endpoints/tipos. Detalle y quirks en `frontend/AGENTS.md`.
+- Servicios (desde cada `<svc>/`): `npm ci && npm run build && npm test --if-present`. `analysis-svc` integra cola Redis con `REDIS_TEST_URL=redis://localhost:6379 npm test`; benchmark estricto: `npm run benchmark -- --strict`. `analysis-svc` corre HTTP (`dist/index.js`) y worker separado (`dist/worker.js`, scripts `dev:worker|start:worker`).
+- Stack local: Supabase corre en host (`supabase start`), no en Compose. `docker-compose.yml` expone servicios+Redis y mapea Supabase del host vía `host.docker.internal` (`DOCKER_SUPABASE_URL` para remoto). Frontend dev aparte (`cd frontend && npm run dev`). Health: `:3001-:3005/health`, Supabase `:54321`.
+- CI (`.github/workflows/ci.yml`, Node 22): matriz servicios (Redis service, `REDIS_TEST_URL` solo en `analysis-svc`, benchmark `--strict`), job frontend (tsc+jest), lint incremental con `continue-on-error` por deuda histórica, E2E Playwright en ubuntu-24.04 con Supabase dummy y `TEST_EMAIL/TEST_PASSWORD` secrets, y validación de Dockerfiles. No asumir lint como gate global.
+- Deploy: Vercel proyecto `cobro-detector` con Root Directory `frontend` (si vuelve a root `.` falla en 0 ms). `vercel.json` raíz debe reflejarlo.
+
+## Gotchas de repo (fáciles de romper)
+- Config/env: raíz `.env.example` (Supabase/Groq/Redis/MercadoPago/Resend, URLs servicios, storage/KEK/S3) ≠ `frontend/.env.example`. En Compose, vars por servicio (sin `env_file` global). `S3_TEST_ENDPOINT` para tests S3 reales; no emular AWS localmente.
+- Frontend TS: `next dev/build` puede reinsertar `.next/types/**/*.ts` en `frontend/tsconfig.json`; ejecutar `tsc` en paralelo al build puede dar TS6053 transitorio. Para chequeos estables usar `frontend/tsconfig.check.json` (`npm run typecheck`).
+- Storage/cifrado (crítico cross-service): drivers `supabase|s3` con ruta `${userId}/${ts}-${safe}.enc` y verdad en `analyses.storage_driver`; S3 usa presigned PUT/GET vía `/api/storage/*` (server-only, sin credenciales al cliente). DEK por archivo se envuelve con `ANALYSIS_KEY_ENCRYPTION_KEY` (KEK) en frontend server y se desenvuelve en `analysis-svc` — la KEK debe ser la misma en ambos; sin KEK opera en modo legado y filas envueltas no se descifran. Backfill: `scripts/backfill-wrap-analysis-keys.mjs` (dry-run/`--apply`).
+- Migración crítica pendiente: `supabase/migrations/20261110000200_analyses_paywall.sql` (breaking, paywall cloud) **no aplicar en cloud** sin ventana coordinada. Aplicación/preflight: `scripts/apply-prod-migration.sh` (args/`chain`, verificación ampliada). Ver `SECURITY.md` para notas de hardening.
+- Branch actual con trabajo no commiteado posible en `frontend/tsconfig.json`, `frontend/package.json`, `frontend/tsconfig.check.json` y specs e2e (`frontend/e2e/*`) según estado local reciente; revisar `git status` antes de asumir baseline limpio.
+
+## Historial de mejoras en base a calendarización aplicada (fuente de verdad)
+Leer en este orden para ver planificación calendarizada vs. lo aplicado:
+- `frontend/docs/superpowers/specs/2026-05-26-plan-implementacion.md` — roadmap v1.0→v2.0 (Mayo 2026): estado completado, **Fase 1 crítica / Fase 2 mejoras / Fase 3 opcionales** con esfuerzo/dependencias/riesgo, **Historial de Releases** calendarizado (`v0.1` 2026-Q1 → `v1.0` 2026-05 actual → `v1.1/v1.2` próximos → `v2.0` futuro) y métricas de progreso por fase.
+- `frontend/docs/superpowers/specs/2026-05-26-roadmap-v1.1-changelog.md` — ejecución aplicada de rama `feature/roadmap-v1.1` (base `main@5fda8c5`, 5 commits `6be367a..886caa0`): features/tests por commit, cambios de DB/API/páginas/librerías y pendientes explícitos (“No Implementado”).
+- `frontend/docs/superpowers/specs/2026-11-08-plan-mejora-v2.md` — plan con fecha/estado (2026-11-08): **línea base** (hecho vs deuda), **“Ejecutado después de escribir el plan”** (✅ aplicados), **Fases 0–4** calendarizadas por semanas (0: Sem 1, 1: Sem 2–3, 2: Sem 3–6, 3: Sem 6–9, 4: Sem 9–12) con checkpoint/scope, **Sprints de 7 días** (Día 1–7) y **Definición de “listo” (v2)** con checkboxes `[ ]` pendientes — usar esto para distinguir planificado vs aplicado por calendario.
+- `.opencode/todo.md` — ejecución operativa tracked (fases/tareas y hallazgos) complementaria a los specs.
+- `git log --oneline --date=short --format="%h %ad %s"` — evidencia cronológica de mejoras aplicadas en repo (commits recientes incluyen hardening/cola/KEK/migraciones, fixes CI, v2 análisis/evidencia/reclamo/UI y fixes de flujo). Contrastar con los planes para saber qué del calendario ya cayó.
+
+## Referencias clave (no duplicar)
+- Arquitectura/quirks/frontend en detalle: `frontend/AGENTS.md`. DB: `supabase/schema.sql` y skill `cobro-detector-db` (`.agents/skills/cobro-detector-db/SKILL.md`, ver nota en `frontend/AGENTS.md`). Seguridad/hardening: `SECURITY.md`. Config OpenCode: `opencode.json` (skills/commands review,audit,test) y `frontend/opencode.json` (plugin `superpowers`).

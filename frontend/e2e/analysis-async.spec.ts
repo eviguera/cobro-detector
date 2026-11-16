@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { getTestCredentials } from './helpers/auth';
+import { TEST_EMAIL, TEST_PASSWORD, hasTestCredentials, MISSING_CREDENTIALS } from './helpers/auth';
 
-const { email, password } = getTestCredentials();
-const needsAuth = Boolean(email && password);
+const email = TEST_EMAIL;
+const password = TEST_PASSWORD;
+const needsAuth = hasTestCredentials;
 
 test.describe('Flujo de análisis asíncrono (202 Accepted + polling)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });

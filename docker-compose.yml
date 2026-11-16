@@ -10,6 +10,11 @@ x-docker-host: &docker-host
   extra_hosts:
     - "host.docker.internal:host-gateway"
 
+x-common-runtime: &common-runtime
+  NODE_ENV: ${NODE_ENV:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  SENTRY_DSN: ${SENTRY_DSN:-}
+
 services:
   redis:
     image: redis:7-alpine
@@ -23,10 +28,15 @@ services:
     build: ./api-svc
     ports:
       - "3004:3004"
-    env_file:
-      - .env
     environment:
-      <<: *supabase-host-env
+      <<: [*supabase-host-env, *common-runtime]
+      PORT: 3004
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
     <<: *docker-host
     depends_on:
       - analysis-svc
@@ -38,10 +48,62 @@ services:
     build: ./analysis-svc
     ports:
       - "3001:3001"
-    env_file:
-      - .env
     environment:
-      <<: *supabase-host-env
+      <<: [*supabase-host-env, *common-runtime]
+      PORT: 3001
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-supabase}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      ANALYSIS_KEY_ENCRYPTION_KEY: ${ANALYSIS_KEY_ENCRYPTION_KEY:-}
+      QUEUE_MAX_ATTEMPTS: ${QUEUE_MAX_ATTEMPTS:-3}
+      QUEUE_STALE_SECONDS: ${QUEUE_STALE_SECONDS:-600}
+      QUEUE_REAP_INTERVAL_SECONDS: ${QUEUE_REAP_INTERVAL_SECONDS:-60}
+      QUEUE_POLL_INTERVAL_MS: ${QUEUE_POLL_INTERVAL_MS:-500}
+      QUEUE_HARD_SHUTDOWN_SECONDS: ${QUEUE_HARD_SHUTDOWN_SECONDS:-30}
+    <<: *docker-host
+    depends_on:
+      - redis
+
+  # Worker de la cola de análisis: misma imagen, proceso aparte (src/worker.ts).
+  # Escala CPU (parseo/IA) independiente del HTTP y sobrevive a redeploys del
+  # servidor con shutdown elegante (SIGTERM).
+  analysis-worker:
+    build: ./analysis-svc
+    command: ["node", "--env-file-if-exists=.env", "dist/worker.js"]
+    environment:
+      <<: [*supabase-host-env, *common-runtime]
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-supabase}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      ANALYSIS_KEY_ENCRYPTION_KEY: ${ANALYSIS_KEY_ENCRYPTION_KEY:-}
+      QUEUE_MAX_ATTEMPTS: ${QUEUE_MAX_ATTEMPTS:-3}
+      QUEUE_STALE_SECONDS: ${QUEUE_STALE_SECONDS:-600}
+      QUEUE_REAP_INTERVAL_SECONDS: ${QUEUE_REAP_INTERVAL_SECONDS:-60}
+      QUEUE_POLL_INTERVAL_MS: ${QUEUE_POLL_INTERVAL_MS:-500}
+      QUEUE_HARD_SHUTDOWN_SECONDS: ${QUEUE_HARD_SHUTDOWN_SECONDS:-30}
     <<: *docker-host
     depends_on:
       - redis
@@ -50,30 +112,49 @@ services:
     build: ./payment-svc
     ports:
       - "3002:3002"
-    env_file:
-      - .env
     environment:
-      <<: *supabase-host-env
+      <<: [*supabase-host-env, *common-runtime]
+      PORT: 3002
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY: ${NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY:-}
+      PAYMENT_SERVICE_URL: ${PAYMENT_SERVICE_URL:-}
+      PAYMENT_SVC_PUBLIC_URL: ${PAYMENT_SVC_PUBLIC_URL:-}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
     <<: *docker-host
 
   notification-svc:
     build: ./notification-svc
     ports:
       - "3003:3003"
-    env_file:
-      - .env
     environment:
-      <<: *supabase-host-env
+      <<: [*supabase-host-env, *common-runtime]
+      PORT: 3003
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      FROM_EMAIL: ${FROM_EMAIL:-}
+      CRON_SECRET: ${CRON_SECRET:-}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
     <<: *docker-host
 
   admin-svc:
     build: ./admin-svc
     ports:
       - "3005:3005"
-    env_file:
-      - .env
     environment:
-      <<: *supabase-host-env
+      <<: [*supabase-host-env, *common-runtime]
+      PORT: 3005
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
     <<: *docker-host
 
 volumes:

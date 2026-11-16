@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test'
-import { getTestCredentials, login } from './helpers/auth'
+import { TEST_EMAIL, TEST_PASSWORD, hasTestCredentials, login } from './helpers/auth'
 
-const { email, password } = getTestCredentials()
+const email = TEST_EMAIL
+const password = TEST_PASSWORD
 
 test.describe('Analytics y Webhooks E2E', () => {
   test('Página de analytics carga con datos', async ({ page }) => {
     test.setTimeout(30000)
-    const ok = await login(page, email, password)
-    if (!ok) { test.skip(); return }
+    if (!hasTestCredentials) { test.skip(); return }
+    await login(page, email, password)
 
     await page.goto('/dashboard/analytics')
     await page.waitForTimeout(3000)
@@ -18,8 +19,8 @@ test.describe('Analytics y Webhooks E2E', () => {
 
   test('Sidebar muestra link de Analytics', async ({ page }) => {
     test.setTimeout(30000)
-    const ok = await login(page, email, password)
-    if (!ok) { test.skip(); return }
+    if (!hasTestCredentials) { test.skip(); return }
+    await login(page, email, password)
 
     await page.goto('/dashboard')
     await page.waitForTimeout(2000)
@@ -32,8 +33,8 @@ test.describe('Analytics y Webhooks E2E', () => {
 
 test.describe('API Edge Cases', () => {
   test('Analyze rechaza sin archivo', async ({ page }) => {
-    const ok = await login(page, email, password)
-    if (!ok) { test.skip(); return }
+    if (!hasTestCredentials) { test.skip(); return }
+    await login(page, email, password)
     console.log('✅ Analyze rejects empty body')
   })
 })

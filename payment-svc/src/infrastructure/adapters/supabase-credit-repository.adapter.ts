@@ -16,12 +16,6 @@ export class SupabaseCreditRepositoryAdapter implements CreditRepository {
     return data as unknown as Credit
   }
 
-  async consumeAtomic(userId: string): Promise<boolean> {
-    const { data, error } = await this.supabaseService.rpc('consume_credit', { p_user_id: userId })
-    if (error) return false
-    return data as boolean
-  }
-
   async addCredits(userId: string, amount: number): Promise<void> {
     // Acreditación atómica en base (total = total + amount) con lock por
     // usuario. Antes era read-modify-write: dos acreditaciones concurrentes

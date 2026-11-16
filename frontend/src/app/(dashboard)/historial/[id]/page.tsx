@@ -9,12 +9,10 @@ import {
   Loader2,
   RotateCcw,
   Lock,
-  Trash2,
   ShieldCheck,
   FileText,
   ClipboardList,
   Building2,
-  Clock3,
 } from 'lucide-react'
 import { formatCLP, formatDate, getStatusLabel } from '@/lib/utils'
 import type { DetectedAnomaly, ParsedTransaction, Analysis } from '@/domain'
@@ -136,7 +134,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
   if (analysis.status === 'awaiting_payment' && (analysis.recoverable_amount ?? 0) > 0) {
     const pct = Math.round((analysis.recoverable_amount ?? 0) * 0.2)
     return (
-      <div className="mx-auto max-w-2xl animate-fade-in">
+      <div className="mx-auto max-w-2xl animate-fade-in pb-24 md:pb-0">
         <Link href="/historial" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver al historial
         </Link>
@@ -175,13 +173,34 @@ export default async function AnalysisDetailPage({ params }: Props) {
             />
           </div>
         </Card>
+
+        {/* Resumen fijo en móvil: recuerda el monto mientras se paga */}
+        <div
+          role="region"
+          aria-label="Resumen del monto a recuperar"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur md:hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="eyebrow">Recuperable</p>
+              <p className="num truncate text-base font-semibold text-foreground">
+                {formatCLP(analysis.recoverable_amount)}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="eyebrow">20% a pagar</p>
+              <p className="num text-base font-semibold text-foreground">{formatCLP(pct)}</p>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
     <ReportSelectionProvider analysisId={analysis.id} keys={anomalyKeys}>
-      <div className="animate-fade-in space-y-6">
+      <div className="animate-fade-in space-y-6 pb-24 md:pb-0">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Link href="/historial" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
@@ -196,7 +215,7 @@ export default async function AnalysisDetailPage({ params }: Props) {
           </p>
         </div>
         {reportUnlocked ? (
-          <div className="shrink-0">
+          <div className="hidden shrink-0 md:block">
             <DownloadReportButton analysis={analysis} anomalies={anomalies} transactions={transactions} />
           </div>
         ) : null}
@@ -353,35 +372,46 @@ export default async function AnalysisDetailPage({ params }: Props) {
         </TabsContent>
       </Tabs>
 
-      {/* Seguridad, al final y colapsada */}
-      <details className="group rounded-2xl border border-border bg-card">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
-          <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <ShieldCheck className="h-4 w-4 text-success-600 dark:text-success-500" aria-hidden="true" />
+      {/* Privacidad: un solo mensaje, alineado con /seguridad */}
+      <p className="flex items-start gap-2.5 rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-600 dark:text-success-500" aria-hidden="true" />
+        <span>
+          Tu cartola se cifra con AES-256-GCM en el navegador antes de subir y el archivo se elimina al terminar el
+          análisis. Conservamos solo los resultados.{' '}
+          <Link href="/seguridad" className="font-medium text-primary hover:underline">
             Cómo cuidamos tus datos
-          </span>
-          <span className="text-[11px] text-muted-foreground group-open:hidden">Ver detalle</span>
-          <span className="hidden text-[11px] text-muted-foreground group-open:inline">Ocultar</span>
-        </summary>
-        <div className="grid gap-3 border-t border-border p-5 sm:grid-cols-3">
-          {[
-            { icon: Lock, title: 'Encriptado', detail: 'AES-256 antes de salir del navegador' },
-            { icon: CheckCircle2, title: 'Procesado', detail: 'Análisis aislado y trazable' },
-            { icon: Trash2, title: 'Eliminado', detail: 'El archivo original se borra al terminar' },
-          ].map((item) => (
-            <div key={item.title} className="rounded-xl border border-border/70 bg-secondary/30 p-4">
-              <item.icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <p className="mt-2 text-xs font-semibold text-foreground">{item.title}</p>
-              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{item.detail}</p>
-            </div>
-          ))}
-        </div>
-        <p className="border-t border-border px-5 py-3 text-[11px] leading-relaxed text-muted-foreground">
-          <Clock3 className="mr-1 inline h-3 w-3" aria-hidden="true" />
-          No almacenamos el contenido original de la cartola, solo los datos del análisis.
-        </p>
-      </details>
+          </Link>
+        </span>
+      </p>
       </div>
+
+      {/* Acciones fijas en móvil: monto + descarga, sin duplicar el botón de escritorio */}
+      {reportUnlocked ? (
+        <div
+          role="region"
+          aria-label="Acciones del reporte"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur md:hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="eyebrow">Recuperable</p>
+              <p className="num truncate text-base font-semibold text-foreground">
+                {insights.counts.total > 0 ? formatCLP(insights.recoverable) : 'Sin montos para reclamar'}
+              </p>
+            </div>
+            {insights.counts.total > 0 ? (
+              <div className="shrink-0 [&_select]:hidden">
+                <DownloadReportButton analysis={analysis} anomalies={anomalies} transactions={transactions} />
+              </div>
+            ) : (
+              <Link href="/historial" className="shrink-0 text-xs font-medium text-primary hover:underline">
+                Volver al historial
+              </Link>
+            )}
+          </div>
+        </div>
+      ) : null}
     </ReportSelectionProvider>
   )
 }

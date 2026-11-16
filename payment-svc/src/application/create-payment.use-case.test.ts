@@ -41,7 +41,6 @@ function mockOrderRepository(overrides?: Partial<OrderRepository>): OrderReposit
 function mockCreditRepository(overrides?: Partial<CreditRepository>): CreditRepository {
   return {
     getCredits: vi.fn(),
-    consumeAtomic: vi.fn(),
     addCredits: vi.fn(),
     ...overrides,
   }

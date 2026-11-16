@@ -22,6 +22,20 @@ const GENERIC_RE =
 const KNOWN_FEE_RE =
   /(mantenci[oó]n|mantencion|administraci[oó]n|administracion|seguro|anualidad|suscripci[oó]n|suscripcion|impuesto|iva|patente|comisi[oó]n\s+por\s+mantenci[oó]n)/i
 
+/**
+ * Descriptores que declaran un gasto recurrente (suscripción o servicio
+ * mensual). Se evalúan sobre texto normalizado (minúsculas, sin acentos).
+ */
+const RECURRING_EXPENSE_RE =
+  /(suscripcion|membresia|mensual|pago automatico|plan mensual|servicio mensual|servicios recurrentes)/i
+
+/**
+ * Comercios que cobran de forma recurrente por diseño. Un mismo monto repetido
+ * mes a mes en estos comercios es una suscripción legítima, no un duplicado.
+ */
+const KNOWN_RECURRING_MERCHANT_RE =
+  /(netflix|spotify|disney|hbo|\bmax\b|prime video|youtube|apple|icloud|google one|dropbox|adobe|microsoft|office 365|notion|figma|openai|chatgpt|github|duolingo|canva|audible|kindle|paramount|crunchyroll|deezer|tidal|isapre|fonasa|\bafp\b|seguro|entel|movistar|\bclaro\b|\bwom\b|vtr|directv|starlink)/
+
 const STOP_WORDS = new Set([
   'de', 'del', 'la', 'el', 'los', 'las', 'por', 'para', 'con', 'sin', 'y', 'en',
   'comision', 'comisión', 'credito', 'crédito', 'tc', 'td', 'compra', 'venta',
@@ -108,6 +122,90 @@ function isGenericDescription(description: string): boolean {
 function amountsClose(a: number, b: number): boolean {
   const diff = Math.abs(Math.abs(a) - Math.abs(b))
   return diff <= Math.max(1, Math.abs(a) * 0.01)
+}
+
+/* -------------------------------------------------------------------------- */
+/* Recurrencia legítima (suscripciones y servicios mensuales)                  */
+/* -------------------------------------------------------------------------- */
+
+export function isRecurringExpense(description: string): boolean {
+  const normalized = normalizeText(description)
+  return RECURRING_EXPENSE_RE.test(normalized) || KNOWN_RECURRING_MERCHANT_RE.test(normalized)
+}
+
+/**
+ * Cadencia de cobro recurrente: ~1 mes (25–35 días) o un múltiplo de mes
+ * calendario. La tolerancia crece con el número de meses para absorber meses
+ * de 28/31 días y feriados, pero nunca lo suficiente como para confundir dos
+ * cobros del mismo día o de la misma semana con una suscripción.
+ */
+export function isRecurringCadence(firstDate: string, secondDate: string): boolean {
+  const gap = daysBetween(firstDate, secondDate)
+
+  // Un ciclo mensual acepta entre 25 y 35 días.
+  if (gap >= 25 && gap <= 35) return true
+
+  // Múltiplos (bimestral, trimestral, semestral, anual…).
+  const months = Math.round(gap / 30.44)
+  if (months < 2) return false
+
+  const expected = months * 30.44
+  const tolerance = Math.max(5, months * 4)
+  return Math.abs(gap - expected) <= tolerance
+}
+
+/**
+ * IDs de transacciones que forman parte de una serie recurrente legítima.
+ *
+ * Condiciones acumulativas: mismo comercio normalizado, monto igual o similar,
+ * al menos dos ocurrencias con cadencia mensual (o múltiplo) y un descriptor
+ * que declare recurrencia (suscripción/servicio/mensual o comercio conocido).
+ */
+function recurringTransactionIds(transactions: ParsedTransaction[]): Set<string> {
+  const recurring = new Set<string>()
+  const groups = new Map<string, ParsedTransaction[]>()
+
+  for (const tx of transactions) {
+    if (tx.amount >= 0) continue
+    if (!isRecurringExpense(tx.description)) continue
+    const key = merchantKey(tx.description)
+    if (key === '') continue
+    const group = groups.get(key) ?? []
+    group.push(tx)
+    groups.set(key, group)
+  }
+
+  for (const group of groups.values()) {
+    if (group.length < 2) continue
+    const sorted = [...group].sort((a, b) => a.date.localeCompare(b.date))
+
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        if (!amountsClose(sorted[i].amount, sorted[j].amount)) continue
+        if (!isRecurringCadence(sorted[i].date, sorted[j].date)) continue
+        recurring.add(sorted[i].id)
+        recurring.add(sorted[j].id)
+      }
+    }
+  }
+
+  return recurring
+}
+
+/**
+ * ¿La transacción tiene un gemelo dentro de la ventana corta de duplicados?
+ * Los duplicados reales ocurren el mismo día o a pocos días; ese patrón manda
+ * sobre cualquier apariencia de recurrencia.
+ */
+function hasShortWindowTwin(tx: ParsedTransaction, pool: ParsedTransaction[]): boolean {
+  const key = merchantKey(tx.description)
+  return pool.some(
+    (other) =>
+      other.id !== tx.id &&
+      merchantKey(other.description) === key &&
+      amountsClose(other.amount, tx.amount) &&
+      daysBetween(other.date, tx.date) <= 10
+  )
 }
 
 function roundMoney(value: number): number {
@@ -209,12 +307,20 @@ function detectDuplicateCommissions(transactions: ParsedTransaction[]): Detected
 
 function detectDuplicateCharges(transactions: ParsedTransaction[]): DetectedAnomaly[] {
   const anomalies: DetectedAnomaly[] = []
-  const charges = transactions.filter(
+  const pool = transactions.filter(
     (tx) =>
       tx.amount < 0 &&
       !isCommission(tx.description) &&
       !isInterest(tx.description) &&
       merchantKey(tx.description) !== ''
+  )
+
+  // Una suscripción legítima repite el mismo monto mes a mes. Se excluye del
+  // clustering de duplicados SOLO si no tiene un vecino dentro de la ventana
+  // corta: si lo tiene, el cobro repetido es real y debe detectarse igual.
+  const recurring = recurringTransactionIds(transactions)
+  const charges = pool.filter(
+    (tx) => !recurring.has(tx.id) || hasShortWindowTwin(tx, pool)
   )
 
   const groups = new Map<string, ParsedTransaction[]>()
@@ -329,6 +435,10 @@ function detectGenericCharges(transactions: ParsedTransaction[]): DetectedAnomal
       !isInterest(tx.description) &&
       !isInstallmentSale(tx.description) &&
       !isKnownFee(tx.description) &&
+      // Un descriptor de servicio recurrente ("SERVICIO MENSUAL", "PLAN
+      // MENSUAL", "SUSCRIPCION…") explica el cargo. Marcarlo como "sin
+      // descripción clara" era el principal falso positivo del motor.
+      !isRecurringExpense(tx.description) &&
       isGenericDescription(tx.description)
   )
 
@@ -448,10 +558,13 @@ export function normalizeAiAnomalies(
     const rawRefs = Array.isArray(item.transactionRefs)
       ? item.transactionRefs.filter((ref): ref is string => typeof ref === 'string')
       : []
+    // La IA puede describir patrones, pero no puede inventar cobros. Si
+    // referencia una transacción que no existe, se descarta el hallazgo
+    // completo: una referencia válida mezclada con inventadas indica que el
+    // modelo está alucinando y no es evidencia confiable.
+    const hasUnknownRef = rawRefs.some((ref) => !byId.has(ref))
     const refs = rawRefs.filter((ref) => byId.has(ref))
-    // Sin transacciones verificables no publicamos un hallazgo: la IA puede
-    // describir patrones, pero no puede inventar cobros.
-    if (!type || !title || refs.length === 0) continue
+    if (!type || !title || refs.length === 0 || hasUnknownRef) continue
 
     const referenced = refs.map((ref) => byId.get(ref)!).filter(Boolean)
     const maxRecoverable = referenced.reduce((sum, tx) => sum + roundMoney(tx.amount), 0)
@@ -486,32 +599,79 @@ export function mergeAnomalies(
   ruleAnomalies: DetectedAnomaly[],
   aiAnomalies: DetectedAnomaly[]
 ): DetectedAnomaly[] {
+  // Confianza máxima que el motor determinístico respalda por transacción.
+  const ruleConfidenceByRef = new Map<string, number>()
+  for (const anomaly of ruleAnomalies) {
+    for (const ref of anomaly.transactionRefs) {
+      ruleConfidenceByRef.set(
+        ref,
+        Math.max(ruleConfidenceByRef.get(ref) ?? 0, anomaly.confidence ?? 0)
+      )
+    }
+  }
+
+  // La segunda opinión de IA nunca puede superar la confianza de la regla
+  // determinística que cubre las mismas transacciones: la regla es
+  // reproducible y auditable, la IA no.
+  const cappedAi = aiAnomalies.map((anomaly) => {
+    const refs = [...new Set(anomaly.transactionRefs)]
+    const ruleConfidence = refs.reduce(
+      (best, ref) => Math.max(best, ruleConfidenceByRef.get(ref) ?? 0),
+      0
+    )
+    return {
+      ...anomaly,
+      transactionRefs: refs,
+      confidence:
+        ruleConfidence > 0
+          ? Math.min(anomaly.confidence ?? 0, ruleConfidence)
+          : anomaly.confidence ?? 0,
+    }
+  })
+
   const merged: DetectedAnomaly[] = []
 
-  for (const anomaly of [...ruleAnomalies, ...aiAnomalies]) {
-    const existing = merged.find(
-      (candidate) =>
-        candidate.type === anomaly.type &&
-        candidate.transactionRefs.some((ref) => anomaly.transactionRefs.includes(ref))
+  // Las reglas se procesan primero: en un empate de confianza, la
+  // representación determinística es la que sobrevive.
+  for (const anomaly of [...ruleAnomalies, ...cappedAi]) {
+    const refs = [...new Set(anomaly.transactionRefs)]
+    if (refs.length === 0) continue
+
+    // Dedupe por transacciones compartidas SIN importar el `type`: si dos
+    // hallazgos hablan de los mismos cobros, son el mismo hallazgo aunque la
+    // IA lo etiquete distinto.
+    const existing = merged.find((candidate) =>
+      candidate.transactionRefs.some((ref) => refs.includes(ref))
     )
 
     if (!existing) {
-      merged.push({ ...anomaly, transactionRefs: [...new Set(anomaly.transactionRefs)] })
+      merged.push({ ...anomaly, transactionRefs: refs })
       continue
     }
 
-    const keep = (existing.confidence ?? 0) >= (anomaly.confidence ?? 0) ? existing : anomaly
-    existing.transactionRefs = [...new Set([...existing.transactionRefs, ...anomaly.transactionRefs])]
+    // Conservamos la representación de mayor confianza (empate → la que ya
+    // estaba, es decir, la determinística) y unimos la evidencia.
+    const incomingWins = (anomaly.confidence ?? 0) > (existing.confidence ?? 0)
+    const representation = incomingWins ? anomaly : existing
+
+    existing.type = representation.type
+    existing.title = representation.title
+    existing.description = representation.description
+    existing.detail = representation.detail
+    existing.recommendedAction = representation.recommendedAction
+    existing.evidence = representation.evidence
+    existing.transactionRefs = [...new Set([...existing.transactionRefs, ...refs])]
     existing.confidence = Math.max(existing.confidence ?? 0, anomaly.confidence ?? 0)
     existing.severity =
-      SEVERITY_SCORE[keep.severity] >= SEVERITY_SCORE[existing.severity]
-        ? keep.severity
+      SEVERITY_SCORE[anomaly.severity] > SEVERITY_SCORE[existing.severity]
+        ? anomaly.severity
         : existing.severity
     existing.recoverableAmount = Math.max(existing.recoverableAmount, anomaly.recoverableAmount)
   }
 
-  // Cada transacción recuperable se reclama una sola vez. Si dos hallazgos
-  // comparten referencias, el segundo se recorta para no inflar el total.
+  // Cada transacción recuperable se reclama una sola vez. Tras el dedupe por
+  // refs los hallazgos son disjuntos, así que este paso solo actúa como red de
+  // seguridad contra solapamientos residuales.
   const claimed = new Set<string>()
   const unique: DetectedAnomaly[] = []
 
@@ -525,12 +685,17 @@ export function mergeAnomalies(
     if (amount === 0) continue
 
     unclaimed.forEach((ref) => claimed.add(ref))
-    unique.push({ ...anomaly, transactionRefs: unclaimed.length > 0 ? unclaimed : refs, recoverableAmount: amount })
+    unique.push({
+      ...anomaly,
+      transactionRefs: unclaimed.length > 0 ? unclaimed : refs,
+      recoverableAmount: amount,
+    })
   }
 
   return unique.sort(
     (a, b) =>
-      SEVERITY_SCORE[b.severity] - SEVERITY_SCORE[a.severity] || b.recoverableAmount - a.recoverableAmount
+      SEVERITY_SCORE[b.severity] - SEVERITY_SCORE[a.severity] ||
+      b.recoverableAmount - a.recoverableAmount
   )
 }
 

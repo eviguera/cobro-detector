@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { getTestCredentials } from './helpers/auth';
+import { TEST_EMAIL, TEST_PASSWORD, hasTestCredentials } from './helpers/auth';
 
-const { email, password } = getTestCredentials();
-const needsAuth = Boolean(email && password);
+const email = TEST_EMAIL;
+const password = TEST_PASSWORD;
+const needsAuth = hasTestCredentials;
 
 test.describe('Flujo de pago (MercadoPago webhook y créditos)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });

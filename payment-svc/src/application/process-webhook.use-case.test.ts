@@ -4,6 +4,7 @@ import type { PaymentGateway } from '../domain/ports/payment-gateway.port'
 import type { OrderRepository } from '../domain/ports/order-repository.port'
 import type { CreditRepository } from '../domain/ports/credit.repository.port'
 import type { AnalysisRepository } from '../domain/ports/analysis-repository.port'
+import type { PaymentEventRepository } from '../domain/ports/payment-event-repository.port'
 
 function mockPaymentGateway(overrides?: Partial<PaymentGateway>): PaymentGateway {
   return {
@@ -47,7 +48,6 @@ function mockOrderRepository(order?: Partial<OrderRepository>): OrderRepository 
 function mockCreditRepository(overrides?: Partial<CreditRepository>): CreditRepository {
   return {
     getCredits: vi.fn(),
-    consumeAtomic: vi.fn(),
     addCredits: vi.fn(),
     ...overrides,
   }
@@ -55,8 +55,33 @@ function mockCreditRepository(overrides?: Partial<CreditRepository>): CreditRepo
 
 function mockAnalysisRepository(overrides?: Partial<AnalysisRepository>): AnalysisRepository {
   return {
-    markCompleted: vi.fn().mockResolvedValue(undefined),
+    // Contrato CAS: true cuando el análisis pasó de 'awaiting_payment' a
+    // 'completed' (fue este webhook el que liberó el reporte).
+    markCompleted: vi.fn().mockResolvedValue(true),
     ...overrides,
+  }
+}
+
+function mockPaymentEventRepository(overrides?: Partial<PaymentEventRepository>): PaymentEventRepository {
+  return {
+    record: vi.fn().mockResolvedValue(true),
+    isProcessed: vi.fn().mockResolvedValue(false),
+    ...overrides,
+  }
+}
+
+/**
+ * Repositorio de eventos con estado compartido entre ejecuciones: simula la
+ * tabla payment_events para probar replays del mismo paymentId.
+ */
+function inMemoryPaymentEventRepository(): PaymentEventRepository {
+  const processed = new Set<string>()
+  return {
+    isProcessed: vi.fn().mockImplementation((id: string) => Promise.resolve(processed.has(id))),
+    record: vi.fn().mockImplementation((id: string) => {
+      processed.add(id)
+      return Promise.resolve(true)
+    }),
   }
 }
 
@@ -76,6 +101,7 @@ describe('ProcessWebhookUseCase', () => {
       mockOrderRepository(),
       mockCreditRepository(),
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     await expect(useCase.execute(validBody(), null))
@@ -89,6 +115,7 @@ describe('ProcessWebhookUseCase', () => {
       mockOrderRepository(),
       mockCreditRepository(),
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     await expect(useCase.execute(validBody(), 'ts=123,v1=badhash', 'req-123'))
@@ -103,6 +130,7 @@ describe('ProcessWebhookUseCase', () => {
       mockOrderRepository(),
       mockCreditRepository(),
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     const result = await useCase.execute(validBody('plan'), 'ts=123,v1=hash')
@@ -116,6 +144,7 @@ describe('ProcessWebhookUseCase', () => {
       mockOrderRepository(),
       mockCreditRepository(),
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     await expect(useCase.execute(JSON.stringify({ type: 'payment', data: {} }), 'ts=123,v1=hash'))
@@ -131,10 +160,35 @@ describe('ProcessWebhookUseCase', () => {
       mockOrderRepository(),
       mockCreditRepository(),
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     await expect(useCase.execute(validBody(), 'ts=123,v1=hash'))
       .rejects.toThrow('Sin referencia externa')
+  })
+
+  // HARDENED (2026-11): dedup durable. Un reenvío del mismo paymentId se
+  // corta antes de llamar a MercadoPago (antes: getPaymentStatus + rerun de
+  // toda la lógica protegida solo por el CAS, sin auditoría).
+  it('responde duplicate sin llamar a MercadoPago cuando el pago ya fue procesado', async () => {
+    const paymentGateway = mockPaymentGateway()
+    const orderRepo = mockOrderRepository()
+    const eventRepo = mockPaymentEventRepository({ isProcessed: vi.fn().mockResolvedValue(true) })
+    const useCase = new ProcessWebhookUseCase(
+      paymentGateway,
+      orderRepo,
+      mockCreditRepository(),
+      mockAnalysisRepository(),
+      eventRepo,
+    )
+
+    const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
+
+    expect(result).toEqual({ received: true, duplicate: true })
+    expect(paymentGateway.getPaymentStatus).not.toHaveBeenCalled()
+    expect(orderRepo.confirmPaid).not.toHaveBeenCalled()
+    expect(orderRepo.updateStatus).not.toHaveBeenCalled()
+    expect(eventRepo.record).not.toHaveBeenCalled()
   })
 
   it('marks analysis as completed when externalRef starts with unlock_', async () => {
@@ -147,17 +201,21 @@ describe('ProcessWebhookUseCase', () => {
       }),
     })
     const analysisRepo = mockAnalysisRepository()
+    const eventRepo = mockPaymentEventRepository()
     const useCase = new ProcessWebhookUseCase(
       paymentGateway,
       mockOrderRepository(),
       mockCreditRepository(),
       analysisRepo,
+      eventRepo,
     )
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
 
     expect(result).toEqual({ received: true, unlock: true, analysisId })
     expect(analysisRepo.markCompleted).toHaveBeenCalledWith(analysisId)
+    // El evento de unlock se registra con el analysisId para auditoría.
+    expect(eventRepo.record).toHaveBeenCalledWith('pay-12345', 'unlock', undefined, analysisId)
   })
 
   // El path de unlock_ no debe tocar la tabla de órdenes: si lo hiciera con un
@@ -178,6 +236,7 @@ describe('ProcessWebhookUseCase', () => {
       orderRepo,
       creditRepo,
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     await useCase.execute(validBody(), 'ts=123,v1=hash')
@@ -202,6 +261,7 @@ describe('ProcessWebhookUseCase', () => {
       orderRepo,
       mockCreditRepository(),
       analysisRepo,
+      mockPaymentEventRepository(),
     )
 
     await expect(useCase.execute(validBody(), 'ts=123,v1=hash'))
@@ -226,6 +286,7 @@ describe('ProcessWebhookUseCase', () => {
       mockOrderRepository(),
       mockCreditRepository(),
       analysisRepo,
+      mockPaymentEventRepository(),
     )
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
@@ -247,6 +308,7 @@ describe('ProcessWebhookUseCase', () => {
       mockOrderRepository(),
       mockCreditRepository(),
       analysisRepo,
+      mockPaymentEventRepository(),
     )
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
@@ -267,6 +329,7 @@ describe('ProcessWebhookUseCase', () => {
       mockOrderRepository(),
       mockCreditRepository(),
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     await expect(useCase.execute(validBody(), 'ts=123,v1=hash'))
@@ -277,7 +340,8 @@ describe('ProcessWebhookUseCase', () => {
     const paymentGateway = mockPaymentGateway()
     const orderRepo = mockOrderRepository()
     const creditRepo = mockCreditRepository()
-    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, mockAnalysisRepository())
+    const eventRepo = mockPaymentEventRepository()
+    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, mockAnalysisRepository(), eventRepo)
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
 
@@ -296,6 +360,87 @@ describe('ProcessWebhookUseCase', () => {
     )
     expect(creditRepo.addCredits).not.toHaveBeenCalled()
     expect(orderRepo.updateStatus).not.toHaveBeenCalled()
+    // Tras acreditar, el pago queda registrado: los reenvíos se cortan.
+    expect(eventRepo.record).toHaveBeenCalledWith(
+      'pay-12345',
+      'payment',
+      '550e8400-e29b-41d4-a716-446655440000',
+      undefined,
+    )
+  })
+
+  // HARDENED (2026-11): el evento se registra SOLO en el camino exitoso. Si
+  // la RPC de acreditación lanza, no hay evento y MercadoPago reintenta.
+  it('no registra el evento cuando la acreditación de la orden falla', async () => {
+    const orderRepo = mockOrderRepository()
+    orderRepo.confirmPaid = vi.fn().mockRejectedValue(new Error('rpc caída'))
+    const eventRepo = mockPaymentEventRepository()
+    const useCase = new ProcessWebhookUseCase(
+      mockPaymentGateway(),
+      orderRepo,
+      mockCreditRepository(),
+      mockAnalysisRepository(),
+      eventRepo,
+    )
+
+    await expect(useCase.execute(validBody(), 'ts=123,v1=hash')).rejects.toThrow('rpc caída')
+    expect(eventRepo.record).not.toHaveBeenCalled()
+  })
+
+  // Replay completo del flujo unlock: el primer webhook marca el análisis y
+  // registra el pago; el segundo se corta por dedup sin volver a tocar nada.
+  it('un replay de unlock no re-consulta MercadoPago ni re-marca el análisis', async () => {
+    const analysisId = '123e4567-e89b-12d3-a456-426614174000'
+    const paymentGateway = mockPaymentGateway({
+      getPaymentStatus: vi.fn().mockResolvedValue({
+        status: 'approved',
+        externalRef: `unlock_${analysisId}`,
+      }),
+    })
+    const analysisRepo = mockAnalysisRepository()
+    const eventRepo = inMemoryPaymentEventRepository()
+    const useCase = new ProcessWebhookUseCase(
+      paymentGateway,
+      mockOrderRepository(),
+      mockCreditRepository(),
+      analysisRepo,
+      eventRepo,
+    )
+
+    const first = await useCase.execute(validBody(), 'ts=123,v1=hash')
+    const second = await useCase.execute(validBody(), 'ts=123,v1=hash')
+
+    expect(first).toEqual({ received: true, unlock: true, analysisId })
+    expect(second).toEqual({ received: true, duplicate: true })
+    expect(analysisRepo.markCompleted).toHaveBeenCalledTimes(1)
+    expect(paymentGateway.getPaymentStatus).toHaveBeenCalledTimes(1)
+  })
+
+  // El CAS de markCompleted protege el caso en que el registro del evento
+  // falló tras desbloquear: MercadoPago reintenta, el CAS devuelve false y
+  // no hay doble efecto ni registro engañoso.
+  it('unlock sobre un análisis que ya no está awaiting_payment no registra evento', async () => {
+    const analysisId = '123e4567-e89b-12d3-a456-426614174000'
+    const paymentGateway = mockPaymentGateway({
+      getPaymentStatus: vi.fn().mockResolvedValue({
+        status: 'approved',
+        externalRef: `unlock_${analysisId}`,
+      }),
+    })
+    const analysisRepo = mockAnalysisRepository({ markCompleted: vi.fn().mockResolvedValue(false) })
+    const eventRepo = mockPaymentEventRepository()
+    const useCase = new ProcessWebhookUseCase(
+      paymentGateway,
+      mockOrderRepository(),
+      mockCreditRepository(),
+      analysisRepo,
+      eventRepo,
+    )
+
+    const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
+
+    expect(result).toEqual({ received: true, unlock: false, analysisId })
+    expect(eventRepo.record).not.toHaveBeenCalled()
   })
 
   // Un pago sigue en curso (in_process): la orden queda 'pending' y no se
@@ -310,7 +455,7 @@ describe('ProcessWebhookUseCase', () => {
     })
     const orderRepo = mockOrderRepository()
     const creditRepo = mockCreditRepository()
-    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, mockAnalysisRepository())
+    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, mockAnalysisRepository(), mockPaymentEventRepository())
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
 
@@ -338,7 +483,7 @@ describe('ProcessWebhookUseCase', () => {
     })
     const orderRepo = mockOrderRepository()
     const creditRepo = mockCreditRepository()
-    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, mockAnalysisRepository())
+    const useCase = new ProcessWebhookUseCase(paymentGateway, orderRepo, creditRepo, mockAnalysisRepository(), mockPaymentEventRepository())
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
 
@@ -366,6 +511,7 @@ describe('ProcessWebhookUseCase', () => {
       orderRepo,
       creditRepo,
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     await useCase.execute(validBody(), 'ts=123,v1=hash')
@@ -392,6 +538,7 @@ describe('ProcessWebhookUseCase', () => {
       orderRepo,
       creditRepo,
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     await useCase.execute(validBody(), 'ts=123,v1=hash')
@@ -416,6 +563,7 @@ describe('ProcessWebhookUseCase', () => {
       orderRepo,
       creditRepo,
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     await useCase.execute(validBody(), 'ts=123,v1=hash')
@@ -438,6 +586,7 @@ describe('ProcessWebhookUseCase', () => {
       orderRepo,
       mockCreditRepository(),
       mockAnalysisRepository(),
+      mockPaymentEventRepository(),
     )
 
     const result = await useCase.execute(validBody(), 'ts=123,v1=hash')
