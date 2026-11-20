@@ -162,6 +162,8 @@ CREATE TABLE IF NOT EXISTS analyses (
   encryption_key_iv TEXT,            -- IV del cifrado AES-256-GCM (base64)
   encryption_key_base64 TEXT,        -- Clave de cifrado (base64) para que analysis-svc descifre
   file_deleted_at TIMESTAMPTZ,       -- Timestamp de eliminación REAL del archivo de Storage
+  plan TEXT NOT NULL DEFAULT 'credits',
+  credit_consumed_at TIMESTAMPTZ,
   bank TEXT,
   period_start DATE,
   period_end DATE,
@@ -176,18 +178,23 @@ CREATE TABLE IF NOT EXISTS analyses (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Columnas de cifrado/retención agregadas después de la creación inicial de la
--- tabla. `CREATE TABLE IF NOT EXISTS` no las agrega en instalaciones que ya
--- existían, así que se fuerzan de forma idempotente. Sin esto, el flujo de
--- subida cifrada falla con PGRST204 ("Could not find the 'storage_path' column").
+-- Columnas agregadas/evolucionadas de forma idempotente (compatibilidad con
+-- instalaciones previas y con migraciones incrementales).
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS storage_path TEXT;
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS storage_driver TEXT NOT NULL DEFAULT 'supabase';
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS encryption_key_iv TEXT;
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS encryption_key_base64 TEXT;
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS file_deleted_at TIMESTAMPTZ;
+ALTER TABLE analyses ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'credits';
+ALTER TABLE analyses ADD COLUMN IF NOT EXISTS credit_consumed_at TIMESTAMPTZ;
 ALTER TABLE analyses DROP CONSTRAINT IF EXISTS analyses_storage_driver_check;
 ALTER TABLE analyses ADD CONSTRAINT analyses_storage_driver_check
   CHECK (storage_driver IN ('supabase', 's3'));
+DO $$
+BEGIN
+  ALTER TABLE analyses ADD CONSTRAINT analyses_plan_check CHECK (plan IN ('credits', 'platino'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- anomalies
 CREATE TABLE IF NOT EXISTS anomalies (
@@ -301,6 +308,7 @@ CREATE INDEX IF NOT EXISTS idx_analyses_company_id     ON analyses(company_id);
 CREATE INDEX IF NOT EXISTS idx_anomalies_user_id       ON anomalies(user_id);
 CREATE INDEX IF NOT EXISTS idx_anomalies_analysis_id   ON anomalies(analysis_id);
 CREATE INDEX IF NOT EXISTS idx_anomalies_type_status   ON anomalies(type, status);
+CREATE INDEX IF NOT EXISTS idx_anomalies_user_created  ON anomalies(user_id, created_at DESC);
 
 -- credits
 CREATE INDEX IF NOT EXISTS idx_credits_user_id         ON credits(user_id);
@@ -313,6 +321,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_status      ON orders(user_id, status
 CREATE INDEX IF NOT EXISTS idx_orders_status           ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at       ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_company_id       ON orders(company_id);
+CREATE INDEX IF NOT EXISTS idx_orders_user_created     ON orders(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS orders_mp_preference_id_idx ON orders(mp_preference_id);
 CREATE INDEX IF NOT EXISTS orders_mp_payment_id_idx    ON orders(mp_payment_id);
 
@@ -323,6 +332,7 @@ CREATE INDEX IF NOT EXISTS api_keys_key_hash_idx       ON api_keys(key_hash);
 -- api_logs
 CREATE INDEX IF NOT EXISTS api_logs_api_key_id_idx     ON api_logs(api_key_id);
 CREATE INDEX IF NOT EXISTS api_logs_created_at_idx     ON api_logs(created_at);
+CREATE INDEX IF NOT EXISTS api_logs_user_created_idx   ON api_logs(user_id, created_at DESC);
 
 -- payment_methods
 CREATE INDEX IF NOT EXISTS payment_methods_user_id_idx ON payment_methods(user_id);
@@ -331,6 +341,7 @@ CREATE INDEX IF NOT EXISTS payment_methods_user_id_idx ON payment_methods(user_i
 CREATE INDEX IF NOT EXISTS success_charges_user_id_idx    ON success_charges(user_id);
 CREATE INDEX IF NOT EXISTS success_charges_status_idx     ON success_charges(status);
 CREATE INDEX IF NOT EXISTS success_charges_anomaly_id_idx ON success_charges(anomaly_id);
+CREATE INDEX IF NOT EXISTS success_charges_user_created_idx ON success_charges(user_id, created_at DESC);
 
 -- companies
 CREATE INDEX IF NOT EXISTS companies_accountant_id_idx ON companies(accountant_id);
@@ -646,12 +657,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION cleanup_old_api_logs()
 RETURNS void
-SET search_path = ''
+LANGUAGE plpgsql
+SET search_path = 'public'
 AS $$
 BEGIN
-  DELETE FROM api_logs WHERE created_at < NOW() - INTERVAL '30 days';
+  DELETE FROM public.api_logs WHERE created_at < NOW() - INTERVAL '30 days';
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 
 -- =============================================
@@ -715,6 +727,44 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.add_credits(UUID, INTEGER) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.add_credits(UUID, INTEGER) TO service_role;
+
+-- Confirmación atómica de pago: CAS de orden + acreditación en la misma transacción.
+-- Evita orden pagada sin créditos si falla la acreditación (webhook debe reintentar).
+CREATE OR REPLACE FUNCTION public.confirm_order_paid(
+  p_order_id UUID,
+  p_mp_payment_id TEXT,
+  p_mp_status TEXT DEFAULT NULL,
+  p_mp_detail TEXT DEFAULT NULL,
+  p_expected_status TEXT DEFAULT NULL
+) RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_user UUID;
+  v_credits INTEGER;
+BEGIN
+  UPDATE orders
+     SET status = 'paid',
+         mp_payment_id = p_mp_payment_id,
+         mp_status = p_mp_status,
+         mp_detail = p_mp_detail
+   WHERE id = p_order_id
+     AND (p_expected_status IS NULL OR status = p_expected_status)
+  RETURNING user_id, credits_purchased INTO v_user, v_credits;
+
+  IF NOT FOUND THEN
+    RETURN FALSE;
+  END IF;
+
+  PERFORM public.add_credits(v_user, v_credits);
+  RETURN TRUE;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.confirm_order_paid(UUID, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.confirm_order_paid(UUID, TEXT, TEXT, TEXT, TEXT) TO service_role;
 
 
 -- =============================================
@@ -865,6 +915,7 @@ GRANT UPDATE (full_name, business_name, business_type, rut, phone) ON public.pro
 CREATE OR REPLACE FUNCTION generate_referral_code()
 RETURNS TEXT
 LANGUAGE plpgsql
+SET search_path = 'public'
 AS $$
 DECLARE
   code TEXT;
@@ -872,7 +923,7 @@ DECLARE
 BEGIN
   WHILE NOT done LOOP
     code := lower(substr(md5(random()::text), 1, 8));
-    IF NOT EXISTS (SELECT 1 FROM profiles WHERE referral_code = code) THEN
+    IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE referral_code = code) THEN
       done := true;
     END IF;
   END LOOP;
@@ -994,36 +1045,49 @@ CREATE POLICY "Users can delete own anomaly feedback"
 
 -- ============================================================
 -- SECTION 15: EVENTOS DE PRODUCTO (embudo de activación)
+-- Tabla canónica `events` + vista de compatibilidad `product_events`.
+-- Escrita por notification-svc (service_role) y por clientes autenticados
+-- (RLS propia). Reconciliada en migraciones 20261113000000/20261119000000.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS public.product_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  event_type text NOT NULL,
-  metadata jsonb,
-  created_at timestamptz NOT NULL DEFAULT now()
+CREATE TABLE IF NOT EXISTS public.events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  event_type TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_product_events_user_time
-  ON public.product_events(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_product_events_type_time
-  ON public.product_events(event_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS events_user_created_idx
+  ON public.events (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS events_type_created_idx
+  ON public.events (event_type, created_at DESC);
 
-ALTER TABLE public.product_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can insert own product events" ON public.product_events;
-CREATE POLICY "Users can insert own product events"
-  ON public.product_events FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS events_select_own ON public.events;
+CREATE POLICY events_select_own ON public.events
+  FOR SELECT
+  TO authenticated
+  USING ((SELECT auth.uid()) = user_id);
 
-DROP POLICY IF EXISTS "Users can view own product events" ON public.product_events;
-CREATE POLICY "Users can view own product events"
-  ON public.product_events FOR SELECT
-  USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS events_insert_own ON public.events;
+CREATE POLICY events_insert_own ON public.events
+  FOR INSERT
+  TO authenticated
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 
--- Los eventos son inmutables para el usuario.
-DROP POLICY IF EXISTS "Users can update own product events" ON public.product_events;
-DROP POLICY IF EXISTS "Users can delete own product events" ON public.product_events;
+REVOKE UPDATE, DELETE ON public.events FROM anon, authenticated;
+
+-- Compatibilidad: código histórico usa `product_events`.
+CREATE OR REPLACE VIEW public.product_events AS
+  SELECT id, user_id, event_type, metadata, created_at
+  FROM public.events;
+
+GRANT SELECT, INSERT ON public.events TO authenticated;
+GRANT SELECT, INSERT ON public.product_events TO authenticated;
+REVOKE ALL ON public.events FROM anon;
+REVOKE ALL ON public.product_events FROM anon;
 
 -- ============================================================
 -- SECTION 16: SEGUIMIENTO DEL RECLAMO
@@ -1081,3 +1145,100 @@ ALTER TABLE public.claim_tracking
 CREATE INDEX IF NOT EXISTS idx_claim_tracking_reminder_due
   ON public.claim_tracking(status, sent_at)
   WHERE reminder_sent_at IS NULL;
+
+-- ============================================================
+-- SECTION 17: IDEMPOTENCIA DE WEBHOOKS DE PAGO (MercadoPago)
+-- Registro auditable y dedup atómico por mp_payment_id.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.payment_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mp_payment_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  order_id UUID NULL,
+  analysis_id UUID NULL,
+  payload JSONB NULL,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT payment_events_mp_payment_id_key UNIQUE (mp_payment_id)
+);
+
+ALTER TABLE public.payment_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.payment_events FROM anon, authenticated;
+
+CREATE INDEX IF NOT EXISTS payment_events_analysis_id_idx
+  ON public.payment_events (analysis_id);
+
+CREATE OR REPLACE FUNCTION public.record_payment_event(
+  p_mp_payment_id TEXT,
+  p_event_type TEXT,
+  p_order_id UUID DEFAULT NULL,
+  p_analysis_id UUID DEFAULT NULL,
+  p_payload JSONB DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  inserted BOOLEAN;
+BEGIN
+  INSERT INTO public.payment_events (mp_payment_id, event_type, order_id, analysis_id, payload)
+  VALUES (p_mp_payment_id, p_event_type, p_order_id, p_analysis_id, p_payload)
+  ON CONFLICT (mp_payment_id) DO NOTHING;
+  GET DIAGNOSTICS inserted = ROW_COUNT;
+  RETURN inserted;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_payment_event_processed(p_mp_payment_id TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.payment_events WHERE mp_payment_id = p_mp_payment_id
+  );
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.record_payment_event(TEXT, TEXT, UUID, UUID, JSONB) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_payment_event(TEXT, TEXT, UUID, UUID, JSONB) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.is_payment_event_processed(TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_payment_event_processed(TEXT) TO service_role;
+
+-- ============================================================
+-- SECTION 18: RPCs OPERATIVAS (marcado de fallo, etc.)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.mark_analysis_failed(p_analysis_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  updated BOOLEAN;
+BEGIN
+  UPDATE public.analyses
+     SET status = 'error'
+   WHERE id = p_analysis_id
+     AND user_id = auth.uid()
+     AND status <> 'completed';
+  GET DIAGNOSTICS updated = ROW_COUNT;
+  RETURN updated;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.mark_analysis_failed(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.mark_analysis_failed(UUID) TO authenticated;
+
+-- Nota: las migraciones 20261110000200_analyses_paywall.sql y posteriores
+-- introducen endurecimiento breaking (revocación/restricción de columnas en
+-- analyses, paywall RPCs charge/refund/get_analysis_report y grants asociados).
+-- Para instalaciones existentes aplicar migraciones en orden y coordinar el
+-- deploy; para alinear este schema con el estado post-paywall final, incorporar
+-- explícitamente esos cambios según el estado del entorno.

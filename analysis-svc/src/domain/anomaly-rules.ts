@@ -1,4 +1,4 @@
-import type { DetectedAnomaly, ParsedTransaction } from './analysis-result.entity'
+import type { DetectedAnomaly, ParsedTransaction } from './analysis-result.entity.js'
 
 /**
  * Motor de reglas determinístico de CobroDetector.

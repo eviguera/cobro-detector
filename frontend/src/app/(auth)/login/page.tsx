@@ -306,7 +306,7 @@ function LoginForm() {
 
         <div className="relative rounded-2xl border border-white/15 bg-white/5 p-5">
           <p className="text-[13px] leading-relaxed text-white/80">
-            “Revisé 300 pagos de mi carnicería y recuperé $500.000 en comisiones que se
+            “Revisé más de 1.000 pagos de mi carnicería y recuperé $500.000 en comisiones que se
             repetían en cada cuota.”
           </p>
           <p className="mt-3 text-[11px] font-medium text-white/50">

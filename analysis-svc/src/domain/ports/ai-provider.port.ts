@@ -1,4 +1,4 @@
-import type { ParsedTransaction } from '../analysis-result.entity'
+import type { ParsedTransaction } from '../analysis-result.entity.js'
 
 export interface AiResult {
   anomalies: Array<Record<string, unknown>>

@@ -86,7 +86,7 @@ npm run build         # Build de producción
 El skill `cobro-detector-db` (`.agents/skills/cobro-detector-db/SKILL.md`) es la referencia completa del schema. Resumen ejecutivo:
 
 - **Schema consolidado**: `supabase/schema.sql` — 15 tablas, 30+ índices, RLS en todas las tablas de usuario, 8 triggers, 3 constraints, 2 vistas `security_invoker`.
-- **Feedback, telemetría y reclamo**: `anomaly_feedback` guarda el feedback por hallazgo (falsos positivos); `events` guarda eventos del embudo (`analysis_started`, `analysis_completed`, `analysis_failed`, `report_downloaded`, `claim_status_changed`), la escribe notification-svc con service role y el usuario solo puede leer los suyos; `claim_tracking` guarda el estado del reclamo (`draft|sent|responded|escalated`). Todas con RLS `auth.uid() = user_id`.
+- **Feedback, telemetría y reclamo**: `anomaly_feedback` guarda el feedback por hallazgo (falsos positivos); `events` es la tabla canónica del embudo (`analysis_started`, `analysis_completed`, `analysis_failed`, `report_downloaded`, `claim_status_changed`, etc.), escrita por notification-svc (service_role) y por clientes autenticados donde aplique (RLS propia; `product_events` es vista de compatibilidad); `claim_tracking` guarda el estado del reclamo (`draft|sent|responded|escalated`). Todas con RLS `auth.uid() = user_id`.
 - **Schema `internal`**: privado para funciones SECURITY DEFINER (`verify_api_key`, `consume_credit`, `can_access_company`). Wrappers públicos en `public`.
 - Aplicar `supabase/schema.sql` en SQL Editor de Supabase para instalaciones nuevas. Es idempotente (`IF NOT EXISTS` / `CREATE OR REPLACE` / bloques `DO`).
 - **Nunca usar `apply_migration`** para cambios iterativos. Usar `execute_sql` (MCP). Luego correr advisors.

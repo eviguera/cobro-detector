@@ -1,4 +1,4 @@
-import type { ParsedTransaction, DetectedAnomaly } from './analysis-result.types'
+import type { ParsedTransaction, DetectedAnomaly } from './analysis-result.types.js'
 
 export interface AnalysisResult {
   anomalies: DetectedAnomaly[]

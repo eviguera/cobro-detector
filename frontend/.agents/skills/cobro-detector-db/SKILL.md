@@ -9,18 +9,18 @@ metadata:
 
 # CobroDetector — Schema de Base de Datos
 
-Base de datos PostgreSQL gestionada con Supabase. Schema consolidado en `supabase/schema.sql`.
+Base de datos PostgreSQL gestionada con Supabase. Esquema base en `frontend/supabase/schema.sql` y evolución versionada en `supabase/migrations/*.sql` (fuente autoritativa en conjunto; verificar estado aplicado en cada entorno).
 
 ---
 
 ## Arquitectura General
 
-- **Schemas**: `public` (expuesto a REST API) + `internal` (privado, solo accesible desde funciones)
-- **Auth**: Supabase Auth → `auth.users` → trigger `handle_new_user` → tabla `profiles`
-- **RLS**: Habilitado en 12 tablas
-- **Políticas**: 38 políticas RLS, todas basadas en `auth.uid() = user_id`
-- **Vistas**: 2 vistas con `security_invoker = true`
-- **Triggers**: 8 triggers (incluye orders_updated_at y analyses_updated_at agregados 2026-05-25)
+- **Schemas**: `public` (expuesto a REST API) + `internal` (privado, solo accesible desde funciones/wrappers)
+- **Auth**: Supabase Auth → `auth.users` → triggers (`handle_new_user`, referidos) → `profiles`/`credits`
+- **RLS**: habilitado en tablas de usuario/dominio (core + `outgoing_webhooks`, `referrals`, `anomaly_feedback`, `events`/`product_events` vista, `claim_tracking`, `payment_events` sin acceso a usuarios finales). Revisar políticas/grants efectivos antes de asumir.
+- **Vistas**: `orders_with_credits`, `analyses_with_company` (`security_invoker=true`) y `product_events` (compatibilidad sobre `events`)
+- **RPCs/seguridad**: operaciones sensibles de dinero/paywall/reportes vía funciones `SECURITY DEFINER`/wrappers controlados (`confirm_order_paid`, `add_credits`, `charge_analysis_credit`, `refund_analysis_credit`, `get_analysis_report`, `mark_analysis_failed`, idempotencia `payment_events`, etc.). `internal.*` no ejecutable por usuarios finales.
+- **Nota**: el conteo exacto de tablas/políticas/triggers evoluciona con migraciones (2026-11+ añade `payment_events`, endurece `analyses`/paywall y reconcilia telemetría); no confiar en cifras históricas fijas.
 
 ---
 
@@ -238,10 +238,10 @@ Columnas:
   response_time_ms INTEGER
   created_at      TIMESTAMPTZ DEFAULT NOW()
 
-RLS: NO HABILITADO ⚠️
-Índices: api_logs_api_key_id_idx, api_logs_created_at_idx
+RLS: habilitado en esquema actual (políticas por usuario; verificar estado efectivo en prod)
+Índices: api_logs_api_key_id_idx, api_logs_created_at_idx (+ índice user_id, created_at DESC según migraciones recientes)
 ```
-⚠️ Esta tabla no tiene RLS. Es la única tabla expuesta sin protección a nivel de fila.
+⚠️ Confirmar en cada entorno quién escribe/lee (cliente vs service_role), retención programada y minimización de datos sensibles (`request_body`, IP/UA).
 
 ### 1.11 `company_members` — Miembros de empresas (multi-usuario)
 ```
@@ -434,13 +434,13 @@ GRANT EXECUTE ON FUNCTION internal.can_access_company(UUID) TO authenticated;
 
 ---
 
-## Sección 10: Issues Conocidos
+## Sección 10: Issues Conocidos / Evolución reciente
 
-1. **`handle_new_user` en `public` con SECURITY DEFINER** — si bien su ejecución está revocada a `anon`/`authenticated`, la función sigue en schema `public`. Idealmente debería moverse a `internal`.
-2. ~~`api_logs` sin RLS~~ — **Resuelto**: RLS habilitado con políticas SELECT/INSERT.
-3. ~~`orders` sin `updated_at` ni trigger~~ — **Resuelto**: columna `updated_at` y trigger `orders_updated_at` agregados (2026-05-25).
-4. ~~`analyses` sin `updated_at`~~ — **Resuelto**: columna `updated_at` y trigger `analyses_updated_at` agregados (2026-05-25).
-5. ~~`search_path` no configurado~~ — **Resuelto**: las 12 funciones tienen `SET search_path = 'public'` o `SET search_path = ''`.
+1. **`handle_new_user` y funciones de referidos en `public` (SECURITY DEFINER)** — ejecución revocada donde aplica, pero conviene revisar owner/ubicación y estandarizar `search_path` calificado en toda función.
+2. **Drift base vs migraciones/prod** — `frontend/supabase/schema.sql` y `supabase/migrations/*` deben mantenerse reconciliados; `20261110000200_analyses_paywall.sql` es breaking y su aplicación en cloud debe coordinarse con deploy. Validar objetos/grants efectivos por entorno.
+3. **Telemetría** — canon `events` con `product_events` como vista de compatibilidad (reconciliación 2026-11-19). Alinear productores/consumidores y catálogo de `event_type`.
+4. **Escalabilidad operativa** — retención/particionado/archivado y jobs de limpieza para tablas append-only (`events`, `api_logs`, `payment_events`, `anomalies`, etc.) y control de JSONB grande en `analyses`; validar índices con `EXPLAIN (ANALYZE, BUFFERS)` y monitorear bloat/vacuum.
+5. **Histórico resuelto (verificar en prod)** — RLS/`updated_at`/triggers/`search_path` en partes del esquema, pero no asumir sin revalidar tras cambios o en entornos rezagados.
 
 ---
 

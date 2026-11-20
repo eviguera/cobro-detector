@@ -1,5 +1,5 @@
-import type { Analysis } from '../analysis.entity'
-import type { AnalysisResult } from '../analysis-result.entity'
+import type { Analysis } from '../analysis.entity.js'
+import type { AnalysisResult } from '../analysis-result.entity.js'
 
 export interface AnalysisRepository {
   create(userId: string, fileName: string, fileType: string, fileUrl: string, companyId: string | null): Promise<string>

@@ -377,7 +377,7 @@ export default function LandingPage() {
           <figure className="relative rounded-3xl border border-border bg-card p-8 shadow-card sm:p-10">
             <Quote className="h-7 w-7 text-brand-500/40" aria-hidden="true" />
             <blockquote className="mt-4 text-lg leading-relaxed text-foreground sm:text-xl">
-              Revisando los pagos con tarjeta de mi carnicería descubrí que el banco me cobraba la comisión de crédito
+              Revisando más de 1.000 pagos con tarjeta de mi carnicería descubrí que el banco me cobraba la comisión de crédito
               en <strong>cada cuota</strong>, cuando solo debía cobrarse una vez. Con el reporte pude reclamar con
               evidencia, sin revisar los movimientos uno por uno.
             </blockquote>

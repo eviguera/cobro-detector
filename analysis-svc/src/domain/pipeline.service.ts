@@ -1,13 +1,13 @@
-import type { ParsedTransaction, DetectedAnomaly } from './analysis-result.entity'
-import type { AnalysisResult } from './analysis-result.entity'
-import type { AiProvider } from './ports/ai-provider.port'
-import type { FileParser } from './ports/parser.port'
+import type { ParsedTransaction, DetectedAnomaly } from './analysis-result.entity.js'
+import type { AnalysisResult } from './analysis-result.entity.js'
+import type { AiProvider } from './ports/ai-provider.port.js'
+import type { FileParser } from './ports/parser.port.js'
 import {
   buildDeterministicSummary,
   detectRuleAnomalies,
   mergeAnomalies,
   normalizeAiAnomalies,
-} from './anomaly-rules'
+} from './anomaly-rules.js'
 
 export interface PipelineOptions {
   userId?: string
