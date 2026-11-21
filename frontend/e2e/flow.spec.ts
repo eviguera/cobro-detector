@@ -35,7 +35,8 @@ test.describe('Rutas públicas', () => {
     ).toBeVisible();
 
     // Al menos un precio formateado aparece en la sección.
-    await expect(pricing.getByText(/\$/).first()).toBeVisible();
+    // El componente móvil (md:hidden) también contiene "$"; en desktop está oculto.
+    await expect(pricing.getByText(/\$/).and(page.locator(':visible')).first()).toBeVisible();
   });
 
   test('rutas protegidas redirigen a login sin sesión', async ({ page }) => {
