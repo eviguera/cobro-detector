@@ -195,24 +195,6 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: frontend
 
-      - name: Start Next.js dev server
-        run: npm run dev &
-        working-directory: frontend
-
-      - name: Wait for server to be ready
-        run: |
-          for i in $(seq 1 30); do
-            if curl -s http://localhost:3000 > /dev/null 2>&1; then
-              echo "Server is ready"
-              exit 0
-            fi
-            echo "Waiting for server... ($i/30)"
-            sleep 2
-          done
-          echo "Server did not start in time"
-          exit 1
-        working-directory: frontend
-
       - name: Run E2E tests
         run: npx playwright test
         working-directory: frontend
