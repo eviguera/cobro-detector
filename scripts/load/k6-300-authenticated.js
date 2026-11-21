@@ -8,8 +8,8 @@ import { check, sleep } from 'k6';
 //   -e TEST_EMAIL=... -e TEST_PASSWORD=... -v $PWD/scripts/load/k6-300-authenticated.js:/scripts/k6.js grafana/k6 run /scripts/k6.js
 export const options = {
   stages: [
-    { duration: '20s', target: 50 },
-    { duration: '40s', target: 150 },
+    { duration: '20s', target: 100 },
+    { duration: '40s', target: 300 },
     { duration: '20s', target: 0 },
   ],
   thresholds: {
