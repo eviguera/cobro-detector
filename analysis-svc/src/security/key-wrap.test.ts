@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { unwrapDataKey } from './key-wrap.js'
 
@@ -6,7 +7,6 @@ const RAW_DATA_KEY = Buffer.alloc(32, 3).toString('base64')
 
 function wrapWithKek(rawKeyBase64: string, kekBase64: string): string {
   // Implementación espejo mínima para generar material de prueba determinista en formato v1.
-  const crypto = require('node:crypto') as typeof import('node:crypto')
   const iv = Buffer.alloc(12, 5)
   const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(kekBase64, 'base64'), iv)
   const ct = Buffer.concat([cipher.update(Buffer.from(rawKeyBase64, 'base64')), cipher.final()])

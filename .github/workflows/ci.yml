@@ -111,12 +111,10 @@ jobs:
       - name: Install analysis-svc deps
         run: npm ci
         working-directory: analysis-svc
-        continue-on-error: true
 
       - name: Lint analysis-svc
         run: npm run lint --if-present
         working-directory: analysis-svc
-        continue-on-error: true
 
       - name: Install payment-svc deps
         run: npm ci

@@ -13,25 +13,25 @@ function validateStartupEnv(): void {
 
   if (isProd && missing.length > 0) {
     // Fail-fast en producción: sin estas vars el servicio no puede operar correctamente.
-    // eslint-disable-next-line no-console
+     
     console.error(`[analysis-svc] Faltan variables críticas en producción: ${missing.join(', ')}`)
     process.exit(1)
   }
   if (!isProd && missing.length > 0) {
-    // eslint-disable-next-line no-console
+     
     console.warn(`[analysis-svc] Variables no configuradas (modo dev): ${missing.join(', ')}`)
   }
   if (isProd && !(process.env.CORS_ORIGINS || '').trim()) {
-    // eslint-disable-next-line no-console
+     
     console.error('[analysis-svc] CORS_ORIGINS es requerido en producción')
     process.exit(1)
   }
   if (isProd && !process.env.SENTRY_DSN) {
-    // eslint-disable-next-line no-console
+     
     console.warn('[analysis-svc] SENTRY_DSN no configurado en producción: sin monitoreo de errores')
   }
   if (isProd && !process.env.ANALYSIS_KEY_ENCRYPTION_KEY) {
-    // eslint-disable-next-line no-console
+     
     console.warn('[analysis-svc] ANALYSIS_KEY_ENCRYPTION_KEY no configurado en producción: claves envueltas (envelope) no se podrán descifrar')
   }
 }

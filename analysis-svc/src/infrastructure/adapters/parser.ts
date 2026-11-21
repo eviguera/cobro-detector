@@ -25,7 +25,7 @@ function parseDate(raw: string): string {
   if (!raw) return today()
 
   // DD/MM/YYYY o DD-MM-YYYY
-  const ddmmyyyy = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/)
+  const ddmmyyyy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
   if (ddmmyyyy) {
     const [, d, m, y] = ddmmyyyy
     const year = y.length === 2 ? `20${y}` : y
@@ -310,7 +310,7 @@ function parsePDFText(text: string): ParsedTransaction[] {
 
   // Regex para detectar líneas con fecha + descripción + monto
   // Soporta: "01/03/2024  COMPRA SUPERMERCADO  -45.900"
-  const lineRegex = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(.+?)\s+([\-\+]?[\d\.]+(?:,\d{2})?)\s*$/
+  const lineRegex = /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+(.+?)\s+([-+]?[\d.]+(?:,\d{2})?)\s*$/
 
   lines.forEach(line => {
     const match = line.match(lineRegex)
