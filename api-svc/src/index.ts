@@ -14,7 +14,9 @@ function validateStartupEnv(): void {
   if (isProd && missing.length > 0) {
     // eslint-disable-next-line no-console
     console.error(`[api-svc] Faltan variables críticas en producción: ${missing.join(', ')}`)
-    process.exit(1)
+    // En Vercel preview/build la inyección de env puede no estar disponible;
+    // evitamos tumbar el boot para no romper el despliegue de preview.
+    if (!process.env.VERCEL) process.exit(1)
   }
   if (!isProd && missing.length > 0) {
     // eslint-disable-next-line no-console
@@ -23,7 +25,7 @@ function validateStartupEnv(): void {
   if (isProd && !(process.env.CORS_ORIGINS || '').trim()) {
     // eslint-disable-next-line no-console
     console.error('[api-svc] CORS_ORIGINS es requerido en producción')
-    process.exit(1)
+    if (!process.env.VERCEL) process.exit(1)
   }
   if (isProd && !process.env.SENTRY_DSN) {
     // eslint-disable-next-line no-console
