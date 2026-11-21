@@ -39,7 +39,7 @@ export function TransactionsTable({ transactions, flaggedIds }: TransactionsTabl
       return tx.description.toLowerCase().includes(term) || tx.date.includes(term)
     })
 
-    return [...filtered].sort((a, b) => {
+    return filtered.toSorted((a, b) => {
       const diff = new Date(a.date).getTime() - new Date(b.date).getTime()
       return descending ? -diff : diff
     })

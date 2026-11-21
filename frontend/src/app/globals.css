@@ -419,6 +419,12 @@
 .stagger-children > *:nth-child(5) { animation-delay: 280ms; }
 .stagger-children > *:nth-child(6) { animation-delay: 350ms; }
 
+@supports (animation-delay: calc(1s * sibling-index())) {
+  .stagger-children > * {
+    animation-delay: calc((sibling-index() - 1) * 70ms);
+  }
+}
+
 /* Compatibilidad con clases previas */
 .card-fintech {
   background: hsl(var(--card));

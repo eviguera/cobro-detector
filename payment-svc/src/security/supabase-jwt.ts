@@ -125,10 +125,8 @@ async function fetchJwks(): Promise<JwksCache | null> {
   const url = jwksUrl()
   if (!url) return null
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), JWKS_FETCH_TIMEOUT_MS)
   try {
-    const response = await fetch(url, { signal: controller.signal })
+    const response = await fetch(url, { signal: AbortSignal.timeout(JWKS_FETCH_TIMEOUT_MS) })
     if (!response.ok) return null
     const body = (await response.json()) as { keys?: Jwk[] }
     if (!Array.isArray(body.keys)) return null
@@ -145,8 +143,6 @@ async function fetchJwks(): Promise<JwksCache | null> {
     return jwksCache
   } catch {
     return null
-  } finally {
-    clearTimeout(timer)
   }
 }
 

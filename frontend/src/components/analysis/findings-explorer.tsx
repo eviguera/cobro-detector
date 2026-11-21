@@ -76,7 +76,7 @@ export function FindingsExplorer({ findings, groups, analysisId, bank }: Finding
       )
     })
 
-    return [...rows].sort((a, b) => {
+    return rows.toSorted((a, b) => {
       if (sort === 'amount') return b.amount - a.amount
       const rank = { high: 0, medium: 1, low: 2 }
       return rank[a.severity] - rank[b.severity] || b.amount - a.amount

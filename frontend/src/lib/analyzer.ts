@@ -194,7 +194,7 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
   const commissionKeywords = ['comision credito', 'com credito', 'comision tc', 'comisión crédito', 'com. credito', 'comissao credito']
   
   // Buscar patrones: Venta X cuotas + Comisión repetida
-  const sortedTxs = [...transactions].sort((a, b) => a.date.localeCompare(b.date))
+  const sortedTxs = transactions.toSorted((a, b) => a.date.localeCompare(b.date))
   
   // Detectar ventas a cuotas
   const saleGroups: Record<string, ParsedTransaction[]> = {}
@@ -253,17 +253,14 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
   )
 
   // Agrupar comisiones por mes y monto (evita mezclar distintos tipos de comisión)
-  const commissionsByGroup: Record<string, ParsedTransaction[]> = {}
-  commissions.forEach(tx => {
+  const commissionsByGroup = Object.groupBy(commissions, (tx) => {
     const month = tx.date.substring(0, 7)
     const amountKey = Math.round(Math.abs(tx.amount) / 100).toString()
-    const group = `${month}-${amountKey}`
-    if (!commissionsByGroup[group]) commissionsByGroup[group] = []
-    commissionsByGroup[group].push(tx)
+    return `${month}-${amountKey}`
   })
 
   Object.entries(commissionsByGroup).forEach(([group, txs]) => {
-    if (txs.length > 1) {
+    if (txs && txs.length > 1) {
       const totalExtra = txs.slice(1).reduce((sum, tx) => sum + Math.abs(tx.amount), 0)
       const month = group.split('-')[0]
       // Evitar duplicados con Regla 1a
@@ -283,7 +280,7 @@ export function detectAnomaliesRules(transactions: ParsedTransaction[]): Detecte
 
   // Regla 2: Montos idénticos en ventana de 7 días (posible duplicado)
   const checked = new Set<string>()
-  const sortedTxs2 = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  const sortedTxs2 = transactions.toSorted((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
   sortedTxs2.forEach((tx, i) => {
     if (checked.has(tx.id)) return

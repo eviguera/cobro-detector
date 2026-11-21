@@ -177,7 +177,7 @@ function recurringTransactionIds(transactions: ParsedTransaction[]): Set<string>
 
   for (const group of groups.values()) {
     if (group.length < 2) continue
-    const sorted = [...group].sort((a, b) => a.date.localeCompare(b.date))
+    const sorted = group.toSorted((a, b) => a.date.localeCompare(b.date))
 
     for (let i = 0; i < sorted.length; i++) {
       for (let j = i + 1; j < sorted.length; j++) {
@@ -268,7 +268,7 @@ function detectDuplicateCommissions(transactions: ParsedTransaction[]): Detected
     if (group.length < 2) continue
     if (!group.every((tx) => amountsClose(tx.amount, group[0].amount))) continue
 
-    const sorted = [...group].sort((a, b) => a.date.localeCompare(b.date))
+    const sorted = group.toSorted((a, b) => a.date.localeCompare(b.date))
     const extras = sorted.slice(1)
     const recoverableAmount = extras.reduce((sum, tx) => sum + roundMoney(tx.amount), 0)
     if (recoverableAmount <= 0) continue
@@ -333,7 +333,7 @@ function detectDuplicateCharges(transactions: ParsedTransaction[]): DetectedAnom
 
   for (const group of groups.values()) {
     if (group.length < 2) continue
-    const sorted = [...group].sort((a, b) => a.date.localeCompare(b.date))
+    const sorted = group.toSorted((a, b) => a.date.localeCompare(b.date))
 
     // Clusterizar por cercanía temporal: dos cargos iguales con 45 días de
     // diferencia pueden ser una suscripción legítima, no un duplicado.
