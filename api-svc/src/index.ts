@@ -12,23 +12,23 @@ function validateStartupEnv(): void {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY')
 
   if (isProd && missing.length > 0) {
-    // eslint-disable-next-line no-console
+     
     console.error(`[api-svc] Faltan variables críticas en producción: ${missing.join(', ')}`)
     // En Vercel preview/build la inyección de env puede no estar disponible;
     // evitamos tumbar el boot para no romper el despliegue de preview.
     if (!process.env.VERCEL) process.exit(1)
   }
   if (!isProd && missing.length > 0) {
-    // eslint-disable-next-line no-console
+     
     console.warn(`[api-svc] Variables no configuradas (modo dev): ${missing.join(', ')}`)
   }
   if (isProd && !(process.env.CORS_ORIGINS || '').trim()) {
-    // eslint-disable-next-line no-console
+     
     console.error('[api-svc] CORS_ORIGINS es requerido en producción')
     if (!process.env.VERCEL) process.exit(1)
   }
   if (isProd && !process.env.SENTRY_DSN) {
-    // eslint-disable-next-line no-console
+     
     console.warn('[api-svc] SENTRY_DSN no configurado en producción: sin monitoreo de errores')
   }
 }

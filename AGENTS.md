@@ -12,8 +12,8 @@ Monorepo: `frontend/` (Next.js 14, Vercel root=`frontend`), microservicios `anal
 - Frontend (`frontend/`): `npm run dev|build|lint|test`, `npm run test:e2e` (requiere `TEST_EMAIL`/`TEST_PASSWORD`, ver `frontend/.env.example`), `npm run typecheck`/`typecheck:ci` = `tsc --noEmit -p tsconfig.check.json` (estable; `next dev/build` puede reinsertar `.next/types/**/*.ts` en `tsconfig.json` y romper `tsc` paralelo). `npx ts-node scripts/qa-check.ts` verifica migraciones/endpoints/tipos.
 - Servicios (`<svc>/`): `npm ci && npm run build && npm test --if-present`. `analysis-svc`: HTTP `dist/index.js` y worker aparte `dist/worker.js` (`dev:worker|start:worker`), cola Redis `REDIS_TEST_URL=redis://localhost:6379 npm test`, benchmark `npm run benchmark -- --strict`.
 - Local: Supabase en host (`supabase start`), no en Compose. `docker-compose.yml` levanta servicios+Redis y mapea Supabase vía `host.docker.internal`. Frontend dev aparte. Health: `:3001-:3005/health`, Supabase `:54321`.
-- CI (`.github/workflows/ci.yml`, Node 22): matriz servicios (Redis service, `REDIS_TEST_URL` solo en `analysis-svc`, benchmark `--strict`), frontend typecheck+jest, lint (deuda histórica: `analysis-svc` lint `continue-on-error` por falta de ESLint flat config), e2e Playwright (Supabase dummy, secrets `TEST_EMAIL/TEST_PASSWORD`), validación Dockerfiles.
-- Deploy: Vercel proyecto `cobro-detector` con Root Directory `frontend` (root `.` falla). `vercel.json` raíz debe reflejarlo.
+- CI (`.github/workflows/ci.yml`, Node 22, `ubuntu-24.04` para E2E por Playwright): matriz servicios (Redis service, `REDIS_TEST_URL` solo en `analysis-svc`, benchmark `--strict`); frontend typecheck+jest; lint gateado por servicio (`eslint src/` en todos los servicios, `next lint` en frontend); e2e Playwright con `NEXT_PUBLIC_SUPABASE_*` dummy y secrets `TEST_EMAIL/TEST_PASSWORD`; validación Dockerfiles.
+- Deploy: Vercel proyecto `cobro-detector` con Root Directory `frontend` (root `.` falla por `package.json` raíz sin build). Root `vercel.json` es simple (`build/install/framework/outputDirectory`); no reintroducir `rootDirectory` incompatible con el setup multi-proyecto.
 
 ## Base de datos (estructura, funcionalidad, seguridad, escalabilidad)
 - **Fuente de verdad**: esquema base `frontend/supabase/schema.sql` (instalaciones nuevas, idempotente) + evolución versionada en `supabase/migrations/*.sql` (aplicar en orden por nombre). No existe `supabase/schema.sql` en raíz. Revisar skill `cobro-detector-db` antes de cambiar schema/RLS/funciones.
@@ -28,7 +28,7 @@ Monorepo: `frontend/` (Next.js 14, Vercel root=`frontend`), microservicios `anal
 - Storage/cifrado cross-service: drivers `supabase|s3`, ruta `${userId}/${ts}-${safe}.enc`, verdad en `analyses.storage_driver`; S3 vía presigned `/api/storage/*` (server-only). DEK envuelta con `ANALYSIS_KEY_ENCRYPTION_KEY` (KEK) en frontend server y desenvuelta en `analysis-svc` — **misma KEK en ambos**; sin KEK modo legado y filas envueltas no descifran. Backfill: `scripts/backfill-wrap-analysis-keys.mjs`.
 - Webhooks/auth: firma y anti-replay en MercadoPago, idempotencia en `payment_events`, JWT/validación de propiedad en servicios (`*/src/security/*`). No exponer `service_role` al cliente.
 - Frontend build: `typescript.ignoreBuildErrors=false` y `npm run typecheck:ci` como gate; integración `@supabase/ssr`/tipos sensible a upgrades. `next dev/build` puede reinsertar `.next/types` en `tsconfig.json`.
-- Deuda: lint de `analysis-svc` no gateado (sin ESLint flat config); rotación/backfill de secretos y configuración Sentry/CORS/KEK en entornos son prerequisitos operativos.
+- Deuda operativa: rotación/backfill de secretos y configuración Sentry/CORS/KEK en entornos siguen siendo prerequisitos; mantener lint/typo gates verdes al agregar servicios.
 
 ## Historial de mejoras en base a calendarización aplicada (fuente de verdad)
 Leer en este orden para distinguir planificado vs aplicado:

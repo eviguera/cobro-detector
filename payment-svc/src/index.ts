@@ -12,21 +12,21 @@ function validateStartupEnv(): void {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY')
 
   if (isProd && missing.length > 0) {
-    // eslint-disable-next-line no-console
+     
     console.error(`[payment-svc] Faltan variables críticas en producción: ${missing.join(', ')}`)
     process.exit(1)
   }
   if (!isProd && missing.length > 0) {
-    // eslint-disable-next-line no-console
+     
     console.warn(`[payment-svc] Variables no configuradas (modo dev): ${missing.join(', ')}`)
   }
   if (isProd && !(process.env.CORS_ORIGINS || '').trim()) {
-    // eslint-disable-next-line no-console
+     
     console.error('[payment-svc] CORS_ORIGINS es requerido en producción')
     process.exit(1)
   }
   if (isProd && !process.env.SENTRY_DSN) {
-    // eslint-disable-next-line no-console
+     
     console.warn('[payment-svc] SENTRY_DSN no configurado en producción: sin monitoreo de errores')
   }
 }
